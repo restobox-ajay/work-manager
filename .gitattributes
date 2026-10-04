@@ -1,0 +1,8 @@
+# Exclude agent/process scaffolding from distributed archives (git archive,
+# GitHub release tarballs, composer create-project dist installs). These files
+# stay in the repo for development; consumers get a clean Symfony app.
+/.agent         export-ignore
+/CLAUDE.md      export-ignore
+/.claudeignore  export-ignore
+/caddy          export-ignore
+/.gitattributes export-ignore

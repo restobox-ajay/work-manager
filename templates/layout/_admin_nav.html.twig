@@ -1,0 +1,30 @@
+{% set cur = app.request.attributes.get('_route') %}
+<div class="brand">Admin Panel</div>
+<nav>
+    <h2>Manage</h2>
+    <a href="{{ path('app_admin_dashboard') }}" class="{{ cur == 'app_admin_dashboard' ? 'active' }}">Dashboard</a>
+    <a href="{{ path('app_admin_users') }}" class="{{ cur starts with 'app_admin_users' and cur != 'app_admin_users_invite' and cur != 'app_admin_users_invitations' ? 'active' }}">Users</a>
+    <a href="{{ path('app_admin_users_invite') }}" class="{{ cur == 'app_admin_users_invite' ? 'active' }}">Invite User</a>
+    <a href="{{ path('app_admin_users_invitations') }}" class="{{ cur == 'app_admin_users_invitations' ? 'active' }}">Invitations</a>
+    <a href="{{ path('app_admin_audit_log') }}" class="{{ cur == 'app_admin_audit_log' ? 'active' }}">Audit Log</a>
+    <a href="{{ path('app_admin_config') }}" class="{{ cur == 'app_admin_config' ? 'active' }}">Config</a>
+    <a href="{{ path('app_admin_api_docs') }}" class="{{ cur starts with 'app_admin_api_docs' ? 'active' }}">API Docs</a>
+    <a href="{{ path('app_admin_login_history') }}" class="{{ cur == 'app_admin_login_history' ? 'active' }}">Login History</a>
+    <a href="{{ path('app_admin_account_sessions') }}" class="{{ cur starts with 'app_admin_account_sessions' ? 'active' }}">Active Sessions</a>
+    <a href="{{ path('app_admin_api_tokens') }}" class="{{ cur starts with 'app_admin_api_tokens' ? 'active' }}">API Tokens</a>
+    <a href="{{ path('app_admin_2fa_setup') }}" class="{{ cur starts with 'app_admin_2fa' ? 'active' }}">Two-Factor Auth</a>
+
+    {% if is_granted('ROLE_SUPER_ADMIN') %}
+        <h2>Superadmin</h2>
+        <a href="{{ path('app_admin_superadmin_admins') }}" class="{{ cur == 'app_admin_superadmin_admins' ? 'active' }}">Manage Admins</a>
+    {% endif %}
+
+    {% if is_granted('ROLE_TECH_SUPPORT') %}
+        <h2>Maintainer</h2>
+        <a href="{{ path('app_admin_db_console') }}" class="{{ cur starts with 'app_admin_db' ? 'active' }}">DB Console</a>
+        <a href="{{ path('app_admin_htaccess_lock') }}" class="{{ cur starts with 'app_admin_htaccess_lock' ? 'active' }}">Htaccess Lock</a>
+    {% endif %}
+
+    <div class="divider"></div>
+    <a href="{{ path('app_admin_logout') }}">Logout</a>
+</nav>

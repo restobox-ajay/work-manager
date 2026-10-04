@@ -1,0 +1,25 @@
+
+###> symfony/framework-bundle ###
+/.env.local
+/.env.local.php
+/.env.*.local
+/config/secrets/prod/prod.decrypt.private.php
+/public/bundles/
+/var/
+/vendor/
+###< symfony/framework-bundle ###
+
+###> phpunit/phpunit ###
+/phpunit.xml
+/.phpunit.cache/
+###< phpunit/phpunit ###
+
+# Agent-loop generated run logs (regenerated every round; not source of truth)
+.agent/verify.log
+.agent/review.log
+
+# generated verify-gate output (root)
+/verify.log
+
+# Backup of the old boilerplate git history (kept locally, never pushed)
+/.git-old-boilerplate-history/
