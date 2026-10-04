@@ -1,0 +1,31 @@
+{#
+    Renders a sidebar tree in the wholesale-b2b admin markup (.nav-group / .nav-group-title / .nav-sub-list /
+    a.nav-sub, is-current / is-open), shared by the admin and user navs so the markup lives in one place.
+
+    `items`: a list of entries, each either
+      - a link:  { label, href, icon, current }
+      - a group: { label, icon, children: [ { label, href, current }, ... ] }
+    A group renders open when one of its children is the current page, so the active page is visible on load
+    without JavaScript; theme.js only adds open/close on click.
+#}
+{% import 'layout/_icons.html.twig' as icons %}
+{% for item in items %}
+    {% if item.children is defined %}
+        {% set groupOpen = item.children|filter(child => child.current)|length > 0 %}
+        <div class="nav-group{{ groupOpen ? ' is-open' }}">
+            {% set listId = 'nav-group-' ~ loop.index %}
+            <button class="nav-group-title" type="button" aria-expanded="{{ groupOpen ? 'true' : 'false' }}" aria-controls="{{ listId }}">
+                <span class="nav-icon">{{ icons.icon(item.icon) }}</span><span class="nav-label">{{ item.label }}</span>
+            </button>
+            <div class="nav-sub-list" id="{{ listId }}">
+                {% for child in item.children %}
+                    <a class="nav-sub{{ child.current ? ' is-current' }}" href="{{ child.href }}"{{ child.current ? ' aria-current="page"' }}><span class="nav-label">{{ child.label }}</span></a>
+                {% endfor %}
+            </div>
+        </div>
+    {% else %}
+        <a href="{{ item.href }}" class="{{ item.current ? 'is-current' }}"{{ item.current ? ' aria-current="page"' }}>
+            <span class="nav-icon">{{ icons.icon(item.icon) }}</span><span class="nav-label">{{ item.label }}</span>
+        </a>
+    {% endif %}
+{% endfor %}

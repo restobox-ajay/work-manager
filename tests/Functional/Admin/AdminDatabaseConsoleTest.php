@@ -192,7 +192,7 @@ final class AdminDatabaseConsoleTest extends WebTestCase
         $crawler = $this->client->request('GET', '/admin/db');
         self::assertStringContainsString(
             'Arm for 5 minutes',
-            $crawler->filter('button')->text(),
+            $crawler->filter('.page-body button')->text(), // the page's own button, not the layout's sidebar controls
             'the button must offer the configured window, not a hardcoded 30',
         );
 

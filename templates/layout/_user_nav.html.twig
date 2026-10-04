@@ -1,19 +1,23 @@
+{# User (account) sidebar entries; rendered by layout/_nav_tree.html.twig. Bundle-owned links appear only when
+   their bundle is installed (the `pat_available` / `two_factor_available` Twig globals, issue #14). #}
 {% set cur = app.request.attributes.get('_route') %}
-<div class="brand">{{ app.user.name|default('My Account') }}</div>
-<nav>
-    <h2>Account</h2>
-    <a href="{{ path('app_dashboard') }}" class="{{ cur == 'app_dashboard' ? 'active' }}">Dashboard</a>
-    <a href="{{ path('app_account_settings') }}" class="{{ cur == 'app_account_settings' ? 'active' }}">Settings</a>
-    <a href="{{ path('app_account_change_password') }}" class="{{ cur == 'app_account_change_password' ? 'active' }}">Change Password</a>
-    <a href="{{ path('app_account_sessions') }}" class="{{ cur == 'app_account_sessions' ? 'active' }}">Active Sessions</a>
-    <a href="{{ path('app_account_login_history') }}" class="{{ cur == 'app_account_login_history' ? 'active' }}">Login History</a>
-    {% if pat_available is defined and pat_available %}
-    <a href="{{ path('app_account_tokens') }}" class="{{ cur == 'app_account_tokens' ? 'active' }}">API Tokens</a>
-    {% endif %}
-    {% if two_factor_available is defined and two_factor_available %}
-    <a href="{{ path('app_2fa_setup') }}" class="{{ cur == 'app_2fa_setup' ? 'active' }}">Two-Factor Auth</a>
-    {% endif %}
-
-    <div class="divider"></div>
-    <a href="{{ path('app_logout') }}">Logout</a>
-</nav>
+{% set accountLinks = [
+    { label: 'Settings', href: path('app_account_settings'), current: cur == 'app_account_settings' },
+    { label: 'Change Password', href: path('app_account_change_password'), current: cur == 'app_account_change_password' },
+] %}
+{% set securityLinks = [
+    { label: 'Active Sessions', href: path('app_account_sessions'), current: cur == 'app_account_sessions' },
+    { label: 'Login History', href: path('app_account_login_history'), current: cur == 'app_account_login_history' },
+] %}
+{% if pat_available is defined and pat_available %}
+    {% set securityLinks = securityLinks|merge([{ label: 'API Tokens', href: path('app_account_tokens'), current: cur == 'app_account_tokens' }]) %}
+{% endif %}
+{% if two_factor_available is defined and two_factor_available %}
+    {% set securityLinks = securityLinks|merge([{ label: 'Two-Factor Auth', href: path('app_2fa_setup'), current: cur == 'app_2fa_setup' }]) %}
+{% endif %}
+{{ include('layout/_nav_tree.html.twig', { items: [
+    { label: 'Dashboard', icon: 'dashboard', href: path('app_dashboard'), current: cur == 'app_dashboard' },
+    { label: 'My Account', icon: 'user', children: accountLinks },
+    { label: 'Security', icon: 'shield', children: securityLinks },
+    { label: 'Logout', icon: 'logout', href: path('app_logout'), current: false },
+] }, with_context = false) }}

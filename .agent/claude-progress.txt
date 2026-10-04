@@ -4168,3 +4168,8 @@ SQLite gave for free made explicit: PAT cap owner row lock (real two-connection 
 Lock save as an upsert, integer-bound LIMIT. DB console: phpLiteAdmin removed (SQLite-only); gateway checks ported,
 hand-off is a 503 until a MySQL tool is chosen (OQ-MYSQL-CONSOLE). Tests ported (ScratchDatabase, TableInfo helpers).
 verify-fast steps 2-3 green on MySQL 8.0.46. CLAUDE.md: MySQL platform constraints + Coding Standards section added.
+
+FEATURE-190 / ADR-067 (2026-10-04): wholesale-b2b theme on every page. theme.css copied from wholesale-b2b-core
+(old Compliance Log CSS removed); base.html.twig = wholesale admin shell for signed-in pages, sign-in card for
+signed-out pages; data-driven sidebar via layout/_nav_tree.html.twig; theme-bridge.css maps plain page markup;
+vanilla theme.js. SidebarTest extended. Theme specs from the owner still to come.

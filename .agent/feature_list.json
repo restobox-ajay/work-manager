@@ -5005,6 +5005,28 @@
         "tests/Functional/Security/InvalidUtf8LoginInputTest.php (reviewer finding: invalid-UTF-8 email variants matched the real account in MySQL while getting fresh throttle buckets) red without InvalidUtf8RequestListener, green with it",
         "bin/verify-fast.sh steps 2-3 on MySQL 8.0.46: 1119 PHPUnit tests green, 117 acceptance green, ADR tripwire no flags (composer audit not runnable in the sandbox: no packagist access)"
       ]
+    },
+    {
+      "id": "FEATURE-190",
+      "title": "Wholesale-b2b theme on every page (ADR-067)",
+      "description": "Every signed-in page uses the wholesale-b2b admin shell (sidebar with groups/icons/collapse, account menu bar, footer); signed-out pages use the wholesale sign-in card. theme.css copied from wholesale-b2b-core; theme-bridge.css maps the existing plain page markup; vanilla theme.js for sidebar/menu behaviour. Detailed theme specs to follow.",
+      "priority": "must",
+      "depends_on": [],
+      "acceptance_criteria": [
+        "Signed-in user and admin pages render the themed shell with the role-appropriate sidebar",
+        "The current page is marked and its sidebar group renders open without JavaScript",
+        "Signed-out pages render the sign-in card with no sidebar",
+        "All existing behaviour and sidebar link sets unchanged"
+      ],
+      "test_type": [
+        "functional"
+      ],
+      "passes": true,
+      "evidence": [
+        "tests/Functional/Navigation/SidebarTest.php::testTheCurrentPageIsMarkedAndOnlyItsGroupRendersOpen, ::testSignedInPagesUseTheThemeShell, ::testSignedOutPagesUseTheSignInCard, ::testTheThemeAssetsTheLayoutLinksExist; the existing sidebar link-set tests unchanged and green",
+        "tests/Functional/Admin/AdminDatabaseConsoleTest.php: arm-button lookup scoped to .page-body (the layout now has its own buttons)",
+        "Rendered and inspected with headless Chromium: admin login, dashboard, users, create user, config, account menu, collapsed sidebar, mobile"
+      ]
     }
   ]
 }

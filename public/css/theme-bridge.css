@@ -1,0 +1,390 @@
+/* ============================================================================
+   Theme bridge: this app's plain page markup → the wholesale-b2b look.
+
+   theme.css is the wholesale-b2b-core design system, copied unchanged so the two apps share one look and the
+   file can be refreshed from there. Wholesale pages use classed markup (.panel, .table-card, .button.primary);
+   this app's pages are mostly bare elements — an <h1>, a <form> of <div>s, a <table> — so the rules below give
+   those elements the same treatment, scoped to .page-body, without editing every page template.
+
+   All colours, radii and spacing come from theme.css's custom properties.
+   ============================================================================ */
+
+/* ── Page body ─────────────────────────────────────────────────────────────── */
+/* Keep the footer at the bottom of the viewport on short pages (the shell's own background shows otherwise). */
+.site-admin .content-frame {
+    min-height: calc(100vh - 61px);
+}
+
+.site-admin .page-body {
+    padding: 14px 24px 24px;
+}
+
+.site-admin .page-body > h1 {
+    margin: 4px 0 6px;
+    color: var(--ink);
+    font-size: 1.05rem;
+    font-weight: 900;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    line-height: 1.15;
+}
+
+.site-admin .page-body > h1 + p {
+    margin: 0 0 14px;
+    font-size: 0.8rem;
+}
+
+.page-body h2 {
+    margin: 20px 0 8px;
+}
+
+.page-body h3 {
+    margin: 16px 0 6px;
+}
+
+.page-body p {
+    margin: 0 0 10px;
+}
+
+.page-body > * + table,
+.page-body > * + form,
+.page-body > * + section {
+    margin-top: 6px;
+}
+
+/* A bare link in the page flow reads as a link, not as body text. */
+.page-body a:not(.button) {
+    color: var(--admin-blue-hover);
+    font-weight: 600;
+}
+
+.page-body a:not(.button):hover {
+    text-decoration: underline;
+}
+
+/* A page action on a plain page is a bare anchor directly in the flow: give it the outline-button shape. */
+.site-admin .page-body > a:not(.button) {
+    display: inline-flex;
+    align-items: center;
+    min-height: 32px;
+    margin: 0 6px 12px 0;
+    padding: 0 12px;
+    border: 1.5px solid var(--line);
+    border-radius: var(--radius-sm);
+    background: #fff;
+    color: var(--ink-body);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    text-decoration: none;
+}
+
+.site-admin .page-body > a:not(.button):hover {
+    border-color: var(--admin-blue-soft);
+    background: var(--admin-blue-soft);
+    color: var(--admin-blue-hover);
+    text-decoration: none;
+}
+
+/* ── Buttons ───────────────────────────────────────────────────────────────── */
+/* Every plain <button> on a page is an action: the theme's primary button. */
+.page-body button:not(.button),
+.impersonation-banner button,
+.admin-impersonation-banner button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 34px;
+    padding: 0 14px;
+    border: 1.5px solid var(--admin-blue);
+    border-radius: var(--radius-sm);
+    background: var(--admin-blue);
+    color: #fff;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    white-space: nowrap;
+    transition: background var(--t), border-color var(--t);
+}
+
+.page-body button:not(.button):hover {
+    background: var(--admin-blue-hover);
+    border-color: var(--admin-blue-hover);
+}
+
+/* Destructive actions keep a red treatment, recognised by the class names the pages already use. */
+.page-body button[class*="delete"],
+.page-body button[class*="revoke"],
+.page-body button[class*="disable"] {
+    border-color: rgba(185, 28, 28, 0.18);
+    background: #fff1f2;
+    color: #991b1b;
+}
+
+.page-body button[class*="delete"]:hover,
+.page-body button[class*="revoke"]:hover,
+.page-body button[class*="disable"]:hover {
+    border-color: rgba(185, 28, 28, 0.28);
+    background: #ffe4e6;
+    color: #7f1d1d;
+}
+
+/* ── Forms ─────────────────────────────────────────────────────────────────── */
+.site-admin .page-body > form:not([style*="inline"]),
+.site-admin .page-body > section > form:not([style*="inline"]) {
+    display: grid;
+    gap: 10px;
+    max-width: 760px;
+    margin: 0 0 18px;
+    padding: 18px 20px;
+    border: 1.5px solid var(--line);
+    border-radius: var(--radius-md);
+    background: #fff;
+}
+
+/* One field per row: label left, control right — the wholesale admin form rhythm. */
+.site-admin .page-body > form > div,
+.site-admin .page-body > section > form > div {
+    display: grid;
+    grid-template-columns: 170px minmax(0, 1fr);
+    column-gap: 16px;
+    row-gap: 4px;
+    align-items: center;
+}
+
+.site-admin .page-body > form > div > :not(label):not(input):not(select):not(textarea),
+.site-admin .page-body > section > form > div > :not(label):not(input):not(select):not(textarea) {
+    grid-column: 1 / -1;
+}
+
+.page-body label {
+    display: block;
+    font-weight: 500;
+    font-size: 0.8125rem;
+}
+
+.site-admin .page-body > form > button,
+.site-admin .page-body > form > div > button,
+.site-admin .page-body > section > form > button {
+    justify-self: start;
+}
+
+.page-body input:focus,
+.page-body select:focus,
+.page-body textarea:focus {
+    border-color: var(--admin-blue);
+    box-shadow: 0 0 0 3px rgba(64, 141, 251, 0.15);
+}
+
+.checkbox-row,
+.page-body label.checkbox-row {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.field-error {
+    margin-top: 2px;
+    color: var(--red);
+    font-size: 0.78rem;
+    font-weight: 600;
+}
+
+/* ── Tables ────────────────────────────────────────────────────────────────── */
+.page-body table {
+    width: 100%;
+    margin: 0 0 18px;
+    border: 1.5px solid var(--line);
+    border-collapse: collapse;
+    background: #fff;
+    font-size: 0.8125rem;
+}
+
+.page-body th {
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--line);
+    background: var(--admin-table-head-bg);
+    color: var(--admin-table-head-ink);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-align: left;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.page-body td {
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--line-light);
+    color: var(--ink-body);
+    vertical-align: middle;
+}
+
+.page-body tbody tr:hover td {
+    background: var(--admin-row-hover);
+}
+
+/* Action clusters in a table cell: several one-button POST forms in a row. */
+.page-body td form {
+    display: inline-flex;
+    margin: 2px 4px 2px 0;
+}
+
+.page-body td button:not(.button) {
+    min-height: 28px;
+    padding: 0 10px;
+    font-size: 0.75rem;
+}
+
+/* ── Alerts ────────────────────────────────────────────────────────────────── */
+.page-body .error,
+.page-body .flash-error,
+.page-body .alert-error,
+.page-body .success,
+.page-body .flash-success,
+.page-body .alert-success,
+.page-body .confirmation,
+.page-body .warning {
+    margin: 0 0 14px;
+    padding: 10px 14px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    font-size: 0.85rem;
+}
+
+.page-body .error,
+.page-body .flash-error,
+.page-body .alert-error {
+    border-color: rgba(239, 68, 68, 0.35);
+    background: #fef2f2;
+    color: #991b1b;
+}
+
+.page-body .success,
+.page-body .flash-success,
+.page-body .alert-success,
+.page-body .confirmation {
+    border-color: rgba(3, 105, 161, 0.35);
+    background: #eff6ff;
+    color: #0369a1;
+}
+
+.page-body .warning {
+    border-color: rgba(245, 158, 11, 0.35);
+    background: #fffbeb;
+    color: #92400e;
+}
+
+.page-body .error p,
+.page-body .success p,
+.page-body .warning p {
+    margin: 0;
+    color: inherit;
+}
+
+/* ── Signed-out pages: the centred sign-in card ────────────────────────────── */
+.admin-login-card .page-body > h1 {
+    margin: 0 0 18px;
+    color: var(--ink);
+    font-size: 1.15rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+}
+
+.admin-login-card .page-body form {
+    display: grid;
+    gap: 14px;
+    margin: 0 0 16px;
+}
+
+.admin-login-card .page-body form > div {
+    display: grid;
+    gap: 6px;
+}
+
+.admin-login-card .page-body label {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--ink);
+}
+
+.admin-login-card .page-body button:not(.button) {
+    width: 100%;
+    min-height: 40px;
+    margin-top: 4px;
+    font-size: 0.875rem;
+}
+
+.admin-login-card .page-body p {
+    margin: 0 0 8px;
+    font-size: 0.82rem;
+}
+
+/* ── Impersonation banners ─────────────────────────────────────────────────── */
+.impersonation-banner,
+.admin-impersonation-banner {
+    position: relative;
+    z-index: 60;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 8px 16px;
+    background: #fffbeb;
+    border-bottom: 1px solid rgba(245, 158, 11, 0.35);
+    color: #92400e;
+    font-size: 0.82rem;
+    font-weight: 600;
+}
+
+.impersonation-banner form,
+.admin-impersonation-banner form {
+    display: inline-flex;
+    margin: 0;
+}
+
+.impersonation-banner button,
+.admin-impersonation-banner button {
+    min-height: 28px;
+    font-size: 0.75rem;
+}
+
+/* ── Responsive ────────────────────────────────────────────────────────────── */
+@media (max-width: 760px) {
+    .site-admin .page-body {
+        padding: 12px 14px 20px;
+    }
+
+    .site-admin .page-body > form > div,
+    .site-admin .page-body > section > form > div {
+        grid-template-columns: 1fr;
+    }
+
+    .page-body table {
+        display: block;
+        overflow-x: auto;
+    }
+}
+
+/* ── Account menu ──────────────────────────────────────────────────────────── */
+.user-menu-dropdown {
+    min-width: 200px;
+}
+
+.user-menu-dropdown a {
+    white-space: nowrap;
+}
+
+/* ── Sidebar groups: keyboard access ───────────────────────────────────────── */
+/* theme.css hides a closed group's links only visually (max-height/opacity), which leaves them in the tab order:
+   a keyboard user would tab through invisible links. visibility removes them from the tab order and the
+   accessibility tree; it switches off only after the close animation (0.5s) and on immediately when opening. */
+.site-admin .nav-group:not(.is-open) .nav-sub-list,
+body.admin-sidebar-collapsed.site-admin .nav-sub-list {
+    visibility: hidden;
+    transition: max-height 0.5s ease, opacity 0.4s ease, transform 0.4s ease, visibility 0s linear 0.5s;
+}
+
+.site-admin .nav-group.is-open .nav-sub-list {
+    visibility: visible;
+    transition: max-height 0.5s ease, opacity 0.4s ease, transform 0.4s ease, visibility 0s;
+}

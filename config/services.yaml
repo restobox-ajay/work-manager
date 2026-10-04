@@ -7,6 +7,9 @@
 # Put parameters here that don't need to change on each machine where the app is deployed
 # https://symfony.com/doc/current/best_practices.html#use-parameters-for-application-configuration
 parameters:
+    # The product name shown in the UI (sidebar brand, sign-in card, footer, page titles).
+    app.name: 'Work Manager'
+
     # The session handler connects to the SAME MySQL database as Doctrine because it is handed the very same
     # DATABASE_URL (parsed by App\Doctrine\MysqlDsn), so the two cannot diverge (ADR-061 / ADR-066).
     # `resolve:` expands any %kernel.*% placeholders inside the URL.

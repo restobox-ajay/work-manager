@@ -2173,3 +2173,23 @@ banner on admin pages during an impersonation — a UX change) and re-checking t
   `bin/verify-fast.sh` drops and re-migrates the test database before each suite.
 **Tripwire:** verifiable. Verified by `tests/Functional/Doctrine/MysqlConnectionBaselineTest.php`, `tests/Unit/Doctrine/MysqlConnectionMiddlewareTest.php`, `tests/Unit/Doctrine/MysqlDsnTest.php`, `tests/Unit/Meta/MysqlOnlyTest.php`, `tests/Functional/Session/PdoSessionHandlerTest.php`, `tests/Functional/Meta/MigrationDryRunSqlTest.php`, `tests/Functional/Account/PersonalAccessTokenRaceTest.php`, `tests/Functional/Security/InvalidUtf8LoginInputTest.php`.
 **Status: decided + implemented (2026-10-04).**
+
+## ADR-067: UI theme = the wholesale-b2b-core design system (owner request, 2026-10-04)
+
+**Context:** the owner asked for every page to look like the wholesale-b2b app (same sidebar and page look);
+detailed theme specs will follow later.
+**Decision:** `public/css/theme.css` is wholesale-b2b-core's `public/assets/css/app.css`, copied unchanged so it can
+be refreshed from there; the old Compliance Log stylesheet is removed. `templates/base.html.twig` renders the
+wholesale admin shell for every signed-in page (users and admins alike): fixed left sidebar (`aside.topbar.sidebar`,
+brand, collapsible groups with icons, collapse toggle), slim account bar with the user menu, content frame and
+footer. Signed-out pages render inside the wholesale centred sign-in card. Sidebar entries are data in
+`layout/_admin_nav.html.twig` / `layout/_user_nav.html.twig`, rendered by one `layout/_nav_tree.html.twig`.
+Page templates are NOT rewritten: `public/css/theme-bridge.css` maps their plain markup (bare h1/form/table/button,
+.error/.success) onto the theme's tokens. `public/js/theme.js` (vanilla, no jQuery) adds group open/close, sidebar
+collapse (remembered in localStorage), the mobile menu and the account dropdown; every link works without it, the
+current group renders open server-side and a `<noscript>` rule opens all groups. App name is the `app.name`
+parameter (Twig global `app_name`).
+**Trade-off:** theme.css is large (~600 KB) and carries wholesale-only components; prune it once the theme specs
+settle which components this app uses.
+**Tripwire:** verifiable. Verified by `tests/Functional/Navigation/SidebarTest.php`.
+**Status: decided + implemented (2026-10-04).**

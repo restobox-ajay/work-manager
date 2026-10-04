@@ -164,4 +164,61 @@ final class SidebarTest extends WebTestCase
         $this->assertResponseIsSuccessful();
         $this->assertSelectorNotExists('aside.sidebar');
     }
+
+    /**
+     * The wholesale-b2b theme (ADR-067): the current page is marked in the sidebar, and its group is rendered open
+     * server-side, so the active page is visible without JavaScript. Other groups stay closed.
+     */
+    public function testTheCurrentPageIsMarkedAndOnlyItsGroupRendersOpen(): void
+    {
+        $this->loginAsSuperAdmin();
+        $this->client->request('GET', '/admin/users');
+
+        $this->assertSelectorExists('aside.sidebar a.nav-sub.is-current[href="/admin/users"][aria-current="page"]');
+        $this->assertSelectorExists('aside.sidebar .nav-group.is-open a[href="/admin/users"]');
+        $this->assertSelectorExists('aside.sidebar .nav-group:not(.is-open) a[href="/admin/config"]');
+        $this->assertSelectorNotExists('aside.sidebar .nav-group:not(.is-open) a.is-current');
+    }
+
+    public function testSignedInPagesUseTheThemeShell(): void
+    {
+        $this->loginAsSuperAdmin();
+        $this->client->request('GET', '/admin/dashboard');
+
+        $this->assertSelectorExists('body.site-admin');
+        $this->assertSelectorExists('link[href="/css/theme.css"]');
+        $this->assertSelectorExists('link[href="/css/theme-bridge.css"]');
+        $this->assertSelectorExists('script[src="/js/theme.js"]');
+        $this->assertSelectorTextContains('.admin-content-header .user-menu-email', 'sidebar-superadmin@example.com');
+        $this->assertSelectorExists('.admin-content-header .user-menu-dropdown a[href="/admin/logout"]');
+        $this->assertSelectorExists('main.content-frame .page-body h1');
+    }
+
+    public function testSignedOutPagesUseTheSignInCard(): void
+    {
+        $this->client->request('GET', '/login');
+
+        $this->assertSelectorExists('body.site-admin-login');
+        $this->assertSelectorExists('.admin-login-card .page-body form');
+        $this->assertSelectorNotExists('.admin-content-header');
+    }
+
+    public function testTheThemeAssetsTheLayoutLinksExist(): void
+    {
+        $publicDir = self::getContainer()->getParameter('kernel.project_dir') . '/public';
+
+        foreach (['/css/theme.css', '/css/theme-bridge.css', '/js/theme.js'] as $asset) {
+            self::assertFileExists($publicDir . $asset);
+        }
+    }
+
+    private function loginAsSuperAdmin(): void
+    {
+        $this->client->request('GET', '/admin/login');
+        $this->client->submitForm('Sign in', [
+            'email'    => 'sidebar-superadmin@example.com',
+            'password' => 'superpass',
+        ]);
+        $this->client->followRedirect();
+    }
 }

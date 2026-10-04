@@ -1,30 +1,40 @@
+{# Admin sidebar entries; rendered by layout/_nav_tree.html.twig. #}
 {% set cur = app.request.attributes.get('_route') %}
-<div class="brand">Admin Panel</div>
-<nav>
-    <h2>Manage</h2>
-    <a href="{{ path('app_admin_dashboard') }}" class="{{ cur == 'app_admin_dashboard' ? 'active' }}">Dashboard</a>
-    <a href="{{ path('app_admin_users') }}" class="{{ cur starts with 'app_admin_users' and cur != 'app_admin_users_invite' and cur != 'app_admin_users_invitations' ? 'active' }}">Users</a>
-    <a href="{{ path('app_admin_users_invite') }}" class="{{ cur == 'app_admin_users_invite' ? 'active' }}">Invite User</a>
-    <a href="{{ path('app_admin_users_invitations') }}" class="{{ cur == 'app_admin_users_invitations' ? 'active' }}">Invitations</a>
-    <a href="{{ path('app_admin_audit_log') }}" class="{{ cur == 'app_admin_audit_log' ? 'active' }}">Audit Log</a>
-    <a href="{{ path('app_admin_config') }}" class="{{ cur == 'app_admin_config' ? 'active' }}">Config</a>
-    <a href="{{ path('app_admin_api_docs') }}" class="{{ cur starts with 'app_admin_api_docs' ? 'active' }}">API Docs</a>
-    <a href="{{ path('app_admin_login_history') }}" class="{{ cur == 'app_admin_login_history' ? 'active' }}">Login History</a>
-    <a href="{{ path('app_admin_account_sessions') }}" class="{{ cur starts with 'app_admin_account_sessions' ? 'active' }}">Active Sessions</a>
-    <a href="{{ path('app_admin_api_tokens') }}" class="{{ cur starts with 'app_admin_api_tokens' ? 'active' }}">API Tokens</a>
-    <a href="{{ path('app_admin_2fa_setup') }}" class="{{ cur starts with 'app_admin_2fa' ? 'active' }}">Two-Factor Auth</a>
-
-    {% if is_granted('ROLE_SUPER_ADMIN') %}
-        <h2>Superadmin</h2>
-        <a href="{{ path('app_admin_superadmin_admins') }}" class="{{ cur == 'app_admin_superadmin_admins' ? 'active' }}">Manage Admins</a>
-    {% endif %}
-
-    {% if is_granted('ROLE_TECH_SUPPORT') %}
-        <h2>Maintainer</h2>
-        <a href="{{ path('app_admin_db_console') }}" class="{{ cur starts with 'app_admin_db' ? 'active' }}">DB Console</a>
-        <a href="{{ path('app_admin_htaccess_lock') }}" class="{{ cur starts with 'app_admin_htaccess_lock' ? 'active' }}">Htaccess Lock</a>
-    {% endif %}
-
-    <div class="divider"></div>
-    <a href="{{ path('app_admin_logout') }}">Logout</a>
-</nav>
+{% set items = [
+    { label: 'Dashboard', icon: 'dashboard', href: path('app_admin_dashboard'), current: cur == 'app_admin_dashboard' },
+    { label: 'Users', icon: 'users', children: [
+        { label: 'All Users', href: path('app_admin_users'), current: cur starts with 'app_admin_users' and cur != 'app_admin_users_invite' and cur != 'app_admin_users_invitations' },
+        { label: 'Invite User', href: path('app_admin_users_invite'), current: cur == 'app_admin_users_invite' },
+        { label: 'Invitations', href: path('app_admin_users_invitations'), current: cur == 'app_admin_users_invitations' },
+    ] },
+    { label: 'Security', icon: 'shield', children: [
+        { label: 'Audit Log', href: path('app_admin_audit_log'), current: cur == 'app_admin_audit_log' },
+        { label: 'Login History', href: path('app_admin_login_history'), current: cur == 'app_admin_login_history' },
+        { label: 'Active Sessions', href: path('app_admin_account_sessions'), current: cur starts with 'app_admin_account_sessions' },
+        { label: 'Two-Factor Auth', href: path('app_admin_2fa_setup'), current: cur starts with 'app_admin_2fa' },
+        { label: 'API Tokens', href: path('app_admin_api_tokens'), current: cur starts with 'app_admin_api_tokens' },
+    ] },
+    { label: 'Settings', icon: 'settings', children: [
+        { label: 'Config', href: path('app_admin_config'), current: cur == 'app_admin_config' },
+        { label: 'API Docs', href: path('app_admin_api_docs'), current: cur starts with 'app_admin_api_docs' },
+    ] },
+] %}
+{% if is_granted('ROLE_SUPER_ADMIN') %}
+    {% set items = items|merge([
+        { label: 'Superadmin', icon: 'star', children: [
+            { label: 'Manage Admins', href: path('app_admin_superadmin_admins'), current: cur == 'app_admin_superadmin_admins' },
+        ] },
+    ]) %}
+{% endif %}
+{% if is_granted('ROLE_TECH_SUPPORT') %}
+    {% set items = items|merge([
+        { label: 'Maintainer', icon: 'tool', children: [
+            { label: 'DB Console', href: path('app_admin_db_console'), current: cur starts with 'app_admin_db' },
+            { label: 'Htaccess Lock', href: path('app_admin_htaccess_lock'), current: cur starts with 'app_admin_htaccess_lock' },
+        ] },
+    ]) %}
+{% endif %}
+{% set items = items|merge([
+    { label: 'Logout', icon: 'logout', href: path('app_admin_logout'), current: false },
+]) %}
+{{ include('layout/_nav_tree.html.twig', { items: items }, with_context = false) }}
