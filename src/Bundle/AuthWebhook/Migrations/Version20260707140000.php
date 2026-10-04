@@ -27,22 +27,12 @@ final class Version20260707140000 extends AbstractMigration
 
     public function up(Schema $schema): void
     {
-        // Create-if-not-exists, declaratively (IF NOT EXISTS, valid on SQLite 3.26): on a history where the
-        // table already exists this is a no-op that is still RECORDED as executed, so the version never stays
-        // pending. Not an introspection of the live database: in a --dry-run / --write-sql nothing executes, so
-        // this and the core migration would both see no table and both emit a plain CREATE, and the written SQL
-        // would not replay (issue #38).
-        $this->addSql('CREATE TABLE IF NOT EXISTS webhook_delivery (
-            id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-            url VARCHAR(2048) NOT NULL,
-            event_type VARCHAR(100) NOT NULL,
-            payload CLOB NOT NULL,
-            status VARCHAR(20) NOT NULL,
-            response_code INTEGER DEFAULT NULL,
-            attempted_at DATETIME NOT NULL
-        )');
-        $this->addSql('CREATE INDEX IF NOT EXISTS idx_webhook_delivery_event_type ON webhook_delivery (event_type)');
-        $this->addSql('CREATE INDEX IF NOT EXISTS idx_webhook_delivery_status ON webhook_delivery (status)');
+        // Create-if-not-exists, declaratively (IF NOT EXISTS): on a history where the table already exists this is
+        // a no-op that is still RECORDED as executed, so the version never stays pending. Not an introspection of
+        // the live database: in a --dry-run / --write-sql nothing executes, so this and the core migration would
+        // both see no table and both emit a plain CREATE, and the written SQL would not replay (issue #38).
+        // MySQL has no CREATE INDEX IF NOT EXISTS, so the indexes are declared inline with the table.
+        $this->addSql('CREATE TABLE IF NOT EXISTS webhook_delivery (id INT AUTO_INCREMENT NOT NULL, url VARCHAR(2048) NOT NULL, event_type VARCHAR(100) NOT NULL, payload LONGTEXT NOT NULL, status VARCHAR(20) NOT NULL, response_code INT DEFAULT NULL, attempted_at DATETIME NOT NULL, INDEX idx_webhook_delivery_event_type (event_type), INDEX idx_webhook_delivery_status (status), PRIMARY KEY (id)) DEFAULT CHARACTER SET utf8mb4 COLLATE `utf8mb4_unicode_ci` ENGINE = InnoDB');
     }
 
     public function down(Schema $schema): void

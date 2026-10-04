@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Security;
 
+use App\Tests\Support\TableInfo;
 use App\Entity\User;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
@@ -65,7 +66,7 @@ final class AccountLockoutTest extends WebTestCase
     private function setConfig(string $key, string $value): void
     {
         $this->conn->executeStatement(
-            "INSERT OR REPLACE INTO config (config_key, config_value) VALUES (?, ?)",
+            "REPLACE INTO config (config_key, config_value) VALUES (?, ?)",
             [$key, $value]
         );
     }
@@ -87,7 +88,7 @@ final class AccountLockoutTest extends WebTestCase
     {
         $this->conn->executeStatement(
             'INSERT INTO account_lockouts (user_id, locked_until) SELECT id, ? FROM "user" WHERE email = ? '
-            . 'ON CONFLICT(user_id) DO UPDATE SET locked_until = excluded.locked_until',
+            . 'ON DUPLICATE KEY UPDATE locked_until = VALUES(locked_until)',
             [$lockedUntil, $email]
         );
     }
@@ -108,10 +109,10 @@ final class AccountLockoutTest extends WebTestCase
         // The lockout state moved off `user` into the auth-security-bundle satellite (FEATURE-144 /
         // ADR-044): core `user` no longer carries locked_until, and the bundle-owned account_lockouts
         // table holds it with a NOT NULL locked_until + a user_id FK column.
-        $userColumns = array_column($this->conn->fetchAllAssociative('PRAGMA table_info("user")'), 'name');
+        $userColumns = array_column(TableInfo::columns($this->conn, 'user'), 'name');
         $this->assertNotContains('locked_until', $userColumns, 'locked_until must be dropped from the user table');
 
-        $lockoutColumns = $this->conn->fetchAllAssociative('PRAGMA table_info("account_lockouts")');
+        $lockoutColumns = TableInfo::columns($this->conn, 'account_lockouts');
         $this->assertNotEmpty($lockoutColumns, 'account_lockouts satellite table must exist');
         $lockoutColumnNames = array_column($lockoutColumns, 'name');
         $this->assertContains('locked_until', $lockoutColumnNames, 'account_lockouts must own the locked_until column');

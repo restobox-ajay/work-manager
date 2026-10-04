@@ -39,9 +39,9 @@ Each is independent — install only what your project needs. Every page is a fu
 ## Requirements
 
 - PHP 8.3+
-- **SQLite ≥ 3.26.0** (production runs 3.26.0; the app is SQLite-only — see `CLAUDE.md` "Platform Constraints")
+- **MySQL 8.0+** (InnoDB, utf8mb4; the app is MySQL-only — see `CLAUDE.md` "Platform Constraints" and ADR-066)
 - Symfony 7.4
-- Doctrine ORM on SQLite (every environment — see ADR-001 / ADR-013)
+- Doctrine ORM on MySQL (every environment — see ADR-066)
 - A Symfony Mailer transport
 
 ## Quick start
@@ -58,18 +58,19 @@ symfony serve
 
 `APP_SECRET` must be supplied via the environment (or an untracked `.env.*.local`), never committed.
 
-### Local development (SQLite, no server setup)
+### Local development (MySQL)
 
-This repo is wired to run locally at **http://auth.localhost** against a SQLite database — no HTTPS, no port juggling:
+`.env` defaults to a local WAMP-style MySQL (`mysql://root:@127.0.0.1:3306/work_manager`); put your real
+credentials in the gitignored `.env.local`. Then:
 
 ```bash
-sudo bin/serve-auth-localhost.sh          # installs the Caddy site + /etc/hosts entry, chmods the SQLite db
+php bin/console doctrine:database:create
+php bin/console doctrine:migrations:migrate
+sudo bin/serve-auth-localhost.sh          # optional: Caddy site + /etc/hosts entry for http://auth.localhost
 ```
 
-Every environment uses SQLite — dev, test, acceptance and production alike. The single-writer
-whole-DB lock is designed around rather than worked around (ADR-001 / ADR-013: throttled
-session writes, `lock_mode: 0` on the session handler), so swapping in a networked engine is a
-real change, not a config edit. See the Core Reference for the firewall and config details.
+Every environment uses MySQL — dev, test, acceptance and production alike (ADR-066). See the Core Reference
+for the firewall and config details.
 
 ## Background worker (Messenger)
 
@@ -128,9 +129,8 @@ they're the ones that bite.
 
 **1. Environment & secrets**
 - [ ] `APP_ENV=prod`, strong random `APP_SECRET` — env or untracked `.env.local` only, never committed.
-- [ ] `DATABASE_URL` → the SQLite file for the deploy, on persistent storage that survives
-      redeploys, backed up, and NOT inside the deployment artifact. This project is SQLite-only;
-      do not point it at PostgreSQL/MySQL without revisiting ADR-001 / ADR-013.
+- [ ] `DATABASE_URL` → the production MySQL 8 database (`mysql://user:pass@host:3306/db?serverVersion=8.0.32&charset=utf8mb4`),
+      in `.env.local` or the real environment, never committed; backed up. This project is MySQL-only (ADR-066).
 - [ ] `MAILER_DSN` → a real transport (password reset / verification / notifications all depend on it).
 - [ ] `DEFAULT_URI`, `ADMIN_DOMAIN`, `APP_DOMAIN` set — **required**; the kernel refuses to boot
       without them, and they pin `trusted_hosts` against Host-header attacks (ADR-029).
@@ -207,7 +207,7 @@ php bin/phpunit             # unit + functional only
 php vendor/bin/codecept run # E2E (Codeception PhpBrowser — no JS engine required)
 ```
 
-Tests run against SQLite — no database server needed. The suite is fully no-JS so E2E needs no headless browser.
+Tests run against a local MySQL 8 server (database `work_manager_test`, created and migrated by `bin/verify-fast.sh`; override credentials in `.env.test.local`). The suite is fully no-JS so E2E needs no headless browser.
 
 ---
 
@@ -232,7 +232,7 @@ The codebase has been through a security review; notable hardening (all document
 - **Password policy hard floor** (min 8, enforced even with empty config) on every password-setting path including admin create.
 - Session cookies pinned (`httponly`, `samesite=lax`, `secure=auto`); `APP_SECRET` kept out of version control.
 
-> **Deliberately *not* implemented:** TOTP-secret-at-rest encryption. For this deployment shape (single host, SQLite file beside `.env`, no separate DB-backup pipeline) the key and ciphertext always share a backup, so at-rest encryption buys nothing. Revisit only on a networked DB with separately-handled backups.
+> **Deliberately *not* implemented:** TOTP-secret-at-rest encryption. For this deployment shape (single host, no separate DB-backup pipeline) the key and ciphertext always share a backup, so at-rest encryption buys nothing. Revisit only on a networked DB with separately-handled backups.
 
 ## Project layout
 

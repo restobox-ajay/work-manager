@@ -1756,9 +1756,9 @@ the role (item 6). Only the CLI's own self-description changed.
 `src/Command/CreateTechSupportCommand.php` (description + `help:` + class docblock reworded).
 **Status: decided + implemented (2026-09-28).**
 
-## ADR-056: Standard SQLite connection baseline (WAL + busy_timeout + foreign_keys=ON) applied to every real connection (Ken, 2026-09-28)
+## ADR-056: [SUPERSEDED by ADR-066 — MySQL] Standard SQLite connection baseline (WAL + busy_timeout + foreign_keys=ON) applied to every real connection (Ken, 2026-09-28)
 
-**Tripwire:** verifiable. Verified by `tests/Functional/Doctrine/SqlitePragmaMiddlewareTest.php`.
+**Tripwire:** verifiable. Verified by `tests/Functional/Doctrine/MysqlConnectionBaselineTest.php` (the MySQL successor baseline, ADR-066).
 
 **Decision:** This project was missing a baseline Ken runs on every SQLite project (dev or prod):
 
@@ -1828,9 +1828,9 @@ navigate to `/admin/db` by guessing the URL and getting a 403 — still does not
 **Impact:** EDIT `templates/layout/_admin_nav.html.twig`, `tests/Functional/Navigation/SidebarTest.php`.
 **Status: decided + implemented (2026-09-28).**
 
-## ADR-058: DATABASE_URL pointed at anything but SQLite now fails loudly at the first connection (Ken, 2026-09-28)
+## ADR-058: [SUPERSEDED by ADR-066 — now: anything but MySQL] DATABASE_URL pointed at anything but SQLite now fails loudly at the first connection (Ken, 2026-09-28)
 
-**Tripwire:** verifiable. Verified by `tests/Unit/Doctrine/SqlitePragmaMiddlewareTest.php`
+**Tripwire:** verifiable. Verified by `tests/Unit/Doctrine/MysqlConnectionMiddlewareTest.php` (same guard, MySQL-only since ADR-066)
 (`testConnectingWithANonSqliteNativeConnectionThrows`).
 
 **Decision:** Ken: engineers working from this boilerplate have repeatedly ended up pointing a
@@ -1964,8 +1964,8 @@ size and licence are pinned in PHP instead.
 (`loginAsEnrolledTechSupport`), `composer.json`/`.lock` (dev: `opis/json-schema`), `CLAUDE.md`, `README.md`.
 **Status: decided + implemented (2026-09-30).**
 
-## ADR-061: Session connection = DATABASE_URL with the SQLite baseline, no row lock; target SQLite 3.26.0; migrations run with foreign keys off (FEATURE-152) — CORRECTS the interim session-DSN fix and ADR-056
-**Tripwire:** verifiable. Verified by `tests/Functional/Session/PdoSessionHandlerTest.php`, `tests/Unit/Doctrine/SqlitePdoFactoryTest.php`, `tests/Functional/Doctrine/SqliteMigrationForeignKeyGuardTest.php`, `tests/Functional/Doctrine/SqlitePragmaMiddlewareTest.php`.
+## ADR-061: [PARTLY SUPERSEDED by ADR-066 — session DSN = DATABASE_URL and LOCK_NONE still hold; the SQLite parts do not] Session connection = DATABASE_URL with the SQLite baseline, no row lock; target SQLite 3.26.0; migrations run with foreign keys off (FEATURE-152) — CORRECTS the interim session-DSN fix and ADR-056
+**Tripwire:** verifiable. Verified by `tests/Functional/Session/PdoSessionHandlerTest.php`, `tests/Functional/Doctrine/MysqlConnectionBaselineTest.php`.
 **Decision (Ken, 2026-09-30):** Ken: the session handler's PDO is a different connection from Doctrine's, another
 agent had to fix its settings in a cloned repo, and **production runs SQLite 3.26.0** with the baseline
 `journal_mode=WAL, busy_timeout=5000, foreign_keys=ON, locking_mode=NORMAL, synchronous=FULL`. Checking found
@@ -2142,3 +2142,34 @@ markers).
 banner on admin pages during an impersonation — a UX change) and re-checking the admin behind `_impersonation_request`.
 **Tripwire:** verifiable. Verified by `tests/Functional/Security/TwoFactorAuthTest.php::testFailedImpersonationLeavesNoMarkerThatSkipsTheTargetsChallengeLater` (fails on the old code at both the banner and the 2FA step).
 **Status: decided + implemented (2026-10-01).**
+
+## ADR-066: MySQL 8 replaces SQLite as the only database engine (owner request, 2026-10-04) — SUPERSEDES ADR-001/013 (engine choice), ADR-056, ADR-058 and the SQLite parts of ADR-061
+
+**Context:** the owner asked for the project (forked as work-manager) to run on MySQL instead of SQLite.
+**Decision:** MySQL 8.0+ only, InnoDB, `utf8mb4` / `utf8mb4_unicode_ci` (also set as doctrine.yaml
+`default_table_options`, so the ORM and the migrations agree and `schema:validate` stays green).
+- **Migrations** rewritten in MySQL DDL in place (no deploy predates them). Bundle ownership and ordering kept.
+  Non-transactional (`transactional: false`) because MySQL commits DDL implicitly. `CREATE INDEX IF NOT EXISTS`
+  does not exist in MySQL, so the guarded `webhook_delivery` create declares its indexes inline.
+- **Connection baseline** (`App\Doctrine\MysqlConnectionBaseline`): `SET NAMES utf8mb4`, strict `sql_mode` incl.
+  `ANSI_QUOTES` (so the existing raw SQL's `"user"` keeps meaning the table), `innodb_lock_wait_timeout = 5`
+  (the old busy_timeout), `time_zone = '+00:00'`. Applied by `MysqlConnectionMiddleware` (Doctrine; refuses any
+  non-pdo_mysql connection) and `MysqlPdoFactory` (session handler, db-console gateway), which parse DATABASE_URL
+  through one `MysqlDsn`. `SqliteMigrationForeignKeyGuard` is removed: MySQL alters tables in place, so there is
+  no rebuild that could cascade-delete satellite rows.
+- **Raw SQL:** `INSERT OR IGNORE` → `INSERT IGNORE`; `ON CONFLICT … DO UPDATE` → `ON DUPLICATE KEY UPDATE`;
+  `INSERT OR REPLACE` → `REPLACE`. Two behaviours SQLite gave for free had to be made explicit: the PAT cap
+  re-count now takes `SELECT … FOR UPDATE` on the owning user (InnoDB has no whole-database write lock), and the
+  Htaccess Lock policy save is an upsert (MySQL reports 0 affected rows for an UPDATE that changes nothing, which
+  made "UPDATE else INSERT" insert a duplicate key). A bound `LIMIT ?` is bound as an integer.
+- **Invalid UTF-8 input is refused (400) before the firewall** (`InvalidUtf8RequestListener`, found by the reviewer
+  pass): MySQL compares a utf8mb4 column against a parameter with invalid bytes by truncating it at the first bad
+  byte (warning only), so `victim@x\xFF` loaded the real account while the throttle/lockout keyed it differently —
+  a fresh bucket per variant. SQLite compared bytes exactly, so this was new with MySQL.
+- **DB console:** phpLiteAdmin is SQLite-only. The gateway's seven checks are ported unchanged; the authorised
+  hand-off returns a 503 "no MySQL console tool installed" page until a MySQL tool is chosen (OQ-MYSQL-CONSOLE).
+- **Tests:** shared DB `work_manager_test`; tests that need their own database use `ScratchDatabase` (a throwaway
+  database on the same server); `PRAGMA table_info` checks read `information_schema` via `TableInfo`.
+  `bin/verify-fast.sh` drops and re-migrates the test database before each suite.
+**Tripwire:** verifiable. Verified by `tests/Functional/Doctrine/MysqlConnectionBaselineTest.php`, `tests/Unit/Doctrine/MysqlConnectionMiddlewareTest.php`, `tests/Unit/Doctrine/MysqlDsnTest.php`, `tests/Unit/Meta/MysqlOnlyTest.php`, `tests/Functional/Session/PdoSessionHandlerTest.php`, `tests/Functional/Meta/MigrationDryRunSqlTest.php`, `tests/Functional/Account/PersonalAccessTokenRaceTest.php`, `tests/Functional/Security/InvalidUtf8LoginInputTest.php`.
+**Status: decided + implemented (2026-10-04).**

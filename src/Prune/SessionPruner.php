@@ -11,7 +11,7 @@ use Doctrine\DBAL\ParameterType;
  * Prunes expired rows of the PdoSessionHandler `sessions` table itself (issue #30). Nothing else guarantees they
  * are ever deleted: the handler only deletes inside PHP's probabilistic session GC, whose probability is left to
  * php.ini — and Debian/Ubuntu ship session.gc_probability = 0 — so on such a host every visitor that ever started
- * a session (e.g. GET /login storing a CSRF token) left a row in the SQLite file forever (ADR-020: ephemeral rows
+ * a session (e.g. GET /login storing a CSRF token) left a row in the database forever (ADR-020: ephemeral rows
  * are flushed on a schedule).
  *
  * sess_lifetime is the ABSOLUTE expiry timestamp the handler writes (time() + ttl — issue #36), and the handler's

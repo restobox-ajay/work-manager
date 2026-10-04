@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Security;
 
 /**
- * Helpers for the phpLiteAdmin console credential (ADR-053).
+ * Helpers for the database console credential (ADR-053).
  *
  * The credential is an opaque, randomly generated token. It is NOT derived from the admin id, the
  * session, or any secret: it is unguessable on its own, stored server-side only as a hash, and looked
@@ -50,49 +50,5 @@ final class ConsoleCookie
     public static function hashToken(string $token): string
     {
         return hash('sha256', $token);
-    }
-
-    /**
-     * Resolve a Doctrine SQLite DATABASE_URL to a filesystem path, the way the gateway needs it.
-     *
-     * The gateway runs outside the kernel, so it cannot ask Doctrine where the database is; it has to
-     * read DATABASE_URL and resolve it by hand. Doing that HERE — from the same value the kernel uses
-     * — is what stops the gateway and the app from ever disagreeing about the path.
-     *
-     * Dotenv populates $_ENV['DATABASE_URL'] with the raw value; it does NOT expand
-     * %kernel.project_dir% or %kernel.environment% (those are container parameters, and Doctrine only
-     * sees them resolved because doctrine.yaml routes DATABASE_URL through `env(resolve:...)`, which
-     * runs inside the DI container), so this substitutes both by hand.
-     *
-     * Returns null for anything that is not a concrete sqlite file path — a non-sqlite driver,
-     * :memory:, or empty — which the caller treats as "no database" and fails closed.
-     */
-    public static function sqlitePath(string $databaseUrl, string $projectDir, string $environment = 'dev'): ?string
-    {
-        if (!str_starts_with($databaseUrl, 'sqlite://')) {
-            return null;
-        }
-
-        $path = substr($databaseUrl, \strlen('sqlite://'));
-        $path = explode('?', $path, 2)[0];         // drop any ?query the DSN may carry
-        if (str_starts_with($path, '/')) {
-            $path = substr($path, 1);              // sqlite:///<path> — the third slash is a separator
-        }
-        $path = str_replace(
-            ['%kernel.project_dir%', '%kernel.environment%'],
-            [$projectDir, $environment],
-            $path,
-        );
-
-        if ($path === '' || $path === ':memory:') {
-            return null;
-        }
-
-        // A path with no placeholder may still be project-relative; anchor it like the kernel would.
-        if (!str_starts_with($path, '/')) {
-            $path = $projectDir . '/' . $path;
-        }
-
-        return $path;
     }
 }

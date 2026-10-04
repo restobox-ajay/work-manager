@@ -1,7 +1,7 @@
 <?php
 
 /**
- * phpLiteAdmin auth gateway (ADR-053).
+ * Database console auth gateway (ADR-053, ported to MySQL by ADR-066).
  *
  * Runs directly under the web server, OUTSIDE Symfony's kernel. It does not read the Symfony session;
  * it authorises purely by looking its cookie token up in db_console_session — a short-lived, randomly
@@ -24,14 +24,15 @@
  * refused outright even with an otherwise-valid token. A successful load clears the IP's counter.
  *
  * Fail closed: any problem at all — bad/absent/expired token, wrong IP, revoked account, missing
- * database, or any thrown error — redirects to /admin/login and never loads phpLiteAdmin. The whole
+ * database, or any thrown error — redirects to /admin/login and never reaches the console. The whole
  * decision lives inline in this one file because it must run without the container; the tests drive
  * this file over real HTTP rather than a stand-in for it.
  */
 
 declare(strict_types=1);
 
-use App\Doctrine\SqlitePdoFactory;
+use App\Doctrine\MysqlDsn;
+use App\Doctrine\MysqlPdoFactory;
 use App\Security\ConsoleCookie;
 use Symfony\Component\Dotenv\Dotenv;
 use Symfony\Component\HttpFoundation\IpUtils;
@@ -100,22 +101,15 @@ try {
     $currentRequest = Request::createFromGlobals();
     $currentIp = (string) $currentRequest->getClientIp();
 
-    // Point phpLiteAdmin at the SAME SQLite file the app uses, resolved from DATABASE_URL rather than
-    // hardcoded, so the gateway follows whatever path each environment declares instead of assuming
-    // one convention and silently denying when a deployment differs.
-    $dbPath = ConsoleCookie::sqlitePath(
-        $envValue('DATABASE_URL'),
-        dirname(__DIR__),
-        $envValue('APP_ENV') ?: 'dev',
-    );
-    if ($dbPath === null || !is_file($dbPath)) {
+    // The console works on the SAME database the app uses, parsed from DATABASE_URL rather than hardcoded, so
+    // the gateway follows whatever each environment declares. Anything that is not a usable mysql:// URL denies.
+    if (MysqlDsn::fromUrl($envValue('DATABASE_URL')) === null) {
         $denyToLogin();
     }
 
-    // The project connection baseline (WAL, busy_timeout 5000, foreign keys on, …) applies here too (ADR-056/061,
-    // issue #43): built by the same factory as the session handler's connection, from the same DATABASE_URL, so
-    // it is the same file the path check above just found.
-    $pdo = (new SqlitePdoFactory(dirname(__DIR__), $envValue('APP_ENV') ?: 'dev'))->create($envValue('DATABASE_URL'));
+    // The project connection baseline applies here too (ADR-056/061/063, issue #43): built by the same factory
+    // as the session handler's connection, from the same DATABASE_URL — never a bare PDO constructor.
+    $pdo = (new MysqlPdoFactory())->create($envValue('DATABASE_URL'));
     $now = time();
 
     // 1. Kill-switch, above everything else. A missing row reads as 0 => off.
@@ -141,7 +135,7 @@ try {
     $denyFailedLogin = static function () use ($pdo, $currentIp, $now, $throttleRow, $denyToLogin): never {
         if ($throttleRow === false || ($now - (int) $throttleRow['window_start']) >= DB_CONSOLE_THROTTLE_WINDOW) {
             $pdo->prepare(
-                'INSERT OR REPLACE INTO db_console_throttle (ip_address, window_start, attempts) VALUES (:ip, :ws, 1)'
+                'REPLACE INTO db_console_throttle (ip_address, window_start, attempts) VALUES (:ip, :ws, 1)'
             )->execute(['ip' => $currentIp, 'ws' => $now]);
         } else {
             $pdo->prepare('UPDATE db_console_throttle SET attempts = attempts + 1 WHERE ip_address = :ip')
@@ -218,22 +212,15 @@ try {
     $denyToLogin();
 }
 
-// phpLiteAdmin starts a native PHP session. Under PHP's default name (PHPSESSID, path /) it would share the panel's
-// session cookie: adopting the admin's live Symfony session id into a second store, or — with
-// session.use_strict_mode — replacing that cookie and logging the admin out of the panel (issue #47). Give it its
-// own cookie, scoped to the gateway, never sent cross-site.
-session_name('pla_console');
-session_set_cookie_params([
-    'lifetime' => 0,
-    'path'     => '/db-admin.php',
-    'secure'   => $currentRequest->isSecure(),
-    'httponly' => true,
-    'samesite' => 'Strict',
-]);
-
-// Authorised — hand off to phpLiteAdmin, which is kept OUTSIDE the docroot so it can never be
-// requested directly, whatever its own in-file guard does.
-define('APP_DB_PATH', $dbPath);
-$password = '';
-define('PHPLITEADMIN_AUTHORIZED', true);
-require_once dirname(__DIR__) . '/tools/phpliteadmin.php';
+// Authorised. phpLiteAdmin (the console this gateway used to hand off to) is SQLite-only and cannot open the
+// MySQL database, and no MySQL console tool has been chosen yet (open question OQ-MYSQL-CONSOLE). Until one is,
+// an authorised request gets a plain 503 that says so — never a broken tool, and never a fallback that skips
+// any of the checks above.
+http_response_code(503);
+header('Content-Type: text/html; charset=UTF-8');
+header('Cache-Control: no-store');
+echo '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>Database console unavailable</title></head><body>'
+    . '<h1>Database console unavailable</h1>'
+    . '<p>Access was authorised, but no MySQL database console tool is installed yet. '
+    . 'The previous tool (phpLiteAdmin) only supports SQLite.</p>'
+    . '</body></html>';

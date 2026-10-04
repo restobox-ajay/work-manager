@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Account;
 
+use App\Tests\Support\TableInfo;
 use App\Entity\User;
 use App\Service\ConfigService;
 use App\Service\LoginNotificationChecker;
@@ -94,7 +95,7 @@ final class LoginNotificationConfigTest extends WebTestCase
     public function testUserEntityHasLoginNotificationsEnabledColumn(): void
     {
         $conn = self::getContainer()->get('doctrine.dbal.default_connection');
-        $columns = $conn->fetchAllAssociative('PRAGMA table_info("user")');
+        $columns = TableInfo::columns($conn, 'user');
         $columnNames = array_column($columns, 'name');
 
         $this->assertContains('login_notifications_enabled', $columnNames);

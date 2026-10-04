@@ -35,8 +35,7 @@ final class Version20260707170000 extends AbstractMigration
     public function up(Schema $schema): void
     {
         // Unidirectional AccountLockout -> User, unique user_id, CASCADE.
-        $this->addSql('CREATE TABLE account_lockouts (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, locked_until DATETIME NOT NULL, user_id INTEGER NOT NULL, CONSTRAINT FK_34F45E15A76ED395 FOREIGN KEY (user_id) REFERENCES "user" (id) ON DELETE CASCADE NOT DEFERRABLE INITIALLY IMMEDIATE)');
-        $this->addSql('CREATE UNIQUE INDEX UNIQ_34F45E15A76ED395 ON account_lockouts (user_id)');
+        $this->addSql('CREATE TABLE account_lockouts (id INT AUTO_INCREMENT NOT NULL, locked_until DATETIME NOT NULL, user_id INT NOT NULL, UNIQUE INDEX UNIQ_34F45E15A76ED395 (user_id), PRIMARY KEY (id), CONSTRAINT FK_34F45E15A76ED395 FOREIGN KEY (user_id) REFERENCES `user` (id) ON DELETE CASCADE) DEFAULT CHARACTER SET utf8mb4 COLLATE `utf8mb4_unicode_ci` ENGINE = InnoDB');
     }
 
     public function down(Schema $schema): void

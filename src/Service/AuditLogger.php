@@ -27,8 +27,8 @@ use Doctrine\ORM\EntityManagerInterface;
 class AuditLogger
 {
     /*
-     * Column contract, enforced here in the one sink (issue #22): SQLite does not enforce declared VARCHAR
-     * lengths, and the actor of a failed login is the attacker-supplied posted email. `context` (TEXT) is NOT
+     * Column contract, enforced here in the one sink (issue #22): strict-mode MySQL REJECTS a value longer than its
+     * VARCHAR (the whole audit write would fail), and the actor of a failed login is the attacker-supplied posted email. `context` (TEXT) is NOT
      * capped: only internal code writes it, and cutting it could hide part of an audited change (e.g. the end of
      * a long IP list in admin.config_update).
      */

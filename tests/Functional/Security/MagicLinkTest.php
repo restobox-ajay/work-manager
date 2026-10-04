@@ -194,7 +194,7 @@ final class MagicLinkTest extends WebTestCase
         self::assertFalse($seen->isUsed());
 
         $this->conn->executeStatement(
-            "UPDATE magic_link_tokens SET used_at = datetime('now') WHERE token_hash = ?",
+            "UPDATE magic_link_tokens SET used_at = CURRENT_TIMESTAMP WHERE token_hash = ?",
             [$hash]
         );
 
@@ -211,7 +211,7 @@ final class MagicLinkTest extends WebTestCase
 
         // Set custom expiry of 30 minutes
         $this->conn->executeStatement(
-            "INSERT OR REPLACE INTO config (config_key, config_value) VALUES ('magic_link.expiry_minutes', '30')"
+            "REPLACE INTO config (config_key, config_value) VALUES ('magic_link.expiry_minutes', '30')"
         );
 
         $this->client->request('GET', '/magic-link');

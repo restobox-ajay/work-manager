@@ -37,8 +37,7 @@ final class Version20260707160000 extends AbstractMigration
     public function up(Schema $schema): void
     {
         // Unidirectional TwoFactorSettings -> User, unique user_id, CASCADE.
-        $this->addSql('CREATE TABLE two_factor_settings (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, totp_secret VARCHAR(64) DEFAULT NULL, is_totp_enabled BOOLEAN DEFAULT 0 NOT NULL, last_totp_counter INTEGER DEFAULT NULL, user_id INTEGER NOT NULL, CONSTRAINT FK_69430517A76ED395 FOREIGN KEY (user_id) REFERENCES "user" (id) ON DELETE CASCADE NOT DEFERRABLE INITIALLY IMMEDIATE)');
-        $this->addSql('CREATE UNIQUE INDEX UNIQ_69430517A76ED395 ON two_factor_settings (user_id)');
+        $this->addSql('CREATE TABLE two_factor_settings (id INT AUTO_INCREMENT NOT NULL, totp_secret VARCHAR(64) DEFAULT NULL, is_totp_enabled TINYINT DEFAULT 0 NOT NULL, last_totp_counter INT DEFAULT NULL, user_id INT NOT NULL, UNIQUE INDEX UNIQ_69430517A76ED395 (user_id), PRIMARY KEY (id), CONSTRAINT FK_69430517A76ED395 FOREIGN KEY (user_id) REFERENCES `user` (id) ON DELETE CASCADE) DEFAULT CHARACTER SET utf8mb4 COLLATE `utf8mb4_unicode_ci` ENGINE = InnoDB');
     }
 
     public function down(Schema $schema): void

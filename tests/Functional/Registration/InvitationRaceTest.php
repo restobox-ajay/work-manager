@@ -79,7 +79,7 @@ final class InvitationRaceTest extends WebTestCase
     public function testConcurrentRegistrationCannotConsumeInviteTwice(): void
     {
         $this->em->getConnection()->executeStatement(
-            "INSERT OR REPLACE INTO config (config_key, config_value) VALUES ('registration.mode', 'invitation-only')"
+            "REPLACE INTO config (config_key, config_value) VALUES ('registration.mode', 'invitation-only')"
         );
 
         // A stale concurrent read: the invite still looks unused to this request.

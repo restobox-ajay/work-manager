@@ -27,11 +27,7 @@ final class Version20260707170100 extends AbstractMigration
 
     public function up(Schema $schema): void
     {
-        $this->addSql("CREATE TABLE login_attempts (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, ip VARCHAR(45) NOT NULL, attempted_at DATETIME NOT NULL, email VARCHAR(254) DEFAULT NULL, realm VARCHAR(10) NOT NULL DEFAULT 'user')");
-        $this->addSql('CREATE INDEX idx_login_attempts_ip_time ON login_attempts (ip, attempted_at)');
-        $this->addSql('CREATE INDEX idx_login_attempts_email_time ON login_attempts (email, attempted_at)');
-        $this->addSql('CREATE INDEX idx_login_attempts_realm_email_time ON login_attempts (realm, email, attempted_at)');
-        $this->addSql('CREATE INDEX idx_login_attempts_realm_ip_time ON login_attempts (realm, ip, attempted_at)');
+        $this->addSql('CREATE TABLE login_attempts (id INT AUTO_INCREMENT NOT NULL, ip VARCHAR(45) NOT NULL, attempted_at DATETIME NOT NULL, email VARCHAR(254) DEFAULT NULL, realm VARCHAR(10) DEFAULT \'user\' NOT NULL, INDEX idx_login_attempts_ip_time (ip, attempted_at), INDEX idx_login_attempts_email_time (email, attempted_at), INDEX idx_login_attempts_realm_email_time (realm, email, attempted_at), INDEX idx_login_attempts_realm_ip_time (realm, ip, attempted_at), PRIMARY KEY (id)) DEFAULT CHARACTER SET utf8mb4 COLLATE `utf8mb4_unicode_ci` ENGINE = InnoDB');
     }
 
     public function down(Schema $schema): void

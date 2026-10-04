@@ -243,7 +243,7 @@ Bundle-specific endpoints (installed only with bundle):
 | Functional | PHPUnit | Form submissions, redirects, email dispatch, DB state, role enforcement |
 | E2E | Codeception PhpBrowser | Full flows — register, verify email, login, reset password, invitation, session management |
 
-- **Default DB for tests: SQLite** — fast, zero config, no server required
+- **DB for tests: MySQL 8** — the same engine as production (ADR-066), a dedicated `work_manager_test` database
 - **No JavaScript required** — all flows work with PhpBrowser (no JS engine). JS is an addon, never a dependency of core or any bundle.
 - Each bundle ships with its own unit, functional, and E2E tests.
 
@@ -259,6 +259,6 @@ Bundle-specific endpoints (installed only with bundle):
 - Symfony Mailer
 - Symfony EventDispatcher
 - Doctrine ORM
-- SQLite (test environment)
+- MySQL 8 (every environment)
 - Codeception + PhpBrowser (E2E tests)
 - PHPUnit (unit + functional tests)

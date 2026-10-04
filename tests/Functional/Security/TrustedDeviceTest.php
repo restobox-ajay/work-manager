@@ -192,7 +192,7 @@ final class TrustedDeviceTest extends WebTestCase
         // Set lifetime to 2 days
         $conn = self::getContainer()->get('doctrine.dbal.default_connection');
         $conn->executeStatement(
-            "INSERT OR REPLACE INTO config (config_key, config_value) VALUES (?, ?)",
+            "REPLACE INTO config (config_key, config_value) VALUES (?, ?)",
             ['trusted_device.lifetime_days', '2']
         );
 

@@ -20,7 +20,7 @@ use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 /**
- * Mints the credential for the phpLiteAdmin console (ADR-053).
+ * Mints the credential for the database console (ADR-053; MySQL tool pending, ADR-066).
  *
  * Two deliberate steps, not one: an admin must first ARM the console (a time-boxed kill-switch stored
  * in config), then OPEN it (which mints a token). Arming is what incident response reverses — setting

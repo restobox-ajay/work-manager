@@ -8,19 +8,18 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
- * This project is SQLite-only (ADR-001 / ADR-013). A PostgreSQL DATABASE_URL has crept back into
- * .env more than once, and the suite could not see it because .env.test and .env.acceptance both
- * override DATABASE_URL with SQLite — so dev and prod pointed at a database that isn't there while
- * every test stayed green. These tests read the FILES, so they fail on exactly that drift.
+ * This project is MySQL-only (ADR-066, superseding the SQLite-only ADR-001 / ADR-013). .env.test and
+ * .env.acceptance override DATABASE_URL, so a wrong engine in .env (dev and prod's fallback) would stay
+ * invisible to every other test. These tests read the FILES, so they fail on exactly that drift.
  */
-final class SqliteOnlyTest extends TestCase
+final class MysqlOnlyTest extends TestCase
 {
     private static function projectDir(): string
     {
         return \dirname(__DIR__, 3);
     }
 
-    /** The effective value is the LAST assignment dotenv sees, which is what must be SQLite. */
+    /** The effective value is the LAST assignment dotenv sees, which is what must be MySQL. */
     private static function effectiveDatabaseUrl(string $envFile): ?string
     {
         $path = self::projectDir() . '/' . $envFile;
@@ -50,7 +49,7 @@ final class SqliteOnlyTest extends TestCase
     }
 
     #[DataProvider('envFiles')]
-    public function testDatabaseUrlIsSqliteInEveryEnvFile(string $envFile): void
+    public function testDatabaseUrlIsMysqlInEveryEnvFile(string $envFile): void
     {
         $url = self::effectiveDatabaseUrl($envFile);
 
@@ -62,19 +61,19 @@ final class SqliteOnlyTest extends TestCase
         }
 
         self::assertStringStartsWith(
-            'sqlite:',
+            'mysql://',
             $url,
-            sprintf('%s sets a non-SQLite DATABASE_URL (%s).', $envFile, $url),
+            sprintf('%s sets a non-MySQL DATABASE_URL (%s).', $envFile, $url),
         );
     }
 
     /** `.env` is the fallback for dev and prod, so it is the one that actually bites. */
-    public function testRootEnvIsSqlite(): void
+    public function testRootEnvIsMysql(): void
     {
         $url = self::effectiveDatabaseUrl('.env');
 
         self::assertNotNull($url, '.env must define DATABASE_URL — dev and prod fall back to it.');
-        self::assertStringStartsWith('sqlite:', $url);
+        self::assertStringStartsWith('mysql://', $url);
     }
 
     /** Keeps Flex from writing Docker Compose files into a project that does not use Docker. */

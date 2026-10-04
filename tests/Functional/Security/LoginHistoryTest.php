@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Security;
 
+use App\Tests\Support\TableInfo;
 use App\Tests\Support\AuthenticationTestTrait;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
@@ -47,7 +48,7 @@ final class LoginHistoryTest extends WebTestCase
     public function testLoginHistoryTableHasRequiredColumns(): void
     {
         $conn = self::getContainer()->get('doctrine.dbal.default_connection');
-        $columns = $conn->executeQuery('PRAGMA table_info(login_history)')->fetchAllAssociative();
+        $columns = TableInfo::columns($conn, 'login_history');
         $names = array_column($columns, 'name');
 
         $this->assertContains('id', $names, 'login_history must have id column');

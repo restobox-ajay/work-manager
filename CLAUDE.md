@@ -23,24 +23,23 @@ The project is not complete until every feature in `.agent/feature_list.json` ha
 
 ## Platform Constraints (read before writing SQL, migrations, DB or server config)
 
-- **Database: SQLite only — and production runs SQLite 3.26.0.** Never MySQL/MariaDB/PostgreSQL (a non-SQLite
-  `DATABASE_URL` fails at the first connection). The dev/CI sandbox has a NEWER SQLite (3.45), so a green test
-  run here does **not** prove 3.26.0 compatibility. Do not use anything added after 3.26.0: `ALTER TABLE …
-  DROP COLUMN` (3.35), `RETURNING` (3.35), `UPDATE … FROM` (3.33), generated columns (3.31), `iif()` (3.32),
-  `STRICT` tables (3.37), `->`/`->>` and `unixepoch()` (3.38), `RIGHT`/`FULL JOIN` (3.39). To change a table,
-  use Doctrine's rebuild idiom (create copy, drop, rename), never `DROP COLUMN`.
-- **Verifying against 3.26.0:** build the real thing (`sqlite-amalgamation-3260000.zip` from
-  `https://www.sqlite.org/2018/`, `gcc shell.c sqlite3.c -lpthread -ldl -lm -o sqlite326`) and feed it
-  `php bin/console doctrine:migrations:migrate --dry-run --write-sql=out.sql` output. Do this for any new
-  migration or raw SQL that is not plain ANSI.
-- **Connection baseline — every SQLite connection the app opens must run it:** `journal_mode = WAL`,
-  `busy_timeout = 5000`, `foreign_keys = ON`, `locking_mode = NORMAL`, `synchronous = FULL` (ADR-056/061).
-  The single definition is `App\Doctrine\SqliteConnectionBaseline`. Doctrine connections get it via
-  `SqlitePragmaMiddleware`; the session handler opens its own separate PDO, so it gets it via
-  `SqlitePdoFactory`. Never write `new PDO('sqlite:…')` directly. The session DSN **is** `DATABASE_URL`.
-- **Migrations run with `foreign_keys = OFF`** (`SqliteMigrationForeignKeyGuard`, automatic). With it ON,
-  rebuilding a parent table such as `user` cascade-deletes every satellite row (2FA, lockouts, password meta,
-  IP whitelist) — proven on 3.26.0. Never run migrations with `--all-or-nothing` (the guard refuses it).
+- **Database: MySQL 8.0+ only (ADR-066)** — InnoDB, `utf8mb4` / `utf8mb4_unicode_ci`. A non-`mysql://`
+  `DATABASE_URL` fails at the first connection. Real credentials go in the gitignored `.env.local`; tests use
+  `work_manager_test` (`.env.test`, override in `.env.test.local`).
+- **Migrations:** write MySQL DDL with the same table options doctrine.yaml's `default_table_options` give the ORM
+  (`DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci ENGINE = InnoDB`), so `doctrine:schema:validate`
+  stays green. MySQL commits DDL implicitly, so migrations are non-transactional (`transactional: false`): keep
+  each migration small and its `down()` a true inverse. MySQL has no `CREATE INDEX IF NOT EXISTS` — declare
+  indexes inline in a guarded `CREATE TABLE IF NOT EXISTS`. Satellite tables with FKs to `user` must sort after
+  the core migration (bundle namespaces > `DoctrineMigrations`).
+- **Connection baseline — every MySQL connection the app opens must run it:** `SET NAMES utf8mb4`, strict
+  `sql_mode` (incl. `ANSI_QUOTES`, so `"user"` is an identifier and string literals are single-quoted),
+  `innodb_lock_wait_timeout = 5`, `time_zone = '+00:00'` (ADR-056/061/063). The single definition is
+  `App\Doctrine\MysqlConnectionBaseline`. Doctrine connections get it via `MysqlConnectionMiddleware`; the session
+  handler and the db-console gateway open their own PDO, so they get it via `MysqlPdoFactory`. Never write
+  `new PDO('mysql:…')` directly. The session DSN **is** `DATABASE_URL` (parsed by `MysqlDsn`).
+- **Raw SQL dialect:** `INSERT IGNORE`, `REPLACE INTO`, `INSERT … ON DUPLICATE KEY UPDATE`; read-check-write races
+  need a row lock (`SELECT … FOR UPDATE`) — InnoDB has no whole-database write lock to serialise them for you.
 - **Web server: LiteSpeed/Apache reading `.htaccess`. No nginx.** Anything that edits `.htaccess` (Htaccess
   Lock, ADR-059) must be Apache-2.4-compatible `Require` syntax; nginx/Caddy ignore it.
 - **API docs are contract-tested.** `docs/api/openapi.yaml` is held to the real routes and responses by
@@ -115,3 +114,61 @@ Definition of done for a feature:
 4. `.agent/feature_list.json` is updated with evidence.
 5. `.agent/claude-progress.txt` is appended.
 6. The work is committed.
+
+## Coding Standards & Engineering Rules
+
+Work as a senior engineer: code must be clean, maintainable, reusable, testable, secure and production-ready —
+not merely "working". Priority order when principles conflict: **Correctness → Security → Maintainability →
+Simplicity → Performance**; explain the trade-off before any major architectural decision.
+
+1. **Understand before coding.** Inspect the related controllers, services, entities, repositories, config,
+   routes, migrations and tests first. Reuse what exists; no duplicate functionality; no unnecessary
+   architectural changes. Explain the approach briefly before a large change.
+2. **Clean code.** SOLID, DRY, KISS, separation of concerns, single responsibility, composition over
+   inheritance. Small focused methods, shallow nesting, no oversized classes/controllers, no needless abstraction.
+3. **No repetition.** Search for similar functionality before writing a method; extract logic that repeats
+   into a reusable component — but don't abstract just to save a few lines.
+4. **Constants.** No magic numbers/strings for meaningful values: use class constants, enums, or config.
+   Don't create constants for truly local, obvious values.
+5. **Interfaces** only where they add a real abstraction (multiple implementations, external integrations,
+   replaceable dependencies). No one-implementation `FooServiceInterface`.
+6. **Responsibilities.** Thin controllers (validate input → call a service → return a response); business
+   logic in services/domain classes. No god classes or grab-bag utility classes.
+7. **Dependency injection** via the Symfony container and constructor injection; don't `new` injectable services.
+8. **Configuration.** Never hard-code URLs, keys, passwords, credentials, environment paths/settings or
+   changeable business config — use env vars, config files or Symfony secrets. Never commit secrets.
+9. **Database.** Parameterized, efficient, ORM/QueryBuilder-consistent queries in repositories (not
+   controllers). Avoid N+1, fetch only needed columns, consider indexes, reuse existing repository methods.
+10. **Validation & errors.** Validate external input; handle expected failures explicitly; never swallow
+    exceptions or use broad `catch (\Exception)` without a clear reason. Log safely; user-facing errors are
+    safe and meaningful.
+11. **Security.** Always consider authN/authZ, input validation, SQL injection, XSS, CSRF, mass assignment,
+    uploads, path traversal, SSRF, data exposure, API auth, rate limiting. Never disable a security mechanism
+    to make something work; flag a risky request before implementing it.
+12. **Logging.** Enough context to diagnose; never passwords, API keys, tokens, card data or sensitive PII.
+13. **External integrations** live in a dedicated client/service layer with timeouts, error handling,
+    retries where appropriate, logging, response validation and secure auth.
+14. **Tests.** Check existing tests first; add/update tests for success, validation failure, edge and error
+    cases. Change a test expectation only when the expectation itself is wrong.
+15. **Backward compatibility.** Find callers and API contracts before changing behaviour; explain any
+    breaking change.
+16. **Naming.** Descriptive names (`$paymentResponse`, not `$data`/`$tmp`/`$x`), per Symfony/PSR conventions.
+17. **Comments** explain WHY, never restate WHAT.
+18. **Refactoring.** Don't rewrite whole files; preserve working behaviour; don't mix unrelated refactors
+    into a feature — report notable tech debt separately.
+19. **Symfony conventions.** DI, proper services, Symfony components over reinvention; DTOs, validators,
+    voters, Messenger, events where appropriate. Don't import other frameworks' patterns.
+20. **Size & complexity.** Split classes with several responsibilities, but don't shatter code into dozens
+    of tiny classes for appearance.
+21. **Performance.** Correct and maintainable first; still catch N+1s, repeated expensive calls, large
+    in-memory datasets, missing pagination; use caching/queues/batching where warranted.
+22. **Git-friendly diffs.** Logical units; no unrelated formatting, mass rewrites or project-wide renames
+    unless asked. Diffs must be easy to review.
+23. **Process for substantial changes:** inspect → explain what must change → list files → smallest
+    appropriate change → review → check duplication/security/edge cases/regressions → run tests/linters →
+    summarise exactly what changed. Don't touch unrelated files.
+24. **Self-review before calling a task done:** right layer and separation? duplication, magic values,
+    unclear names, oversized methods? input validated, permissions checked, secrets protected? efficient
+    queries, no N+1, transactions where needed? tests present for edge cases? consistent and understandable?
+25. **Simplest sufficient architecture** — correct, maintainable, testable, able to grow, framework-
+    conventional. Never pick complexity because it looks "enterprise".

@@ -6,6 +6,7 @@ namespace App\Bundle\AuthPasswordPolicy\Repository;
 
 use App\Bundle\AuthPasswordPolicy\Entity\PasswordHistory;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\DBAL\ParameterType;
 use Doctrine\Persistence\ManagerRegistry;
 
 /**
@@ -36,7 +37,9 @@ class PasswordHistoryRepository extends ServiceEntityRepository
 
         $keepIds = $conn->fetchFirstColumn(
             'SELECT id FROM password_history WHERE user_id = ? ORDER BY created_at DESC LIMIT ?',
-            [$userId, $keepCount]
+            [$userId, $keepCount],
+            // MySQL rejects a quoted LIMIT ('2'), which is what a default string-bound parameter becomes.
+            [ParameterType::INTEGER, ParameterType::INTEGER],
         );
 
         if ($keepIds === []) {

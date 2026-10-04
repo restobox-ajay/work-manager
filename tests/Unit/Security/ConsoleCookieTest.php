@@ -9,11 +9,8 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
- * ADR-053. The db-console credential and the path resolution the gateway depends on.
- *
- * sqlitePath() is the piece worth pinning hardest: the gateway runs outside the kernel and cannot ask
- * Doctrine where the database is, so if this disagrees with DATABASE_URL the console silently denies
- * everyone (or, worse, opens a different database).
+ * ADR-053. The db-console credential. (Resolving DATABASE_URL for the gateway is MysqlDsn's job — see
+ * MysqlDsnTest.)
  */
 final class ConsoleCookieTest extends TestCase
 {
@@ -54,59 +51,5 @@ final class ConsoleCookieTest extends TestCase
     {
         // A zero/negative window would expire every session the instant it is minted.
         self::assertSame($expected, ConsoleCookie::windowSeconds($minutes));
-    }
-
-    public function testSqlitePathResolvesTheProjectConvention(): void
-    {
-        self::assertSame(
-            '/srv/app/var/data_prod.db',
-            ConsoleCookie::sqlitePath(
-                'sqlite:///%kernel.project_dir%/var/data_%kernel.environment%.db',
-                '/srv/app',
-                'prod',
-            ),
-        );
-    }
-
-    public function testSqlitePathHandlesAbsoluteRelativeAndQueryForms(): void
-    {
-        // An absolute path with no placeholders.
-        self::assertSame(
-            '/var/lib/app/data.sqlite',
-            ConsoleCookie::sqlitePath('sqlite:////var/lib/app/data.sqlite', '/srv/app'),
-        );
-
-        // Project-relative, anchored like the kernel would.
-        self::assertSame(
-            '/srv/app/var/data/data.sqlite',
-            ConsoleCookie::sqlitePath('sqlite://var/data/data.sqlite', '/srv/app'),
-        );
-
-        // A ?query on the DSN is not part of the path.
-        self::assertSame(
-            '/srv/app/var/data_dev.db',
-            ConsoleCookie::sqlitePath('sqlite:///%kernel.project_dir%/var/data_dev.db?cache=shared', '/srv/app'),
-        );
-    }
-
-    /** @return array<string,array{0:string}> */
-    public static function nonFilePaths(): array
-    {
-        return [
-            'postgres'  => ['postgresql://app:pw@127.0.0.1:5432/app'],
-            'mysql'     => ['mysql://app:pw@127.0.0.1:3306/app'],
-            'in-memory' => ['sqlite:///:memory:'],
-            'empty dsn' => [''],
-            'empty path' => ['sqlite:///'],
-        ];
-    }
-
-    #[DataProvider('nonFilePaths')]
-    public function testSqlitePathReturnsNullSoTheGatewayFailsClosed(string $dsn): void
-    {
-        self::assertNull(
-            ConsoleCookie::sqlitePath($dsn, '/srv/app'),
-            'anything that is not a concrete sqlite file must resolve to null so the gateway denies',
-        );
     }
 }

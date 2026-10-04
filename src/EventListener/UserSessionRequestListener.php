@@ -15,8 +15,8 @@ class UserSessionRequestListener
 {
     /**
      * Minimum seconds between last_active_at writes for the same session. The activity timestamp
-     * only needs coarse granularity, so we skip the write on most requests — important on SQLite,
-     * where every write takes a whole-DB lock (review C10 / FEATURE-106, AC5).
+     * only needs coarse granularity, so we skip the write on most requests rather than updating the
+     * row on every page load (review C10 / FEATURE-106, AC5).
      */
     private const LAST_ACTIVE_THROTTLE_SECONDS = 60;
 

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Session;
 
-use App\Doctrine\SqlitePdoFactory;
+use App\Doctrine\MysqlPdoFactory;
 use App\Service\ConfigService;
 use App\Session\ConfigAwarePdoSessionHandler;
 use App\Session\SessionTtlResolver;
@@ -15,25 +15,25 @@ use Symfony\Component\HttpFoundation\Session\Session;
 use Symfony\Component\HttpFoundation\Session\Storage\MockArraySessionStorage;
 
 /**
- * ADR-051 end-to-end: proves the resolved TTL actually reaches the `sessions` row, against a real
- * SQLite database. `sess_lifetime` holds an ABSOLUTE expiry (time() + ttl), and PdoSessionHandler
+ * ADR-051 end-to-end: proves the resolved TTL actually reaches the `sessions` row, against the real
+ * (migrated) MySQL test database. `sess_lifetime` holds an ABSOLUTE expiry (time() + ttl), and PdoSessionHandler
  * re-stamps it on every write — which is what makes the window slide on activity.
  */
 final class ConfigAwarePdoSessionHandlerTest extends TestCase
 {
-    private string $dbFile;
+    private const SESSION_ID_PREFIX = 'ttl_test_';
+
+    private \PDO $pdo;
 
     protected function setUp(): void
     {
-        $this->dbFile = sys_get_temp_dir() . '/ttl_' . bin2hex(random_bytes(6)) . '.db';
+        // Built the way production builds it (ADR-061 / ADR-066): the same factory, hence the same baseline.
+        $this->pdo = (new MysqlPdoFactory())->create((string) $_SERVER['DATABASE_URL']);
     }
 
     protected function tearDown(): void
     {
-        // WAL mode (the app's connection baseline) leaves side files next to the database.
-        foreach (['', '-wal', '-shm'] as $suffix) {
-            @unlink($this->dbFile . $suffix);
-        }
+        $this->pdo->prepare('DELETE FROM sessions WHERE sess_id LIKE :prefix')->execute(['prefix' => self::SESSION_ID_PREFIX . '%']);
     }
 
     /** @param array<string,string> $config */
@@ -61,8 +61,7 @@ final class ConfigAwarePdoSessionHandlerTest extends TestCase
         $stack->push($request);
 
         return new ConfigAwarePdoSessionHandler(
-            // Built the way production builds it (ADR-061): the same factory, hence the same SQLite baseline.
-            (new SqlitePdoFactory(sys_get_temp_dir(), 'test'))->create('sqlite:///' . $this->dbFile),
+            $this->pdo,
             new SessionTtlResolver($configService, $stack),
             ['db_table' => 'sessions', 'lock_mode' => 0],
         );
@@ -71,14 +70,12 @@ final class ConfigAwarePdoSessionHandlerTest extends TestCase
     /** Writes one session and returns the absolute expiry stored for it. */
     private function writeAndReadExpiry(ConfigAwarePdoSessionHandler $handler, string $sid): int
     {
-        $handler->createTable();
+        $sid = self::SESSION_ID_PREFIX . $sid;
         $handler->open('', 'test');
         $handler->write($sid, 'payload');
         $handler->close();
 
-        $pdo = new \PDO('sqlite:' . $this->dbFile);
-        $pdo->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
-        $stmt = $pdo->prepare('SELECT sess_lifetime FROM sessions WHERE sess_id = :id');
+        $stmt = $this->pdo->prepare('SELECT sess_lifetime FROM sessions WHERE sess_id = :id');
         $stmt->execute(['id' => $sid]);
 
         return (int) $stmt->fetchColumn();

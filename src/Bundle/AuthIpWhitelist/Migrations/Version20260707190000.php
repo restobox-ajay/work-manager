@@ -36,8 +36,7 @@ final class Version20260707190000 extends AbstractMigration
     public function up(Schema $schema): void
     {
         // Unidirectional UserIpWhitelist -> User, unique user_id, CASCADE.
-        $this->addSql('CREATE TABLE user_ip_whitelist (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, allowed_ips CLOB NOT NULL, user_id INTEGER NOT NULL, CONSTRAINT FK_D5D0EF08A76ED395 FOREIGN KEY (user_id) REFERENCES "user" (id) ON DELETE CASCADE NOT DEFERRABLE INITIALLY IMMEDIATE)');
-        $this->addSql('CREATE UNIQUE INDEX UNIQ_D5D0EF08A76ED395 ON user_ip_whitelist (user_id)');
+        $this->addSql('CREATE TABLE user_ip_whitelist (id INT AUTO_INCREMENT NOT NULL, allowed_ips LONGTEXT NOT NULL, user_id INT NOT NULL, UNIQUE INDEX UNIQ_D5D0EF08A76ED395 (user_id), PRIMARY KEY (id), CONSTRAINT FK_D5D0EF08A76ED395 FOREIGN KEY (user_id) REFERENCES `user` (id) ON DELETE CASCADE) DEFAULT CHARACTER SET utf8mb4 COLLATE `utf8mb4_unicode_ci` ENGINE = InnoDB');
     }
 
     public function down(Schema $schema): void

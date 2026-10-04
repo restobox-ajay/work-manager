@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Session;
 
+use App\Tests\Support\TableInfo;
+use App\Doctrine\MysqlDsn;
+use App\Doctrine\MysqlPdoFactory;
 use App\Kernel;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 use Symfony\Component\HttpFoundation\Session\Storage\Handler\PdoSessionHandler;
@@ -13,13 +16,9 @@ final class PdoSessionHandlerTest extends KernelTestCase
     private const SHIPPED_DEFAULT = '@.env';
 
     /**
-     * Regression tests for a long-standing bug and its first (wrong) fix (ADR-061). `app.session.dsn` was
-     * hardcoded to `var/data.db`, a file DATABASE_URL never named, so in dev/prod the session handler
-     * silently read/wrote a stray file while Doctrine used the real one. An interim fix derived
-     * `var/data_<env>.db` from the environment name — right by default, but wrong the moment an operator
-     * points DATABASE_URL at persistent storage (which the README tells them to do): sessions would go to a
-     * file the migrations never touched. The only invariant that cannot drift is that the session DSN IS
-     * DATABASE_URL, so that is what is asserted — for the default AND a custom URL, in dev AND prod. The
+     * Regression tests for a long-standing bug and its first (wrong) fix (ADR-061): the session handler once
+     * read/wrote a different database than Doctrine. The only invariant that cannot drift is that the session
+     * DSN IS DATABASE_URL, so that is what is asserted — for the default AND a custom URL, in dev AND prod. The
      * real kernels are booted (bootKernel() gives the `test` one, whose own override hid the original bug).
      *
      * @return iterable<string,array{string,string}>
@@ -28,12 +27,12 @@ final class PdoSessionHandlerTest extends KernelTestCase
     {
         foreach (['dev', 'prod'] as $environment) {
             yield "$environment, the shipped default from .env" => [$environment, self::SHIPPED_DEFAULT];
-            yield "$environment, custom DATABASE_URL on persistent storage" => [$environment, 'sqlite:////srv/persistent/app-data.db'];
+            yield "$environment, custom DATABASE_URL on persistent storage" => [$environment, 'mysql://app:s3cret@db.internal:3307/app_data?serverVersion=8.0.32'];
         }
     }
 
     #[\PHPUnit\Framework\Attributes\DataProvider('environmentsAndDatabaseUrls')]
-    public function testSessionDsnIsDatabaseUrlSoSessionsAndDataShareOneFile(string $environment, string $urlCase): void
+    public function testSessionDsnIsDatabaseUrlSoSessionsAndDataShareOneDatabase(string $environment, string $urlCase): void
     {
         // Inside PHPUnit .env.test is already in effect, so "the shipped default" must be loaded from .env
         // itself and put in force explicitly — otherwise a dev/prod kernel would just see the test database.
@@ -49,20 +48,19 @@ final class PdoSessionHandlerTest extends KernelTestCase
 
         try {
             $container = $kernel->getContainer();
-            $projectDir = (string) $container->getParameter('kernel.project_dir');
             $sessionDsn = (string) $container->getParameter('app.session.dsn');
 
-            // What file does each side mean? (ConsoleCookie::sqlitePath is the repo's single DATABASE_URL-to-path
-            // resolver, used by the db-console gateway for the same "same file as the app" guarantee.)
-            $expected = \App\Security\ConsoleCookie::sqlitePath($databaseUrl, $projectDir, $environment);
-            $actual = \App\Security\ConsoleCookie::sqlitePath($sessionDsn, $projectDir, $environment);
+            // Which database does each side mean? MysqlDsn is the one DATABASE_URL parser shared by the session
+            // handler's connection and the db-console gateway.
+            $expected = MysqlDsn::fromUrl($databaseUrl);
+            $actual = MysqlDsn::fromUrl($sessionDsn);
 
-            self::assertNotNull($expected, 'DATABASE_URL must be a SQLite file URL (the app is SQLite-only).');
-            self::assertSame($expected, $actual, "In '$environment' the session handler must use the SAME SQLite file as DATABASE_URL.");
+            self::assertNotNull($expected, 'DATABASE_URL must be a mysql:// URL (the app is MySQL-only).');
+            self::assertEquals($expected, $actual, "In '$environment' the session handler must use the SAME database as DATABASE_URL.");
             if ($customUrl !== null) {
-                self::assertSame('/srv/persistent/app-data.db', $actual, 'a custom DATABASE_URL must be honoured by the session handler too');
+                self::assertSame(['db.internal', 3307, 'app_data'], [$actual->host, $actual->port, $actual->dbname], 'a custom DATABASE_URL must be honoured by the session handler too');
             } else {
-                self::assertSame("$projectDir/var/data_$environment.db", $actual);
+                self::assertSame('work_manager', $actual?->dbname);
             }
         } finally {
             $kernel->shutdown();
@@ -88,33 +86,36 @@ final class PdoSessionHandlerTest extends KernelTestCase
         putenv($getenv === false ? 'DATABASE_URL' : 'DATABASE_URL=' . $getenv);
     }
 
-    public function testPdoSessionHandlerAcceptsTheDatabaseUrlFormAndWritesToThatFile(): void
+    public function testSessionsWrittenThroughTheFactoryConnectionLandInTheDoctrineDatabase(): void
     {
-        // The handler is handed DATABASE_URL verbatim ("sqlite:///<path>", DBAL URL style). Prove Symfony's
-        // handler really parses that form and lands in that file — not merely that the parameter looks right.
-        $file = tempnam(sys_get_temp_dir(), 'sess-url-test-');
-        self::assertNotFalse($file);
+        // Production hands the handler a PDO built by MysqlPdoFactory from DATABASE_URL. Prove a write through
+        // such a handler is visible to Doctrine — not merely that the parameter looks right.
+        self::bootKernel();
+        /** @var \Doctrine\DBAL\Connection $doctrine */
+        $doctrine = self::getContainer()->get('doctrine.dbal.default_connection');
+        $sessionId = 'url_form_' . bin2hex(random_bytes(8));
+
+        $handler = new PdoSessionHandler(
+            (new MysqlPdoFactory())->create((string) self::getContainer()->getParameter('app.session.dsn')),
+            ['db_table' => 'sessions', 'lock_mode' => PdoSessionHandler::LOCK_NONE],
+        );
+        $handler->open('', 'PHPSESSID');
+        $handler->write($sessionId, 'payload-xyz');
+        $handler->close();
 
         try {
-            $handler = new PdoSessionHandler('sqlite:///' . $file, ['db_table' => 'sessions']);
-            $handler->createTable();
-            $handler->open('', 'PHPSESSID');
-            $handler->write('abc123', 'payload-xyz');
-            $handler->close();
-
-            $pdo = new \PDO('sqlite:' . $file);
-            self::assertSame(1, (int) $pdo->query("SELECT COUNT(*) FROM sessions WHERE sess_id = 'abc123'")->fetchColumn());
+            self::assertSame(1, (int) $doctrine->fetchOne('SELECT COUNT(*) FROM sessions WHERE sess_id = ?', [$sessionId]));
         } finally {
-            @unlink($file);
+            $doctrine->executeStatement('DELETE FROM sessions WHERE sess_id = ?', [$sessionId]);
         }
     }
 
     /**
-     * PdoSessionHandler opens its OWN PDO — outside Doctrine — so Doctrine's pragma middleware never reaches
-     * it (ADR-061). Compare the live session connection with Doctrine's: every baseline pragma must read back
-     * the same, and both must be looking at the same database file.
+     * PdoSessionHandler opens its OWN PDO — outside Doctrine — so Doctrine's connection middleware never reaches
+     * it (ADR-061 / ADR-066). Compare the live session connection with Doctrine's: every baseline setting must
+     * read back the same, and both must be connected to the same database.
      */
-    public function testTheSessionConnectionHasTheSameSqliteBaselineAsDoctrineAndTheSameFile(): void
+    public function testTheSessionConnectionHasTheSameMysqlBaselineAsDoctrineAndTheSameDatabase(): void
     {
         self::bootKernel();
         $handler = self::getContainer()->get(PdoSessionHandler::class);
@@ -125,28 +126,24 @@ final class PdoSessionHandlerTest extends KernelTestCase
         /** @var \Doctrine\DBAL\Connection $doctrine */
         $doctrine = self::getContainer()->get('doctrine.dbal.default_connection');
 
-        foreach (['journal_mode', 'busy_timeout', 'foreign_keys', 'locking_mode', 'synchronous'] as $pragma) {
-            self::assertEquals(
-                $doctrine->fetchOne("PRAGMA $pragma"),
-                $sessionPdo->query("PRAGMA $pragma")->fetchColumn(),
-                "PRAGMA $pragma differs between the session connection and Doctrine's.",
-            );
-        }
-        self::assertSame(5000, (int) $sessionPdo->query('PRAGMA busy_timeout')->fetchColumn());
-        self::assertSame(1, (int) $sessionPdo->query('PRAGMA foreign_keys')->fetchColumn());
+        $settings = 'SELECT @@SESSION.sql_mode, @@SESSION.innodb_lock_wait_timeout, @@SESSION.time_zone, '
+            . '@@SESSION.character_set_connection, @@SESSION.collation_connection, DATABASE()';
+        $sessionSettings = $sessionPdo->query($settings)->fetch(\PDO::FETCH_NUM);
+        self::assertSame(array_map('strval', $doctrine->fetchNumeric($settings)), array_map('strval', $sessionSettings));
 
-        $sessionFile = $sessionPdo->query('PRAGMA database_list')->fetchAll(\PDO::FETCH_ASSOC)[0]['file'];
-        $doctrineFile = $doctrine->fetchAllAssociative('PRAGMA database_list')[0]['file'];
-        self::assertSame(realpath($doctrineFile), realpath($sessionFile), 'sessions and data must live in one SQLite file');
+        [$sqlMode, $lockWaitTimeout, $timeZone, $charset] = $sessionSettings;
+        self::assertStringContainsString('STRICT_ALL_TABLES', $sqlMode);
+        self::assertStringContainsString('ANSI_QUOTES', $sqlMode);
+        self::assertSame(5, (int) $lockWaitTimeout);
+        self::assertSame('+00:00', $timeZone);
+        self::assertSame('utf8mb4', $charset);
     }
 
     /**
-     * With the default LOCK_TRANSACTIONAL the session connection holds a SQLite write lock (BEGIN IMMEDIATE) for
-     * the whole request, so Doctrine's own writes in that request — login_history, audit_log — queue behind it
-     * on a second connection to the same file until busy_timeout expires, then fail ("database is locked").
-     * Reproduced with a real admin login: ~8 s, then a 500. That only went unnoticed in production while sessions
-     * wrongly lived in a separate stray file (ADR-061). There is ONE handler definition for every environment
-     * (no dev/acceptance override left), so pinning it here pins production too.
+     * LOCK_NONE is a deliberate choice (ADR-061, kept by ADR-066): with LOCK_TRANSACTIONAL the session connection
+     * holds a transaction open for the whole request alongside Doctrine's own connection, and nothing in this app
+     * needs per-session write serialisation. There is ONE handler definition for every environment, so pinning
+     * it here pins production too.
      */
     public function testSessionHandlerUsesNoRowLockSoSameRequestDoctrineWritesCannotDeadlockOnIt(): void
     {
@@ -170,9 +167,9 @@ final class PdoSessionHandlerTest extends KernelTestCase
         self::bootKernel();
         /** @var \Doctrine\DBAL\Connection $conn */
         $conn = self::getContainer()->get('doctrine.dbal.default_connection');
-        $row = $conn->executeQuery(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name='sessions'"
-        )->fetchOne();
+        $row = $conn->fetchOne(
+            "SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'sessions'"
+        );
         $this->assertSame('sessions', $row, 'sessions table must exist after migrations');
     }
 
@@ -181,7 +178,7 @@ final class PdoSessionHandlerTest extends KernelTestCase
         self::bootKernel();
         /** @var \Doctrine\DBAL\Connection $conn */
         $conn = self::getContainer()->get('doctrine.dbal.default_connection');
-        $columns = $conn->executeQuery('PRAGMA table_info(sessions)')->fetchAllAssociative();
+        $columns = TableInfo::columns($conn, 'sessions');
         $names = array_column($columns, 'name');
 
         $this->assertContains('sess_id', $names);

@@ -7,12 +7,9 @@
 # Put parameters here that don't need to change on each machine where the app is deployed
 # https://symfony.com/doc/current/best_practices.html#use-parameters-for-application-configuration
 parameters:
-    # The session handler reads/writes the SAME SQLite file as Doctrine because it is handed the very same
-    # DATABASE_URL (PdoSessionHandler parses the `sqlite:///path` URL form natively), so the two cannot diverge
-    # — including when an operator points DATABASE_URL at persistent storage, as the README advises. This used to
-    # be a hardcoded `var/data.db`, a file DATABASE_URL never named, so dev/prod sessions silently went to a
-    # stray file. (An interim fix derived `var/data_<env>.db` from the env name; that broke for any custom
-    # DATABASE_URL — ADR-061.) `resolve:` expands the %kernel.*% placeholders inside the URL.
+    # The session handler connects to the SAME MySQL database as Doctrine because it is handed the very same
+    # DATABASE_URL (parsed by App\Doctrine\MysqlDsn), so the two cannot diverge (ADR-061 / ADR-066).
+    # `resolve:` expands any %kernel.*% placeholders inside the URL.
     app.session.dsn: '%env(resolve:DATABASE_URL)%'
 
     # Htaccess Lock (ADR-059): the real .htaccess it edits (the docroot is, by definition, its directory),
@@ -81,26 +78,20 @@ services:
     # lifetime is DB-configurable per request via a ttl closure. Subclass because a closure cannot be
     # expressed in YAML args. Aliased below so the framework handler_id and any PdoSessionHandler
     # type-hint both resolve here.
-    # The session handler opens its OWN PDO connection (it does not use Doctrine), so Doctrine's DBAL pragma
-    # middleware cannot reach it. Build that connection here so it gets the same SQLite baseline and — from the
-    # same DATABASE_URL — the same file (ADR-061).
-    App\Doctrine\SqlitePdoFactory:
-        arguments:
-            $projectDir: '%kernel.project_dir%'
-            $environment: '%kernel.environment%'
+    # The session handler opens its OWN PDO connection (it does not use Doctrine), so Doctrine's connection
+    # middleware cannot reach it. Build that connection here so it gets the same MySQL baseline and — from the
+    # same DATABASE_URL — the same database (ADR-061 / ADR-066).
+    App\Doctrine\MysqlPdoFactory: ~
 
     app.session.pdo:
         class: PDO
-        factory: ['@App\Doctrine\SqlitePdoFactory', 'create']
+        factory: ['@App\Doctrine\MysqlPdoFactory', 'create']
         arguments: ['%app.session.dsn%']
 
-    # lock_mode: 0 (LOCK_NONE) in EVERY environment. The default LOCK_TRANSACTIONAL keeps a SQLite write lock
-    # (BEGIN IMMEDIATE) on the session connection for the whole request; Doctrine's own writes in that same
-    # request (login_history, audit_log, …) run on a second connection to the same file and wait on it until
-    # busy_timeout expires, then fail with "database is locked". Verified with a real login: ~8 s then a 500.
-    # This was once only true in dev/acceptance because prod's sessions silently lived in a separate stray file
-    # (the hardcoded var/data.db bug); with sessions correctly in the one database it applies everywhere
-    # (ADR-061). Cost of no row lock: two simultaneous requests in ONE session are last-writer-wins.
+    # lock_mode: 0 (LOCK_NONE) in EVERY environment. Kept from the SQLite era (where LOCK_TRANSACTIONAL held a
+    # whole-database write lock for the request): Doctrine's own writes in the same request run on a second
+    # connection, and the session row lock buys nothing this app relies on. Cost of no row lock: two
+    # simultaneous requests in ONE session are last-writer-wins (ADR-061 / ADR-066).
     App\Session\ConfigAwarePdoSessionHandler:
         arguments:
             $pdo: '@app.session.pdo'

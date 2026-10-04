@@ -96,15 +96,15 @@ final class HtaccessLockGateTest extends KernelTestCase
         $this->conn->insert('config', ['config_key' => HtaccessLockManager::KEY_IPS, 'config_value' => '198.51.100.1']);
 
         $other = <<<'PHP'
-            [$lockPath, $dbPath, $key, $ip] = array_slice($argv, 1);
+            [$autoload, $lockPath, $databaseUrl, $key, $ip] = array_slice($argv, 1);
+            require $autoload;
             $lock = fopen($lockPath, 'c');
             flock($lock, LOCK_EX);
-            $db = new PDO('sqlite:' . $dbPath, null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
-            $db->exec('PRAGMA busy_timeout = 5000');
+            $db = (new App\Doctrine\MysqlPdoFactory())->create($databaseUrl);
             $stmt = $db->prepare('SELECT config_value FROM config WHERE config_key = ?');
             $stmt->execute([$key]);
             $snapshot = (string) $stmt->fetchColumn();
-            $stmt->closeCursor(); // end the read, as a real request does (an open cursor pins an old WAL snapshot)
+            $stmt->closeCursor(); // end the read, as a real request does
             fwrite(STDOUT, "locked\n"); // straight to the stream: echo is buffered when stdout is a pipe
             fflush(STDOUT);
             usleep(700000);
@@ -112,7 +112,14 @@ final class HtaccessLockGateTest extends KernelTestCase
             flock($lock, LOCK_UN);
             PHP;
         $process = proc_open(
-            ['php', '-r', $other, self::getContainer()->getParameter('app.htaccess_lock.gate_lock_path'), (string) $this->conn->getParams()['path'], HtaccessLockManager::KEY_IPS, '198.51.100.7'],
+            [
+                'php', '-r', $other,
+                self::getContainer()->getParameter('kernel.project_dir') . '/vendor/autoload.php',
+                self::getContainer()->getParameter('app.htaccess_lock.gate_lock_path'),
+                (string) self::getContainer()->getParameter('app.session.dsn'),
+                HtaccessLockManager::KEY_IPS,
+                '198.51.100.7',
+            ],
             [1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
             $pipes,
         );
@@ -300,7 +307,7 @@ final class HtaccessLockGateTest extends KernelTestCase
         $this->gate->enable($this->ts());
         self::assertStringContainsString(HtaccessLockRenderer::BEGIN, $this->htaccess());
         // Policy rot: the error page the stored policy points at has been deleted since.
-        $this->conn->executeStatement("INSERT OR REPLACE INTO config (config_key, config_value) VALUES ('htaccess_lock.error_file', '/gone.html')");
+        $this->conn->executeStatement("REPLACE INTO config (config_key, config_value) VALUES ('htaccess_lock.error_file', '/gone.html')");
 
         $result = $this->gate->disable(HtaccessLockActor::console());
 

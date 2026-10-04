@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Security;
 
+use App\Tests\Support\TableInfo;
 use App\Entity\User;
 use App\Tests\Support\AuthenticationTestTrait;
 use Doctrine\DBAL\Connection;
@@ -80,7 +81,7 @@ final class PasswordExpiryTest extends WebTestCase
     private function setExpiryDays(int $days): void
     {
         $this->conn->executeStatement(
-            "INSERT OR REPLACE INTO config (config_key, config_value) VALUES ('password_policy.expiry_days', ?)",
+            "REPLACE INTO config (config_key, config_value) VALUES ('password_policy.expiry_days', ?)",
             [(string) $days]
         );
     }
@@ -98,14 +99,14 @@ final class PasswordExpiryTest extends WebTestCase
     // FEATURE-145: password_changed_at moved OFF `user` into the bundle-owned password_meta satellite.
     public function testPasswordChangedAtLivesOnTheSatelliteNotUser(): void
     {
-        $userColumns = array_column($this->conn->fetchAllAssociative('PRAGMA table_info("user")'), 'name');
+        $userColumns = array_column(TableInfo::columns($this->conn, 'user'), 'name');
         $this->assertNotContains(
             'password_changed_at',
             $userColumns,
             'password_changed_at must NO LONGER be a column on the user table (moved to password_meta).'
         );
 
-        $metaColumns = $this->conn->fetchAllAssociative('PRAGMA table_info("password_meta")');
+        $metaColumns = TableInfo::columns($this->conn, 'password_meta');
         $metaNames = array_column($metaColumns, 'name');
         $this->assertContains('password_changed_at', $metaNames, 'password_meta must carry password_changed_at');
         $this->assertContains('user_id', $metaNames, 'password_meta must carry the user_id FK');

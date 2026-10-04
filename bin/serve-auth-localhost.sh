@@ -36,10 +36,7 @@ fi
 echo "Installing $DEST_CONF"
 install -m 644 "$SRC_CONF" "$DEST_CONF"
 
-# 4. Make the SQLite dev DB writable by php-fpm (www-data)
-if [ -f "$ROOT/var/data_dev.db" ]; then
-  chmod 666 "$ROOT/var/data_dev.db"
-fi
+# 4. (No database file to chmod: the app runs on MySQL — ADR-066.)
 
 # 5. Validate then reload Caddy
 echo "Validating Caddy config..."

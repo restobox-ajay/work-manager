@@ -35,8 +35,7 @@ final class Version20260707180000 extends AbstractMigration
     public function up(Schema $schema): void
     {
         // Unidirectional PasswordMeta -> User, unique user_id, CASCADE.
-        $this->addSql('CREATE TABLE password_meta (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, password_changed_at DATETIME NOT NULL, user_id INTEGER NOT NULL, CONSTRAINT FK_45A7137EA76ED395 FOREIGN KEY (user_id) REFERENCES "user" (id) ON DELETE CASCADE NOT DEFERRABLE INITIALLY IMMEDIATE)');
-        $this->addSql('CREATE UNIQUE INDEX UNIQ_45A7137EA76ED395 ON password_meta (user_id)');
+        $this->addSql('CREATE TABLE password_meta (id INT AUTO_INCREMENT NOT NULL, password_changed_at DATETIME NOT NULL, user_id INT NOT NULL, UNIQUE INDEX UNIQ_45A7137EA76ED395 (user_id), PRIMARY KEY (id), CONSTRAINT FK_45A7137EA76ED395 FOREIGN KEY (user_id) REFERENCES `user` (id) ON DELETE CASCADE) DEFAULT CHARACTER SET utf8mb4 COLLATE `utf8mb4_unicode_ci` ENGINE = InnoDB');
     }
 
     public function down(Schema $schema): void

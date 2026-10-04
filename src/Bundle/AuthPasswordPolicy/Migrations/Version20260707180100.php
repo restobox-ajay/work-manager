@@ -26,8 +26,7 @@ final class Version20260707180100 extends AbstractMigration
 
     public function up(Schema $schema): void
     {
-        $this->addSql('CREATE TABLE password_history (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, user_id INTEGER NOT NULL, password_hash VARCHAR(255) NOT NULL, created_at DATETIME NOT NULL)');
-        $this->addSql('CREATE INDEX idx_ph_user_id_created ON password_history (user_id, created_at)');
+        $this->addSql('CREATE TABLE password_history (id INT AUTO_INCREMENT NOT NULL, user_id INT NOT NULL, password_hash VARCHAR(255) NOT NULL, created_at DATETIME NOT NULL, INDEX idx_ph_user_id_created (user_id, created_at), PRIMARY KEY (id)) DEFAULT CHARACTER SET utf8mb4 COLLATE `utf8mb4_unicode_ci` ENGINE = InnoDB');
     }
 
     public function down(Schema $schema): void

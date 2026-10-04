@@ -57,7 +57,7 @@ final class InvitationTest extends WebTestCase
     private function setRegistrationMode(string $mode): void
     {
         $this->em->getConnection()->executeStatement(
-            "INSERT OR REPLACE INTO config (config_key, config_value) VALUES ('registration.mode', ?)",
+            "REPLACE INTO config (config_key, config_value) VALUES ('registration.mode', ?)",
             [$mode]
         );
     }

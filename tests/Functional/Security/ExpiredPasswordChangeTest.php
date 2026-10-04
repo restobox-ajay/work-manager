@@ -81,7 +81,7 @@ final class ExpiredPasswordChangeTest extends WebTestCase
     private function setExpiryDays(int $days): void
     {
         $this->conn->executeStatement(
-            "INSERT OR REPLACE INTO config (config_key, config_value) VALUES ('password_policy.expiry_days', ?)",
+            "REPLACE INTO config (config_key, config_value) VALUES ('password_policy.expiry_days', ?)",
             [(string) $days]
         );
     }

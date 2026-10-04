@@ -141,9 +141,9 @@ final class LoginRateLimitListener
             $identifier = trim($event->getRequest()->request->getString('email'));
         }
 
-        // login_attempts.email is VARCHAR(254), which SQLite does not enforce; an over-long identifier (rejected
-        // before the throttle even runs) would otherwise be stored in full (issue #22). Nothing that long is a
-        // real account, so the cut cannot merge two accounts' counts.
+        // login_attempts.email is VARCHAR(254); strict-mode MySQL rejects a longer value, so an over-long identifier
+        // (rejected before the throttle even runs) would make the failure INSERT itself fail and the attempt go
+        // uncounted (issue #22). Nothing that long is a real account, so the cut cannot merge two accounts' counts.
         return $identifier !== '' ? mb_substr($identifier, 0, 254) : null;
     }
 
@@ -200,12 +200,12 @@ final class LoginRateLimitListener
 
             // Write the lockout into the satellite, keyed by user_id resolved from the email. The
             // INSERT ... SELECT inserts nothing when no user has that email (so a non-existent account is
-            // never "locked"); ON CONFLICT refreshes an existing lockout. This mirrors how login_attempts
+            // never "locked"); ON DUPLICATE KEY (the UNIQUE user_id) refreshes an existing lockout. This mirrors how login_attempts
             // is written here (raw DBAL), so no User is hydrated mid-failure-handling.
             $written = $this->connection->executeStatement(
                 'INSERT INTO account_lockouts (user_id, locked_until) '
                 . 'SELECT id, ? FROM "user" WHERE email = ? '
-                . 'ON CONFLICT(user_id) DO UPDATE SET locked_until = excluded.locked_until',
+                . 'ON DUPLICATE KEY UPDATE locked_until = VALUES(locked_until)',
                 [$lockedUntil, $email]
             );
 

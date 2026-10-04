@@ -83,14 +83,18 @@ final class AccountTokenController extends AbstractController
         // it. Enforce it atomically: persist, then re-count active tokens INSIDE the
         // transaction; if the fresh count exceeds the cap, throw to roll the insert back so
         // the cap can never be exceeded by a concurrent create (FEATURE-119 / review C27,
-        // ADR-030). On SQLite the whole-DB write lock serialises the two transactions, so
-        // the second re-count observes the first committed token and rolls back.
+        // ADR-030). The transaction first takes a row lock on the owning user (SELECT … FOR
+        // UPDATE), which serialises concurrent creates for the same user on MySQL/InnoDB: the
+        // second waits for the first to commit, and since a locking read does not start
+        // InnoDB's consistent-read snapshot, its re-count observes the first token and rolls back.
         //
         // We drive the transaction through the DBAL connection (not $em->wrapInTransaction,
         // which closes the EntityManager on a rolled-back closure) so the error re-render
         // below can still query through the EM.
         try {
             $em->getConnection()->transactional(function () use ($em, $token, $tokenRepo, $user, $maxTokens): void {
+                $em->getConnection()->fetchOne('SELECT id FROM "user" WHERE id = ? FOR UPDATE', [(int) $user->getId()]);
+
                 $em->persist($token);
                 $em->flush();
 

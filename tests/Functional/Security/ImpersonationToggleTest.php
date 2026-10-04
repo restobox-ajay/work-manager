@@ -49,7 +49,7 @@ final class ImpersonationToggleTest extends WebTestCase
 
     private function disableImpersonation(): void
     {
-        $this->conn->executeStatement("INSERT OR REPLACE INTO config (config_key, config_value) VALUES ('impersonate.enabled', '0')");
+        $this->conn->executeStatement("REPLACE INTO config (config_key, config_value) VALUES ('impersonate.enabled', '0')");
     }
 
     /** Plant a valid CSRF token in this browser's session, so only the toggle can stop the request. */
@@ -123,7 +123,7 @@ final class ImpersonationToggleTest extends WebTestCase
     {
         $user = $this->createTestUser('imptoggle-user@example.com');
         $this->createTestAdmin('imptoggle-admin@example.com');
-        $this->conn->executeStatement("INSERT OR REPLACE INTO config (config_key, config_value) VALUES ('impersonate.enabled', '1')");
+        $this->conn->executeStatement("REPLACE INTO config (config_key, config_value) VALUES ('impersonate.enabled', '1')");
         $this->loginAsAdmin('imptoggle-admin@example.com');
 
         $this->client->request('GET', '/admin/users');

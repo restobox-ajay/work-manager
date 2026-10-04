@@ -144,7 +144,7 @@ final class AdminReset2faTest extends WebTestCase
 
         // Set enforcement to required
         $this->em->getConnection()->executeStatement(
-            "INSERT OR REPLACE INTO config (config_key, config_value) VALUES ('2fa.enforcement', 'required')"
+            "REPLACE INTO config (config_key, config_value) VALUES ('2fa.enforcement', 'required')"
         );
 
         $this->loginAsAdmin('reset2fa-admin@example.com');

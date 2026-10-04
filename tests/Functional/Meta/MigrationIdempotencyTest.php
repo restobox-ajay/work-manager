@@ -9,7 +9,7 @@ use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 use Symfony\Component\Console\Tester\CommandTester;
 
 /**
- * Guards FEATURE-137 AC3: "the migration step is idempotent on a populated test.db".
+ * Guards FEATURE-137 AC3: "the migration step is idempotent on a populated test database".
  *
  * The verify gate (bin/verify-fast.sh) runs `doctrine:migrations:migrate` before each
  * suite. That step is only safe if, on an already-migrated database, migrate is a no-op

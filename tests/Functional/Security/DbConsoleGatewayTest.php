@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Functional\Security;
 
 use App\Security\ConsoleCookie;
+use App\Tests\Support\ScratchDatabase;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -15,16 +16,19 @@ use PHPUnit\Framework\TestCase;
  * logic. Every one of the seven checks gets its own test, each isolated so a failure names the check
  * that broke: only the condition under test is made to fail, everything else is left valid.
  *
- * Authorisation is observed through the response: a denial is a 302 to /admin/login and phpLiteAdmin
- * is never loaded; an authorised load returns phpLiteAdmin's own HTML.
+ * Authorisation is observed through the response: a denial is a 302 to /admin/login; an authorised load
+ * reaches the hand-off, which — until a MySQL console tool is chosen (ADR-066) — is a 503 page saying so.
  */
 final class DbConsoleGatewayTest extends TestCase
 {
     private const HOST = '127.0.0.1';
     private const PORT = 8931;
 
+    /** Shown only once every check has passed — the observable proof a request was authorised. */
+    private const AUTHORISED_MARKER = 'Access was authorised';
+
     private string $projectRoot;
-    private string $dbPath;
+    private ScratchDatabase $database;
     private \PDO $pdo;
     /** @var resource|null */
     private $server = null;
@@ -32,16 +36,15 @@ final class DbConsoleGatewayTest extends TestCase
     protected function setUp(): void
     {
         $this->projectRoot = \dirname(__DIR__, 3);
-        $this->dbPath = $this->projectRoot . '/var/data_dbconsole.db';
 
-        // A dedicated database holding only the tables the gateway touches, rebuilt fresh so this
+        // A dedicated database holding only the tables the gateway touches, created fresh so this
         // never depends on what another suite left behind.
-        @unlink($this->dbPath);
-        $this->pdo = new \PDO('sqlite:' . $this->dbPath, null, null, [\PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION]);
-        $this->pdo->exec('CREATE TABLE config (id INTEGER PRIMARY KEY AUTOINCREMENT, config_key TEXT, config_value TEXT)');
-        $this->pdo->exec('CREATE TABLE admin (id INTEGER PRIMARY KEY, email TEXT, roles TEXT, status TEXT)');
-        $this->pdo->exec('CREATE TABLE db_console_session (id INTEGER PRIMARY KEY AUTOINCREMENT, token_hash TEXT, admin_id INTEGER, expires_at TEXT, ip_address TEXT, created_at TEXT)');
-        $this->pdo->exec('CREATE TABLE db_console_throttle (ip_address TEXT PRIMARY KEY, window_start INTEGER, attempts INTEGER)');
+        $this->database = ScratchDatabase::create('dbconsole');
+        $this->pdo = $this->database->pdo();
+        $this->pdo->exec('CREATE TABLE config (id INT AUTO_INCREMENT PRIMARY KEY, config_key VARCHAR(255), config_value LONGTEXT)');
+        $this->pdo->exec('CREATE TABLE `admin` (id INT PRIMARY KEY, email VARCHAR(180), roles LONGTEXT, status VARCHAR(20))');
+        $this->pdo->exec('CREATE TABLE db_console_session (id INT AUTO_INCREMENT PRIMARY KEY, token_hash VARCHAR(64), admin_id INT, expires_at DATETIME, ip_address VARCHAR(45), created_at DATETIME)');
+        $this->pdo->exec('CREATE TABLE db_console_throttle (ip_address VARCHAR(45) PRIMARY KEY, window_start INT, attempts INT)');
 
         // The happy-path world: console armed, an active tech-support admin.
         $this->arm(time() + 3600);
@@ -53,7 +56,7 @@ final class DbConsoleGatewayTest extends TestCase
     protected function tearDown(): void
     {
         $this->stopServer();
-        @unlink($this->dbPath);
+        $this->database->drop();
     }
 
     // ---------------------------------------------------------------- helpers
@@ -62,7 +65,7 @@ final class DbConsoleGatewayTest extends TestCase
     {
         $env = [
             'APP_ENV' => 'dev',
-            'DATABASE_URL' => 'sqlite:///' . $this->dbPath,
+            'DATABASE_URL' => $this->database->url,
             'PATH' => getenv('PATH') ?: '/usr/bin:/bin',
         ];
         if ($this->allowedIps !== null) {
@@ -185,14 +188,15 @@ final class DbConsoleGatewayTest extends TestCase
     {
         $r = $this->get($token);
         self::assertSame('/admin/login', $r['location'], $because);
-        self::assertStringNotContainsStringIgnoringCase('phpliteadmin', $r['body'], 'phpLiteAdmin must not load: ' . $because);
+        self::assertStringNotContainsString(self::AUTHORISED_MARKER, $r['body'], 'the console hand-off must not be reached: ' . $because);
     }
 
     private function assertAuthorised(string $token): void
     {
         $r = $this->get($token);
         self::assertNull($r['location'], 'an authorised load must not redirect');
-        self::assertStringContainsStringIgnoringCase('phpliteadmin', $r['body'], 'phpLiteAdmin should have loaded');
+        self::assertSame(503, $r['status'], 'no MySQL console tool is installed yet, so the hand-off says so');
+        self::assertStringContainsString(self::AUTHORISED_MARKER, $r['body'], 'the console hand-off should have been reached');
     }
 
     private function attempts(): int
@@ -204,40 +208,31 @@ final class DbConsoleGatewayTest extends TestCase
 
     // ---------------------------------------------------------------- the happy path
 
-    // Issue #47: phpLiteAdmin starts a native PHP session. Under PHP's default name (PHPSESSID, path /) it shared
-    // the panel's session cookie: it adopted the admin's live Symfony session id into a second store (as a
-    // sess_<id> file, possibly in a shared /tmp) or, with session.use_strict_mode, overwrote the panel cookie and
-    // logged the admin out. It must run under its own cookie, scoped to the gateway.
-    public function testPhpLiteAdminSessionUsesItsOwnCookieScopedToTheGateway(): void
+    // Issue #47: the console must never touch the panel's session cookie — not adopt it, not overwrite it.
+    public function testAnAuthorisedLoadNeverTouchesThePanelSessionCookie(): void
     {
         $token = ConsoleCookie::generateToken();
         $this->openSession($token);
 
         $r = $this->get($token, ['PHPSESSID' => 'panelsessionid0123456789abcdef']);
 
-        self::assertStringContainsStringIgnoringCase('phpliteadmin', $r['body'], 'phpLiteAdmin should have loaded');
-        $console = array_values(array_filter($r['setCookies'], static fn (string $c): bool => str_starts_with($c, 'pla_console=')));
-        self::assertCount(1, $console, 'phpLiteAdmin must start its own session cookie: ' . implode(' | ', $r['setCookies']));
-        self::assertStringContainsStringIgnoringCase('path=/db-admin.php', $console[0]);
-        self::assertStringContainsStringIgnoringCase('httponly', $console[0]);
-        self::assertStringContainsStringIgnoringCase('samesite=strict', $console[0]);
+        self::assertStringContainsString(self::AUTHORISED_MARKER, $r['body'], 'precondition: the request was authorised');
         foreach ($r['setCookies'] as $cookie) {
             self::assertStringStartsNotWith('PHPSESSID=', $cookie, 'the panel session cookie must never be touched');
         }
     }
 
-    // Issue #43: the gateway's connection must run the project connection baseline (ADR-056/061), not a bare
-    // `new PDO('sqlite:…')` with PHP's 60 s busy timeout and foreign keys off. journal_mode=WAL is the baseline's
-    // one setting that persists in the database file, so it is observable from here after a single request.
-    public function testTheGatewayConnectionRunsTheProjectBaseline(): void
+    // Issue #43: the gateway runs outside the kernel, so nothing but its own code decides how it connects. It must
+    // use the project's factory (the one connection baseline, ADR-056/061/063), never a bare PDO. A connection's
+    // session settings are invisible over HTTP, so this pins the wiring in the file itself.
+    public function testTheGatewayConnectsThroughTheProjectFactoryOnly(): void
     {
-        // Read through a NEW connection each time: an already-open one keeps reporting the mode it opened with.
-        $journalMode = fn (): string => strtolower((string) (new \PDO('sqlite:' . $this->dbPath))->query('PRAGMA journal_mode')->fetchColumn());
-        self::assertNotSame('wal', $journalMode(), 'precondition: a fresh file');
+        $source = (string) file_get_contents($this->projectRoot . '/public/db-admin.php');
 
-        $this->get(null);
-
-        self::assertSame('wal', $journalMode());
+        self::assertStringContainsString('(new MysqlPdoFactory())->create(', $source);
+        $barePdo = '/new\s+\\\\?PDO\s*\(/';
+        self::assertMatchesRegularExpression($barePdo, '$pdo = new \PDO($dsn);', 'control: the pattern must catch a bare PDO');
+        self::assertDoesNotMatchRegularExpression($barePdo, $source, 'a bare PDO would skip the connection baseline');
     }
 
     public function testValidTokenIsAuthorised(): void

@@ -76,3 +76,9 @@ Found by the FEATURE-154 reviewer sweep (2026-10-01); neither waives 2FA, so nei
    while the session is C (C is now correctly challenged; this is display only).
 **Assumed resolution:** none yet. Proposal: verify the admin token matches `adminEmail` (and ROLE_ADMIN) before
 `ImpersonationAuthenticator` authenticates, and show each banner only when its flag equals the signed-in identifier.
+
+## OQ-MYSQL-CONSOLE: Which MySQL database console replaces phpLiteAdmin?
+**Raised 2026-10-04 (ADR-066).** phpLiteAdmin cannot open MySQL. The gateway (`public/db-admin.php`) still runs all
+seven checks; an authorised request now gets a 503 "no MySQL console tool installed" page. Candidate: Adminer (single
+file, MySQL support) kept outside the docroot in `tools/` and pinned to the app database. Needs the owner to choose
+and add the tool (third-party code is not vendored by the agent).

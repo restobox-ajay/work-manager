@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Security;
 
+use App\Tests\Support\TableInfo;
 use App\Bundle\AuthWebhook\Message\SendWebhookMessage;
 use App\Bundle\AuthWebhook\MessageHandler\SendWebhookMessageHandler;
 use App\Tests\Service\ControlledHttpWebhookDispatcher;
@@ -74,7 +75,7 @@ final class WebhookDeliveryTest extends WebTestCase
     public function testWebhookDeliveryTableHasRequiredColumns(): void
     {
         $conn    = $this->em->getConnection();
-        $columns = $conn->fetchAllAssociative('PRAGMA table_info(webhook_delivery)');
+        $columns = TableInfo::columns($conn, 'webhook_delivery');
         $names   = array_column($columns, 'name');
 
         $this->assertContains('url', $names, 'webhook_delivery must have a url column');

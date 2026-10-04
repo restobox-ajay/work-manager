@@ -156,7 +156,7 @@ final class PersonalAccessTokenTest extends WebTestCase
         // Set max_tokens_per_user = 1
         $conn = self::getContainer()->get('doctrine.dbal.default_connection');
         $conn->executeStatement(
-            "INSERT OR REPLACE INTO config (config_key, config_value) VALUES ('pat.max_tokens_per_user', '1')"
+            "REPLACE INTO config (config_key, config_value) VALUES ('pat.max_tokens_per_user', '1')"
         );
 
         // Create first token

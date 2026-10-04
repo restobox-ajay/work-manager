@@ -23,15 +23,15 @@ use SymfonyCasts\Bundle\VerifyEmail\VerifyEmailHelper;
 use SymfonyCasts\Bundle\VerifyEmail\VerifyEmailHelperInterface;
 
 /**
- * Codeception module that seeds and resets the SQLite database shared with the
+ * Codeception module that seeds and resets the MySQL test database shared with the
  * live acceptance server. It boots an in-process Symfony kernel (test env, same
- * var/test.db file the server reads) to persist entities through Doctrine.
+ * DATABASE_URL the server reads) to persist entities through Doctrine.
  *
  * Public methods are exposed on the AcceptanceTester as $I->createUser(...) etc.
  */
 class DatabaseHelper extends Module
 {
-    private const TABLES_TO_KEEP = ['doctrine_migration_versions', 'sqlite_sequence'];
+    private const TABLES_TO_KEEP = ['doctrine_migration_versions'];
 
     /** Host/port the live acceptance server listens on (see codeception.yml). */
     private const SERVER_HOST = '127.0.0.1';
@@ -60,7 +60,7 @@ class DatabaseHelper extends Module
      * Remove every row from application tables, leaving the migrated schema in
      * place. Run before each test so scenarios are isolated.
      *
-     * Tables are enumerated straight from sqlite_master rather than via the DBAL
+     * Tables are enumerated straight from information_schema rather than via the DBAL
      * schema manager: the connection carries a global schema_asset_filter
      * (config/packages/doctrine.yaml) that hides login_attempts / endpoint_rate_limits /
      * sessions / messenger_messages from listTableNames(). Reset MUST clear those too —
@@ -75,10 +75,12 @@ class DatabaseHelper extends Module
         $em->clear();
 
         $connection = $em->getConnection();
-        $connection->executeStatement('PRAGMA foreign_keys = OFF');
+        // DELETE (not TRUNCATE) keeps this inside the row-level rules the app itself runs under; FK checks are
+        // off for the sweep only, so the satellite tables can be emptied in any order.
+        $connection->executeStatement('SET FOREIGN_KEY_CHECKS = 0');
 
         $tables = $connection->fetchFirstColumn(
-            "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'"
+            "SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_TYPE = 'BASE TABLE'"
         );
         foreach ($tables as $table) {
             if (\in_array($table, self::TABLES_TO_KEEP, true)) {
@@ -87,7 +89,7 @@ class DatabaseHelper extends Module
             $connection->executeStatement(sprintf('DELETE FROM "%s"', $table));
         }
 
-        $connection->executeStatement('PRAGMA foreign_keys = ON');
+        $connection->executeStatement('SET FOREIGN_KEY_CHECKS = 1');
         $em->clear();
         $this->releaseConnection();
     }
@@ -253,7 +255,7 @@ class DatabaseHelper extends Module
         $lockedUntil = (new \DateTimeImmutable())->modify("+{$minutes} minutes")->format('Y-m-d H:i:s');
         $connection->executeStatement(
             'INSERT INTO account_lockouts (user_id, locked_until) VALUES (?, ?) '
-            . 'ON CONFLICT(user_id) DO UPDATE SET locked_until = excluded.locked_until',
+            . 'ON DUPLICATE KEY UPDATE locked_until = VALUES(locked_until)',
             [$userId, $lockedUntil]
         );
         $this->releaseConnection();
@@ -271,7 +273,7 @@ class DatabaseHelper extends Module
         $changedAt = (new \DateTimeImmutable())->modify($relativeModifier)->format('Y-m-d H:i:s');
         $connection->executeStatement(
             'INSERT INTO password_meta (user_id, password_changed_at) VALUES (?, ?) '
-            . 'ON CONFLICT(user_id) DO UPDATE SET password_changed_at = excluded.password_changed_at',
+            . 'ON DUPLICATE KEY UPDATE password_changed_at = VALUES(password_changed_at)',
             [$userId, $changedAt]
         );
         $this->releaseConnection();
@@ -940,8 +942,8 @@ class DatabaseHelper extends Module
     }
 
     /**
-     * Close the seeding connection so this process never holds a SQLite lock
-     * while the live server is serving requests against the same file.
+     * Close the seeding connection so this process never holds a transaction or row
+     * lock open while the live server is serving requests against the same database.
      */
     private function releaseConnection(): void
     {
@@ -974,12 +976,6 @@ class DatabaseHelper extends Module
             /** @var EntityManagerInterface $em */
             $em = $doctrine->getManager();
             $this->em = $em;
-
-            // WAL lets the live server keep reading while we seed; the busy
-            // timeout makes brief writer overlaps retry instead of failing.
-            $connection = $em->getConnection();
-            $connection->executeStatement('PRAGMA journal_mode = WAL');
-            $connection->executeStatement('PRAGMA busy_timeout = 10000');
         }
 
         return $this->em;

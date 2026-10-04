@@ -72,9 +72,7 @@ class UserSessionRepository extends ServiceEntityRepository
      */
     public function deleteExpired(int $now): int
     {
-        // Bind $now as an INTEGER: SQLite orders storage classes (INTEGER < TEXT), so a
-        // string-bound parameter would make the numeric `sess_lifetime`
-        // expression always compare as less-than and wrongly prune every live session.
+        // Bind $now as an INTEGER: sess_lifetime is an INT UNSIGNED expiry timestamp.
         return (int) $this->getEntityManager()->getConnection()->executeStatement(
             'DELETE FROM user_sessions WHERE session_id NOT IN '
             . '(SELECT sess_id FROM sessions WHERE sess_lifetime >= :now)',
@@ -85,7 +83,7 @@ class UserSessionRepository extends ServiceEntityRepository
 
     /**
      * Dry-run mirror of {@see deleteExpired()} for app:prune (FEATURE-147). Mutates nothing. Binds
-     * $now as INTEGER for the same SQLite storage-class-ordering reason documented on deleteExpired().
+     * $now as INTEGER, like deleteExpired().
      *
      * @param int $now current UNIX timestamp
      */

@@ -4,3 +4,7 @@ doctrine_migrations:
         # as migrations classes should NOT be autoloaded
         'DoctrineMigrations': '%kernel.project_dir%/migrations'
     enable_profiler: false
+    # MySQL commits every DDL statement implicitly, so a migration cannot be wrapped in a transaction:
+    # with this on, Doctrine's closing COMMIT finds no transaction ("There is no active transaction").
+    # Each migration's statements run one by one instead (ADR-066).
+    transactional: false

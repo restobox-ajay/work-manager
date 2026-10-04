@@ -23,7 +23,7 @@ final class ClearIpWhitelistCommandTest extends KernelTestCase
         $this->conn = self::getContainer()->get(Connection::class);
         $this->reset();
         foreach (['ip_whitelist.admin_ips' => '198.51.100.0/24', 'ip_whitelist.user_ips' => '203.0.113.0/24'] as $key => $value) {
-            $this->conn->executeStatement('INSERT OR REPLACE INTO config (config_key, config_value) VALUES (?, ?)', [$key, $value]);
+            $this->conn->executeStatement('REPLACE INTO config (config_key, config_value) VALUES (?, ?)', [$key, $value]);
         }
     }
 

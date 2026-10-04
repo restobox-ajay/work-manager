@@ -3,6 +3,13 @@ doctrine:
         url: '%env(resolve:DATABASE_URL)%'
         profiling_collect_backtrace: '%kernel.debug%'
         use_savepoints: true
+        # MySQL 8 only (ADR-066). Every table is InnoDB/utf8mb4 with one fixed collation, so the ORM's view of
+        # a table always matches what the migrations created (schema:validate stays green) whatever the
+        # server's own default collation is.
+        default_table_options:
+            charset: utf8mb4
+            collation: utf8mb4_unicode_ci
+            engine: InnoDB
         # Tables managed outside the ORM (no entity): the DBAL rate-limit stores
         # (login_attempts, endpoint_rate_limits), the PdoSessionHandler `sessions` table, and
         # the Messenger transport `messenger_messages`. Excluding them from ORM schema management

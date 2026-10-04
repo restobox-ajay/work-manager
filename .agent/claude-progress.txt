@@ -4160,3 +4160,11 @@ Review follow-up (#44): save() writes the policy rows via DBAL in one transactio
 internal; acceptance gets its own gate lock file. Write-side test red before.
 Second review follow-up (#44): write-side test now loads the row as an entity first (it had become vacuous); new test
 covers the entity refresh; both mutation-checked. Htaccess controller/command tests also remove the gate lock file.
+
+FEATURE-189 / ADR-066 (2026-10-04): switched the database engine from SQLite to MySQL 8 at the owner's request.
+Migrations rewritten (InnoDB, utf8mb4_unicode_ci, transactional: false); Sqlite* connection classes replaced by
+MysqlConnectionBaseline / MysqlConnectionMiddleware / MysqlPdoFactory / MysqlDsn; SQLite FK guard removed. Behaviours
+SQLite gave for free made explicit: PAT cap owner row lock (real two-connection race test, mutation-checked), Htaccess
+Lock save as an upsert, integer-bound LIMIT. DB console: phpLiteAdmin removed (SQLite-only); gateway checks ported,
+hand-off is a 503 until a MySQL tool is chosen (OQ-MYSQL-CONSOLE). Tests ported (ScratchDatabase, TableInfo helpers).
+verify-fast steps 2-3 green on MySQL 8.0.46. CLAUDE.md: MySQL platform constraints + Coding Standards section added.

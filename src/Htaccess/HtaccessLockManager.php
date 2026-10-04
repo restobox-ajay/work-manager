@@ -83,11 +83,14 @@ class HtaccessLockManager
         // the one it LOADED, so a row this process had read before another change moved it would be skipped —
         // e.g. "disable" after a concurrent enable wrote nothing, leaving the config saying enabled.
         $this->connection->transactional(function (Connection $connection) use ($rows): void {
+            // One upsert per row, keyed on the UNIQUE config_key. (Not "UPDATE, then INSERT if 0 rows affected":
+            // MySQL counts only rows whose value CHANGED, so re-saving an unchanged value would try to INSERT a
+            // duplicate key.)
             foreach ($rows as $key => $value) {
-                $updated = $connection->executeStatement('UPDATE config SET config_value = ? WHERE config_key = ?', [$value, $key]);
-                if ($updated === 0) {
-                    $connection->insert('config', ['config_key' => $key, 'config_value' => $value]);
-                }
+                $connection->executeStatement(
+                    'INSERT INTO config (config_key, config_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE config_value = VALUES(config_value)',
+                    [$key, $value],
+                );
             }
         });
 

@@ -26,8 +26,7 @@ final class Version20260707170200 extends AbstractMigration
 
     public function up(Schema $schema): void
     {
-        $this->addSql('CREATE TABLE endpoint_rate_limits (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, action VARCHAR(64) NOT NULL, rate_key VARCHAR(255) NOT NULL, hit_at DATETIME NOT NULL)');
-        $this->addSql('CREATE INDEX idx_endpoint_rate_limits_lookup ON endpoint_rate_limits (action, rate_key, hit_at)');
+        $this->addSql('CREATE TABLE endpoint_rate_limits (id INT AUTO_INCREMENT NOT NULL, action VARCHAR(64) NOT NULL, rate_key VARCHAR(255) NOT NULL, hit_at DATETIME NOT NULL, INDEX idx_endpoint_rate_limits_lookup (action, rate_key, hit_at), PRIMARY KEY (id)) DEFAULT CHARACTER SET utf8mb4 COLLATE `utf8mb4_unicode_ci` ENGINE = InnoDB');
     }
 
     public function down(Schema $schema): void

@@ -8,7 +8,7 @@ use App\Repository\DbConsoleSessionRepository;
 use Doctrine\ORM\Mapping as ORM;
 
 /**
- * One open phpLiteAdmin console session (ADR-053).
+ * One open database console session (ADR-053).
  *
  * The row IS the credential's server side: the client holds an opaque random token, this holds only
  * its SHA-256 hash, so a database leak yields nothing usable. Having a row (rather than a

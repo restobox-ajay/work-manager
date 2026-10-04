@@ -14,22 +14,18 @@ echo "=== Verify: symfony-auth-boilerplate ==="
 echo "[1/3] Running composer audit..."
 composer audit
 
-# Reset the shared test SQLite database to a KNOWN CLEAN, fully-migrated state.
+# Reset the shared MySQL test database to a KNOWN CLEAN, fully-migrated state.
 #
-# Both .env.test (PHPUnit) and .env.acceptance (the Codeception live server) point
-# DATABASE_URL at var/test.db, so the two suites share one file. The acceptance
-# DatabaseHelper resets before each of its own tests but never after the suite, so the
-# LAST acceptance test's rows — crucially any GLOBAL `config` values written via
-# seedConfig() — survive the run. The PHPUnit functional tests only clean the specific
-# config keys they each know about, so an unrelated leftover global config row silently
-# changes behaviour and fails the next run (the ~6err+30fail Acceptance->Functional
-# pollution described in FEATURE-137). Deleting the file (WAL is enabled, so the -wal /
-# -shm side files can carry state too) and re-migrating an empty DB gives a deterministic,
-# pristine, zero-row schema. Running migrations on the now-empty file is trivially
-# idempotent. Called before EACH suite so every suite starts from the same clean state,
-# making the whole gate repeatable regardless of what a prior suite/run left behind.
+# Both .env.test (PHPUnit) and .env.acceptance (the Codeception live server) point DATABASE_URL at the
+# same work_manager_test database, so the two suites share it. The acceptance DatabaseHelper resets
+# before each of its own tests but never after the suite, so the LAST acceptance test's rows — crucially
+# any GLOBAL `config` values written via seedConfig() — survive the run, and an unrelated leftover config
+# row silently changes behaviour in the next suite (FEATURE-137). Dropping and re-creating the database,
+# then migrating it, gives a deterministic, zero-row schema before EACH suite, so the whole gate is
+# repeatable regardless of what a prior suite/run left behind (ADR-066).
 reset_test_db() {
-  rm -f var/test.db var/test.db-wal var/test.db-shm
+  APP_ENV=test php bin/console doctrine:database:drop --force --if-exists --no-interaction --quiet 2>&1
+  APP_ENV=test php bin/console doctrine:database:create --no-interaction --quiet 2>&1
   APP_ENV=test php bin/console doctrine:migrations:migrate --no-interaction --quiet 2>&1
 }
 

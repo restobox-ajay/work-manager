@@ -15,14 +15,20 @@ use App\Tests\Support\AcceptanceTester;
  * credential is attacked — wrong token, forged token, revoked console — and finally the RIGHT token is
  * swapped back in to prove the denials were the gateway's doing and not the scenario being broken.
  *
- * It also pins the structural half of the fix, which no other test covers: phpliteadmin.php now lives
- * outside the docroot and must not be reachable by URL at all.
+ * It also pins the structural half of the fix, which no other test covers: console tooling lives in
+ * tools/, outside the docroot, and must not be reachable by URL at all.
  */
 class DatabaseConsoleCest
 {
     private const TS_EMAIL = 'techsup-console@example.com';
     private const PASSWORD = 'password123';
     private const SECRET = 'JBSWY3DPEHPK3PXP';
+
+    /**
+     * Shown by public/db-admin.php only once every check has passed. Until a MySQL console tool is chosen
+     * (ADR-066, OQ-MYSQL-CONSOLE) the authorised hand-off is this "not installed" page.
+     */
+    private const AUTHORISED_MARKER = 'Access was authorised';
 
     /** Log in a tech-support admin and clear the mandatory 2FA gate, leaving the session verified. */
     private function loginAsTechSupport(AcceptanceTester $I): void
@@ -53,15 +59,15 @@ class DatabaseConsoleCest
     // ---------------------------------------------------------------- the structural fix
 
     /**
-     * phpliteadmin.php was moved to tools/. If it is ever reachable by URL again, its own password is
-     * an empty string and the gateway is beside the point.
+     * Console tooling lives in tools/, outside the docroot. If it were ever reachable by URL, the gateway
+     * would be beside the point. (phpliteadmin.php itself is gone since ADR-066; its old URLs stay pinned.)
      */
-    public function phpliteadminIsNotReachableByUrl(AcceptanceTester $I): void
+    public function consoleToolingIsNotReachableByUrl(AcceptanceTester $I): void
     {
-        foreach (['/phpliteadmin.php', '/tools/phpliteadmin.php'] as $path) {
+        foreach (['/phpliteadmin.php', '/tools/phpliteadmin.php', '/tools/adminer.php', '/adminer.php'] as $path) {
             $I->amOnPage($path);
-            // Assert the STATUS, not the body: a 404 page echoes the requested URL, so the word
-            // "phpliteadmin" appears on it either way. What matters is that nothing served the file.
+            // Assert the STATUS, not the body: a 404 page echoes the requested URL. What matters is that
+            // nothing served the file.
             $I->seeResponseCodeIs(404);
             $I->dontSee('CREATE TABLE');
         }
@@ -74,7 +80,7 @@ class DatabaseConsoleCest
         $I->amOnPage('/db-admin.php');
 
         $I->seeCurrentUrlEquals('/admin/login');
-        $I->dontSee('phpLiteAdmin');
+        $I->dontSee(self::AUTHORISED_MARKER);
     }
 
     public function anonymousCannotReachTheConsolePage(AcceptanceTester $I): void
@@ -114,13 +120,13 @@ class DatabaseConsoleCest
         // bounces onward to the dashboard. The claim worth asserting is therefore not the landing URL
         // but the security property: the console did not open.
         $I->dontSeeInCurrentUrl('/db-admin.php');
-        $I->dontSee('phpLiteAdmin');
+        $I->dontSee(self::AUTHORISED_MARKER);
 
         // --- GREEN: the real token, same browser, same everything else.
         $I->setCookie(ConsoleCookie::COOKIE_NAME, $realToken, ['path' => '/db-admin.php']);
         $I->amOnPage('/db-admin.php');
         $I->dontSeeInCurrentUrl('/admin/login');
-        $I->see('phpLiteAdmin');
+        $I->see(self::AUTHORISED_MARKER);
     }
 
     /** The stored form is a hash, so replaying it must not work. */
@@ -134,7 +140,7 @@ class DatabaseConsoleCest
         $I->amOnPage('/db-admin.php');
 
         $I->dontSeeInCurrentUrl('/db-admin.php');
-        $I->dontSee('phpLiteAdmin');
+        $I->dontSee(self::AUTHORISED_MARKER);
     }
 
     // ---------------------------------------------------------------- the kill-switch
@@ -149,7 +155,7 @@ class DatabaseConsoleCest
         // It works right now.
         $I->setCookie(ConsoleCookie::COOKIE_NAME, $realToken, ['path' => '/db-admin.php']);
         $I->amOnPage('/db-admin.php');
-        $I->see('phpLiteAdmin');
+        $I->see(self::AUTHORISED_MARKER);
 
         // Switch it off, then present the very same token again.
         $I->seedConfig(ConsoleCookie::ENABLED_UNTIL_KEY, '0');
@@ -157,6 +163,6 @@ class DatabaseConsoleCest
         $I->amOnPage('/db-admin.php');
 
         $I->dontSeeInCurrentUrl('/db-admin.php');
-        $I->dontSee('phpLiteAdmin');
+        $I->dontSee(self::AUTHORISED_MARKER);
     }
 }

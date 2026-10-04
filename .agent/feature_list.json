@@ -4773,7 +4773,7 @@
       ],
       "passes": true,
       "evidence": [
-        "tests/Functional/Security/DbConsoleGatewayTest.php::testTheGatewayConnectionRunsTheProjectBaseline red before (journal_mode 'delete'), green after; the 22 existing gateway tests still green",
+        "tests/Functional/Security/DbConsoleGatewayTest.php::testTheGatewayConnectsThroughTheProjectFactoryOnly (ADR-066: replaced the removed SQLite-era testTheGatewayConnectionRunsTheProjectBaseline, which was red before (journal_mode 'delete'), green after); the existing gateway tests still green",
         "bin/verify-fast.sh exits 0: 1055 PHPUnit tests / 7589 assertions, 117 acceptance / 491"
       ]
     },
@@ -4792,7 +4792,7 @@
       ],
       "passes": true,
       "evidence": [
-        "tests/Functional/Security/DbConsoleGatewayTest.php::testPhpLiteAdminSessionUsesItsOwnCookieScopedToTheGateway red before (no own cookie; PHPSESSID adopted), green after",
+        "tests/Functional/Security/DbConsoleGatewayTest.php::testAnAuthorisedLoadNeverTouchesThePanelSessionCookie (ADR-066: phpLiteAdmin and its own session are gone; replaced the removed testPhpLiteAdminSessionUsesItsOwnCookieScopedToTheGateway, which was red before (PHPSESSID adopted), green after)",
         "bin/verify-fast.sh exits 0: 1056 PHPUnit tests / 7595 assertions, 117 acceptance / 491"
       ]
     },
@@ -4975,6 +4975,35 @@
         "tests/Functional/Htaccess/HtaccessLockGateTest.php::testAChangeIsStoredEvenWhenThisProcessHadReadAnOlderValue (row loaded as an entity first) and ::testRowsAlreadyLoadedInThisProcessReadBackWhatWasStored; mutation-checked: restoring the ConfigService save() fails the first, removing the entity refresh fails the second",
         "All Htaccess tests (110) and HtaccessLockGateArchitectureTest (now listing HtaccessLockMutex as an internal) green",
         "bin/verify-fast.sh exits 0: 1124 PHPUnit tests / 8121 assertions, 117 acceptance / 491"
+      ]
+    },
+    {
+      "id": "FEATURE-189",
+      "title": "MySQL 8 replaces SQLite as the only database engine (ADR-066)",
+      "description": "Owner request: run on MySQL instead of SQLite. All 12 migrations rewritten in MySQL DDL (InnoDB, utf8mb4_unicode_ci, non-transactional); SQLite connection baseline/pragma middleware/PDO factory/migration FK guard replaced by MysqlConnectionBaseline, MysqlConnectionMiddleware, MysqlPdoFactory and MysqlDsn; raw SQL ported (INSERT IGNORE, ON DUPLICATE KEY UPDATE, REPLACE); PAT cap re-count takes an owner row lock; Htaccess Lock save is an upsert; bound LIMIT is an integer; db-console gateway ported (hand-off pending a MySQL console tool, OQ-MYSQL-CONSOLE); tests, verify-fast, env files, README and CLAUDE.md updated.",
+      "priority": "must",
+      "depends_on": [],
+      "acceptance_criteria": [
+        "doctrine:migrations:migrate builds the full schema on an empty MySQL 8 database and doctrine:schema:validate is in sync",
+        "Every app connection (Doctrine, session handler, db-console gateway) runs the MySQL baseline; a non-mysql DATABASE_URL fails at the first connection",
+        "The PAT per-user cap holds against a real concurrent transaction on another connection",
+        "All existing unit, functional and acceptance behaviour unchanged on MySQL"
+      ],
+      "test_type": [
+        "unit",
+        "functional",
+        "acceptance"
+      ],
+      "passes": true,
+      "evidence": [
+        "tests/Functional/Doctrine/MysqlConnectionBaselineTest.php (live baseline, factory parity, strict mode rejects over-long value, FK cascade fires)",
+        "tests/Unit/Doctrine/MysqlConnectionMiddlewareTest.php, tests/Unit/Doctrine/MysqlDsnTest.php, tests/Unit/Meta/MysqlOnlyTest.php",
+        "tests/Functional/Account/PersonalAccessTokenRaceTest.php::testACreateRacingARealConcurrentTransactionCannotExceedTheCap — mutation-checked: removing the controller's FOR UPDATE makes it fail",
+        "tests/Functional/Htaccess/HtaccessLockGateTest.php (6 tests red on MySQL with UPDATE-else-INSERT: duplicate config_key; green with the upsert)",
+        "tests/Functional/Security/PasswordReuseTest.php::testOnlyMostRecentEntriesAreRetained red on MySQL with a string-bound LIMIT, green with an integer bind",
+        "tests/Functional/Meta/MigrationDryRunSqlTest.php replays the dry-run SQL on a fresh MySQL database",
+        "tests/Functional/Security/InvalidUtf8LoginInputTest.php (reviewer finding: invalid-UTF-8 email variants matched the real account in MySQL while getting fresh throttle buckets) red without InvalidUtf8RequestListener, green with it",
+        "bin/verify-fast.sh steps 2-3 on MySQL 8.0.46: 1119 PHPUnit tests green, 117 acceptance green, ADR tripwire no flags (composer audit not runnable in the sandbox: no packagist access)"
       ]
     }
   ]

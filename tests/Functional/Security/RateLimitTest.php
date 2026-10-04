@@ -60,7 +60,7 @@ final class RateLimitTest extends WebTestCase
     private function setConfig(string $key, string $value): void
     {
         $this->conn->executeStatement(
-            "INSERT OR REPLACE INTO config (config_key, config_value) VALUES (?, ?)",
+            "REPLACE INTO config (config_key, config_value) VALUES (?, ?)",
             [$key, $value]
         );
     }

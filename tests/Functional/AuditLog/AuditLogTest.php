@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\AuditLog;
 
+use App\Tests\Support\TableInfo;
 use App\Tests\Support\AuthenticationTestTrait;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
@@ -80,7 +81,7 @@ final class AuditLogTest extends WebTestCase
     // AC1: audit_log table exists with required columns
     public function testAuditLogTableHasRequiredColumns(): void
     {
-        $columns = $this->conn->fetchAllAssociative('PRAGMA table_info(audit_log)');
+        $columns = TableInfo::columns($this->conn, 'audit_log');
         $names   = array_column($columns, 'name');
 
         $this->assertContains('actor', $names, 'audit_log must have actor column');

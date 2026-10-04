@@ -26,15 +26,7 @@ final class Version20260707130000 extends AbstractMigration
 
     public function up(Schema $schema): void
     {
-        $this->addSql('CREATE TABLE magic_link_tokens (
-            id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-            email VARCHAR(180) NOT NULL,
-            token_hash VARCHAR(64) NOT NULL,
-            expires_at DATETIME NOT NULL,
-            used_at DATETIME DEFAULT NULL,
-            created_at DATETIME NOT NULL
-        )');
-        $this->addSql('CREATE UNIQUE INDEX UNIQ_99E6B427B3BC57DA ON magic_link_tokens (token_hash)');
+        $this->addSql('CREATE TABLE magic_link_tokens (id INT AUTO_INCREMENT NOT NULL, email VARCHAR(180) NOT NULL, token_hash VARCHAR(64) NOT NULL, expires_at DATETIME NOT NULL, used_at DATETIME DEFAULT NULL, created_at DATETIME NOT NULL, UNIQUE INDEX UNIQ_99E6B427B3BC57DA (token_hash), PRIMARY KEY (id)) DEFAULT CHARACTER SET utf8mb4 COLLATE `utf8mb4_unicode_ci` ENGINE = InnoDB');
     }
 
     public function down(Schema $schema): void

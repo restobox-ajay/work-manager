@@ -26,18 +26,7 @@ final class Version20260707120000 extends AbstractMigration
 
     public function up(Schema $schema): void
     {
-        $this->addSql('CREATE TABLE personal_access_tokens (
-            id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-            user_id INTEGER NOT NULL,
-            name VARCHAR(100) NOT NULL,
-            token_hash VARCHAR(64) NOT NULL,
-            expires_at DATETIME DEFAULT NULL,
-            last_used_at DATETIME DEFAULT NULL,
-            revoked_at DATETIME DEFAULT NULL,
-            created_at DATETIME NOT NULL
-        )');
-        $this->addSql('CREATE INDEX IDX_PAT_USER_ID ON personal_access_tokens (user_id)');
-        $this->addSql('CREATE UNIQUE INDEX UNIQ_E63C2166B3BC57DA ON personal_access_tokens (token_hash)');
+        $this->addSql('CREATE TABLE personal_access_tokens (id INT AUTO_INCREMENT NOT NULL, user_id INT NOT NULL, name VARCHAR(100) NOT NULL, token_hash VARCHAR(64) NOT NULL, expires_at DATETIME DEFAULT NULL, last_used_at DATETIME DEFAULT NULL, revoked_at DATETIME DEFAULT NULL, created_at DATETIME NOT NULL, INDEX IDX_PAT_USER_ID (user_id), UNIQUE INDEX UNIQ_E63C2166B3BC57DA (token_hash), PRIMARY KEY (id)) DEFAULT CHARACTER SET utf8mb4 COLLATE `utf8mb4_unicode_ci` ENGINE = InnoDB');
     }
 
     public function down(Schema $schema): void

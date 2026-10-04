@@ -46,7 +46,7 @@ final class PersonalAccessTokenRaceTest extends WebTestCase
 
         // Cap = 1 active token per user.
         $this->em->getConnection()->executeStatement(
-            "INSERT OR REPLACE INTO config (config_key, config_value) VALUES ('pat.max_tokens_per_user', '1')"
+            "REPLACE INTO config (config_key, config_value) VALUES ('pat.max_tokens_per_user', '1')"
         );
     }
 
@@ -103,5 +103,60 @@ final class PersonalAccessTokenRaceTest extends WebTestCase
             'SELECT COUNT(*) FROM personal_access_tokens'
         );
         $this->assertSame(0, $count, 'The over-cap token must be rolled back, not persisted.');
+    }
+
+    /**
+     * ADR-066: the same race with a REAL second connection, no stubs. Another process creates a token for this
+     * user inside its own transaction (taking the same owner row lock the controller takes) and holds it
+     * uncommitted for a moment. InnoDB has no whole-database write lock, so without the controller's
+     * `SELECT … FOR UPDATE` on the owner our request would neither wait nor see that uncommitted token: both
+     * creates would pass the cap. With it, our request waits, then its re-count sees the committed token.
+     */
+    public function testACreateRacingARealConcurrentTransactionCannotExceedTheCap(): void
+    {
+        $userId = (int) $this->em->getConnection()->fetchOne('SELECT id FROM "user" WHERE email = ?', [self::EMAIL]);
+
+        $this->client->request('GET', '/login');
+        $this->client->submitForm('Sign in', ['email' => self::EMAIL, 'password' => 'testpassword']);
+        $this->client->followRedirect();
+        $this->client->request('GET', '/account/tokens');
+
+        $other = <<<'PHP'
+            [$autoload, $databaseUrl, $userId] = array_slice($argv, 1);
+            require $autoload;
+            $db = (new App\Doctrine\MysqlPdoFactory())->create($databaseUrl);
+            $db->beginTransaction();
+            $db->prepare('SELECT id FROM "user" WHERE id = ? FOR UPDATE')->execute([$userId]);
+            $db->prepare("INSERT INTO personal_access_tokens (user_id, name, token_hash, created_at) VALUES (?, 'Other Request', ?, UTC_TIMESTAMP())")
+                ->execute([$userId, hash('sha256', 'other-request')]);
+            fwrite(STDOUT, "locked\n");
+            fflush(STDOUT);
+            usleep(1000000);
+            $db->commit();
+            PHP;
+        $process = proc_open(
+            [
+                'php', '-r', $other,
+                self::getContainer()->getParameter('kernel.project_dir') . '/vendor/autoload.php',
+                (string) self::getContainer()->getParameter('app.session.dsn'),
+                (string) $userId,
+            ],
+            [1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
+            $pipes,
+        );
+        self::assertIsResource($process);
+        self::assertSame("locked\n", fgets($pipes[1]), 'the other request must hold its transaction before ours starts');
+
+        $this->client->submitForm('Create Token', ['name' => 'Racing Token']);
+
+        $stderr = stream_get_contents($pipes[2]);
+        self::assertSame(0, proc_close($process), 'the other request failed: ' . $stderr);
+        $this->assertResponseIsSuccessful();
+        $this->assertSelectorExists('.error');
+        self::assertSame(
+            ['Other Request'],
+            $this->em->getConnection()->fetchFirstColumn('SELECT name FROM personal_access_tokens WHERE user_id = ?', [$userId]),
+            'only the first committed token may exist; ours must have been rolled back',
+        );
     }
 }

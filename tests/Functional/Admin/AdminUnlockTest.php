@@ -83,7 +83,7 @@ final class AdminUnlockTest extends WebTestCase
         $futureTime = (new \DateTimeImmutable())->modify('+30 minutes')->format('Y-m-d H:i:s');
         $this->conn->executeStatement(
             'INSERT INTO account_lockouts (user_id, locked_until) SELECT id, ? FROM "user" WHERE email = ? '
-            . 'ON CONFLICT(user_id) DO UPDATE SET locked_until = excluded.locked_until',
+            . 'ON DUPLICATE KEY UPDATE locked_until = VALUES(locked_until)',
             [$futureTime, 'unlock-user@example.com']
         );
     }

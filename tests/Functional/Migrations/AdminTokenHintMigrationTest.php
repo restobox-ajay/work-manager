@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Migrations;
 
+use App\Tests\Support\ScratchDatabase;
 use Doctrine\DBAL\Connection;
-use Doctrine\DBAL\DriverManager;
 use Doctrine\DBAL\Schema\Schema;
 use DoctrineMigrations\Version20261001120000;
 use PHPUnit\Framework\TestCase;
@@ -19,17 +19,17 @@ use Psr\Log\NullLogger;
  */
 final class AdminTokenHintMigrationTest extends TestCase
 {
-    private string $file;
+    private ScratchDatabase $database;
     private Connection $conn;
 
     protected function setUp(): void
     {
-        $this->file = sys_get_temp_dir() . '/admin-token-hint-' . bin2hex(random_bytes(4)) . '.db';
-        $this->conn = DriverManager::getConnection(['driver' => 'pdo_sqlite', 'path' => $this->file]);
+        $this->database = ScratchDatabase::create('token_hint');
+        $this->conn = $this->database->connection();
 
         // The pre-migration shape (Version20260927120000), trimmed to the columns that matter here.
-        $this->conn->executeStatement("CREATE TABLE admin (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, email VARCHAR(180) NOT NULL, status VARCHAR(20) DEFAULT 'active' NOT NULL)");
-        $this->conn->executeStatement('CREATE TABLE admin_access_tokens (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, admin_id INTEGER NOT NULL, name VARCHAR(100) NOT NULL, token_hash VARCHAR(64) NOT NULL, expires_at DATETIME DEFAULT NULL, last_used_at DATETIME DEFAULT NULL, revoked_at DATETIME DEFAULT NULL, created_at DATETIME NOT NULL)');
+        $this->conn->executeStatement("CREATE TABLE `admin` (id INT AUTO_INCREMENT NOT NULL, email VARCHAR(180) NOT NULL, status VARCHAR(20) DEFAULT 'active' NOT NULL, PRIMARY KEY (id))");
+        $this->conn->executeStatement('CREATE TABLE admin_access_tokens (id INT AUTO_INCREMENT NOT NULL, admin_id INT NOT NULL, name VARCHAR(100) NOT NULL, token_hash VARCHAR(64) NOT NULL, expires_at DATETIME DEFAULT NULL, last_used_at DATETIME DEFAULT NULL, revoked_at DATETIME DEFAULT NULL, created_at DATETIME NOT NULL, PRIMARY KEY (id))');
         $this->conn->executeStatement("INSERT INTO admin (id, email, status) VALUES (1, 'live@example.com', 'active'), (2, 'gone@example.com', 'inactive')");
         $this->conn->executeStatement("INSERT INTO admin_access_tokens (id, admin_id, name, token_hash, revoked_at, created_at) VALUES
             (1, 1, 'live admin token', 'h1', NULL, '2026-01-01 00:00:00'),
@@ -40,7 +40,7 @@ final class AdminTokenHintMigrationTest extends TestCase
     protected function tearDown(): void
     {
         $this->conn->close();
-        @unlink($this->file);
+        $this->database->drop();
     }
 
     private function migrateUp(): void
