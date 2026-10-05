@@ -14,6 +14,21 @@
     </button>
     <span class="crumb">{{ crumb }}</span>
     <span class="spacer"></span>
+    {# Quick create, as wholesale-b2b's "+" menu: only what this person may add. #}
+    {% set quickCreate = [
+        is_granted('TASK_CREATE') ? { label: 'New Task', href: path('app_task_create') } : null,
+        is_granted('PROJECT_CREATE') ? { label: 'New Project', href: path('app_project_create') } : null,
+        is_granted('CLIENT_CREATE') ? { label: 'New Client', href: path('app_client_create') } : null,
+        is_granted('ROLE_ADMIN') ? { label: 'New User', href: path('app_admin_users_new') } : null,
+    ]|filter(link => link) %}
+    {% if quickCreate is not empty %}
+        <div class="user-menu quick-create">
+            <button class="user-menu-toggle quick-create-toggle" type="button" aria-expanded="false" aria-haspopup="true" aria-label="Quick create" title="Quick create">{{ icons.icon('plus') }}</button>
+            <div class="dropdown" role="menu">
+                {% for link in quickCreate %}<a href="{{ link.href }}" role="menuitem">{{ link.label }}</a>{% endfor %}
+            </div>
+        </div>
+    {% endif %}
     <div class="user-menu">
         <button class="user-menu-toggle" type="button" aria-expanded="false" aria-haspopup="true" title="{{ identifier }}">
             <span class="avatar" aria-hidden="true">{{ displayName|first|upper }}</span><span class="user-menu-name">{{ displayName }}</span> ▾

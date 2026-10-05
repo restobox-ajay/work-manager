@@ -3,7 +3,8 @@
 
     `items`: a list of entries, each either
       - a link:  { label, href, icon, current }
-      - a group: { label, icon, children: [ { label, href, current }, ... ] }
+      - a group: { label, icon, children: [ { label, href, current, add? }, ... ] }
+    `add` ({ label, href }) is the row's "+" link: a real link with its own accessible name, revealed on hover.
     A group is a <details>: the browser opens and closes it with no script, so nothing re-lays the sidebar out
     after the first paint (the old max-height animation driven from JavaScript was what flickered). The group
     holding the current page is rendered open server-side.
@@ -16,7 +17,10 @@
             <summary title="{{ item.label }}">{{ icons.icon(item.icon) }}<span class="nav-label">{{ item.label }}</span><span class="chev" aria-hidden="true">▶</span></summary>
             <ul>
                 {% for child in item.children %}
-                    <li{{ child.current ? ' class="active"' }}><a href="{{ child.href }}"{{ child.current ? ' aria-current="page"' }}>{{ child.label }}</a></li>
+                    <li{{ child.current ? ' class="active"' }}>
+                        <a href="{{ child.href }}"{{ child.current ? ' aria-current="page"' }}>{{ child.label }}</a>
+                        {%- if child.add ?? null %}<a class="add" href="{{ child.add.href }}" title="{{ child.add.label }}" aria-label="{{ child.add.label }}">+</a>{% endif %}
+                    </li>
                 {% endfor %}
             </ul>
         </details>

@@ -607,3 +607,38 @@ html:not(.js) .user-menu:focus-within .dropdown {
         grid-template-columns: 1fr;
     }
 }
+
+/* ── Sidebar "+" links and quick create (ADR-070) ──────────────────────────── */
+/* app.css reveals a row's "+" on hover; keyboard focus reveals it too, and on touch screens (no hover) it always shows. */
+.nav-group li:focus-within .add {
+    opacity: 1;
+}
+
+@media (hover: none), (max-width: 900px) {
+    .nav-group li .add {
+        opacity: 1;
+    }
+}
+
+.nav-group li .add {
+    font-weight: 700;
+    text-decoration: none;
+}
+
+.user-menu > .quick-create-toggle {
+    width: 28px;
+    height: 28px;
+    justify-content: center;
+    border-radius: 7px;
+    background: var(--success);
+    color: #fff;
+}
+
+.user-menu > .quick-create-toggle:hover {
+    background: var(--success-hover);
+}
+
+.quick-create-toggle svg {
+    width: 16px;
+    height: 16px;
+}
