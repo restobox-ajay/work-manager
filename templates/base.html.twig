@@ -19,12 +19,12 @@
         <link rel="preconnect" href="https://fonts.googleapis.com">
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
         <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
-        <link rel="stylesheet" href="/css/app.css">
-        <link rel="stylesheet" href="/css/app-bridge.css">
+        <link rel="stylesheet" href="{{ versioned('/css/app.css') }}">
+        <link rel="stylesheet" href="{{ versioned('/css/app-bridge.css') }}">
         {% endblock %}
 
         {% block javascripts %}
-        <script src="/js/app.js" defer></script>
+        <script src="{{ versioned('/js/app.js') }}" defer></script>
         {% endblock %}
 
         {% set frankenphpHotReload = app.request.server.get('FRANKENPHP_HOT_RELOAD') %}

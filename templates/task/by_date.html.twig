@@ -18,17 +18,23 @@
 
 {{ ui.flashes() }}
 
-<form class="mx-period mx-form" method="get" action="{{ path('app_task_by_date') }}">
-    <label>Reporting by
-        <select name="reportingBy">
+{# One row across the page, like the list pages' filter bars; it wraps only on narrow screens. #}
+<div class="table-card">
+    <form class="table-header mx-form filter-row-bar" method="get" action="{{ path('app_task_by_date') }}">
+        <label for="bd-field">Reporting by</label>
+        <select id="bd-field" name="reportingBy">
             <option value="billableDate" {{ field == 'billableDate' ? 'selected' }}>Billable date</option>
             <option value="creationDate" {{ field == 'creationDate' ? 'selected' }}>Creation date</option>
         </select>
-    </label>
-    <label>From <input type="date" name="startDate" value="{{ startDate }}" required></label>
-    <label>To <input type="date" name="endDate" value="{{ endDate }}" required></label>
-    <button class="btn sm" type="submit">Show</button>
-</form>
+        <label for="bd-from">From</label>
+        <input type="date" id="bd-from" name="startDate" value="{{ startDate }}" required>
+        <label for="bd-to">To</label>
+        <input type="date" id="bd-to" name="endDate" value="{{ endDate }}" required>
+        <button class="btn sm" type="submit">Show</button>
+        <span class="grow"></span>
+        <span class="muted small">{{ groups|length }} day{{ groups|length == 1 ? '' : 's' }}, {{ groups|reduce((n, g) => n + g.tasks|length, 0) }} task{{ groups|reduce((n, g) => n + g.tasks|length, 0) == 1 ? '' : 's' }}</span>
+    </form>
+</div>
 
 {% for group in groups %}
     <div class="table-card">

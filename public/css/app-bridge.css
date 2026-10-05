@@ -642,3 +642,27 @@ html:not(.js) .user-menu:focus-within .dropdown {
     width: 16px;
     height: 16px;
 }
+
+/* ── Filter bar in one row (Task By Date) ──────────────────────────────────── */
+.filter-row-bar {
+    flex-wrap: nowrap;
+    white-space: nowrap;
+}
+
+.filter-row-bar label {
+    margin: 0;
+    font-weight: 600;
+}
+
+.filter-row-bar select,
+.filter-row-bar input[type="date"] {
+    width: auto;
+    flex: 0 1 190px;
+    min-width: 140px;
+}
+
+@media (max-width: 900px) {
+    .filter-row-bar {
+        flex-wrap: wrap;
+    }
+}
