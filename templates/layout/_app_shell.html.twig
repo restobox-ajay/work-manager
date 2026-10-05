@@ -53,6 +53,13 @@
     { label: 'Tasks', icon: 'check-square', children: taskLinks },
     { label: 'Security', icon: 'shield', children: securityLinks },
 ] %}
+{# Config: one CRUD page per list (ADR-075), in work-platform's Settings menu order. #}
+{% set kind = app.request.attributes.get('kind') %}
+{% set configLinks = [] %}
+{% for l in [['tags','Tags','New tag'],['payers','Payer Entities','New payer entity'],['wallet-entities','Wallet Entities','New wallet entity'],['payment-methods','Payment Methods','New payment method'],['task-types','Task Types','New task type'],['task-statuses','Task Status','New task status'],['email-templates','Email Templates','New email template'],['currencies','Currency','New currency'],['countries','Country','New country']] %}
+    {% set configLinks = configLinks|merge([{ label: l[1], href: path('app_config_list', {kind: l[0]}), current: cur starts with 'app_config_' and kind == l[0],
+      add: { label: l[2], href: path('app_config_new', {kind: l[0]}) } }]) %}
+{% endfor %}
 {% if is_granted('ROLE_ADMIN') %}
     {% set items = items|merge([
         { label: 'Users', icon: 'users', children: [
@@ -61,14 +68,7 @@
             { label: 'Invite User', href: path('app_admin_users_invite'), current: cur == 'app_admin_users_invite' },
             { label: 'Invitations', href: path('app_admin_users_invitations'), current: cur == 'app_admin_users_invitations' },
         ] },
-        { label: 'Config', icon: 'sliders', children: [
-            { label: 'Task Statuses', href: path('app_config_task_statuses'), current: cur starts with 'app_config_task_statuses',
-              add: { label: 'New task status', href: path('app_config_task_statuses_new') } },
-            { label: 'Task Types', href: path('app_config_task_types'), current: cur starts with 'app_config_task_types',
-              add: { label: 'New task type', href: path('app_config_task_types_new') } },
-            { label: 'Currencies', href: path('app_config_currencies'), current: cur starts with 'app_config_currencies',
-              add: { label: 'New currency', href: path('app_config_currencies_new') } },
-        ] },
+        { label: 'Config', icon: 'sliders', children: configLinks },
         { label: 'Administration', icon: 'settings', children: [
             { label: 'Overview', href: path('app_admin_dashboard'), current: cur == 'app_admin_dashboard' },
             { label: 'Audit Log', href: path('app_admin_audit_log'), current: cur == 'app_admin_audit_log' },

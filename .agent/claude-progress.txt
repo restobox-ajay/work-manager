@@ -4187,3 +4187,6 @@ Version20261006120000 (verified up/down, schema:validate in sync). Browser-check
 contractor (visibility, edit/fee rights, archived tagging, settings popups). symfony/validator added. No tests yet.
 ADR-072 (2026-10-06): all eight work-platform Tasks menu pages + authorization queue + priority; menu ordered
 Clients, Projects, Tasks. Migration Version20261007120000. Browser-checked as admin, client manager, contractor.
+ADR-075 (2026-10-07): Config now has nine work-platform lists (tags, payers, wallets, payment methods, task types,
+task statuses, email templates, currencies, countries) on one generic CRUD. Migration Version20261008130000.
+Browser-checked add/edit/delete/validation on every list. No tests yet.

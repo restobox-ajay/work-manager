@@ -4,81 +4,99 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
-use App\Service\Settings\WorkSettingsService;
+use App\Repository\UserRepository;
+use App\Service\Config\ConfigCrudService;
+use App\Service\Config\ConfigField;
+use App\Service\Config\ConfigListDefinition;
+use App\Service\Config\ConfigListRegistry;
+use App\Service\Task\TaskLookups;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 /**
- * Config (ADR-070/073): the task reference lists — statuses, types, currencies — each a plain CRUD: /config/<list>
- * (the table), /config/<list>/new and /config/<list>/{id}/edit (a form page; POST saves). Under /config, so
- * "settings" stays free for other things. Rows are not deleted: tasks point at them by id. Admins only.
+ * Config (ADR-073/074): every reference list an admin maintains — task statuses, task types, currencies, tags,
+ * payer entities, wallet entities, payment methods, email templates, countries — as plain CRUD pages:
+ * /config/<list> (the table), /config/<list>/new and /config/<list>/{id}/edit (a form; POST saves),
+ * /config/<list>/{id}/delete (POST, lists nothing references by id). Which fields each list has is
+ * ConfigListRegistry's; this controller is the same for all of them. Admins only.
  */
 #[IsGranted('ROLE_ADMIN')]
-#[Route('/config')]
+#[Route('/config/{kind}', requirements: ['kind' => ConfigListRegistry::KINDS])]
 final class ConfigListController extends AbstractWorkController
 {
-    public function __construct(private readonly WorkSettingsService $settings)
-    {
+    public function __construct(
+        private readonly ConfigListRegistry $registry,
+        private readonly ConfigCrudService $crud,
+    ) {
     }
 
-    #[Route('/task-statuses', name: 'app_config_task_statuses', defaults: ['kind' => 'task-statuses'], methods: ['GET'])]
-    #[Route('/task-types', name: 'app_config_task_types', defaults: ['kind' => 'task-types'], methods: ['GET'])]
-    #[Route('/currencies', name: 'app_config_currencies', defaults: ['kind' => 'currencies'], methods: ['GET'])]
-    public function list(string $kind): Response
+    #[Route('', name: 'app_config_list', methods: ['GET'])]
+    public function list(string $kind, TaskLookups $lookups): Response
     {
-        return $this->render('config/list.html.twig', $this->common($kind) + ['rows' => $this->settings->rows($kind)]);
+        $list = $this->registry->get($kind);
+        $hasUserColumn = array_filter($list->listedFields(), static fn ($field) => $field->type === ConfigField::USER) !== [];
+
+        return $this->render('config/list.html.twig', [
+            'list'   => $list,
+            'rows'   => $this->crud->rows($list),
+            'people' => $hasUserColumn ? $lookups->people() : [],
+        ]);
     }
 
-    #[Route('/task-statuses/new', name: 'app_config_task_statuses_new', defaults: ['kind' => 'task-statuses'], methods: ['GET', 'POST'])]
-    #[Route('/task-types/new', name: 'app_config_task_types_new', defaults: ['kind' => 'task-types'], methods: ['GET', 'POST'])]
-    #[Route('/currencies/new', name: 'app_config_currencies_new', defaults: ['kind' => 'currencies'], methods: ['GET', 'POST'])]
-    public function new(string $kind, Request $request): Response
+    #[Route('/new', name: 'app_config_new', methods: ['GET', 'POST'])]
+    public function new(string $kind, Request $request, UserRepository $users): Response
     {
-        return $this->form($kind, null, $request);
+        return $this->form($this->registry->get($kind), null, $request, $users);
     }
 
-    #[Route('/task-statuses/{id}/edit', name: 'app_config_task_statuses_edit', requirements: ['id' => '\d+'], defaults: ['kind' => 'task-statuses'], methods: ['GET', 'POST'])]
-    #[Route('/task-types/{id}/edit', name: 'app_config_task_types_edit', requirements: ['id' => '\d+'], defaults: ['kind' => 'task-types'], methods: ['GET', 'POST'])]
-    #[Route('/currencies/{id}/edit', name: 'app_config_currencies_edit', requirements: ['id' => '\d+'], defaults: ['kind' => 'currencies'], methods: ['GET', 'POST'])]
-    public function edit(string $kind, int $id, Request $request): Response
+    #[Route('/{id}/edit', name: 'app_config_edit', requirements: ['id' => '\d+'], methods: ['GET', 'POST'])]
+    public function edit(string $kind, int $id, Request $request, UserRepository $users): Response
     {
-        return $this->form($kind, $this->settings->find($kind, $id) ?? throw $this->createNotFoundException(), $request);
+        $list = $this->registry->get($kind);
+
+        return $this->form($list, $this->crud->find($list, $id) ?? throw $this->createNotFoundException(), $request, $users);
     }
 
-    /** The list's route name: app_config_task_statuses, …, with an optional suffix (_new, _edit). */
-    public static function routeName(string $kind, string $suffix = ''): string
+    #[Route('/{id}/delete', name: 'app_config_delete', requirements: ['id' => '\d+'], methods: ['POST'])]
+    public function delete(string $kind, int $id, Request $request): Response
     {
-        return 'app_config_'.str_replace('-', '_', $kind).$suffix;
+        $list = $this->registry->get($kind);
+        if (!$list->deletable) {
+            throw $this->createAccessDeniedException(sprintf('%s are referenced by tasks: switch one off instead.', $list->plural));
+        }
+        $row = $this->crud->find($list, $id) ?? throw $this->createNotFoundException();
+        $this->assertCsrf($request, 'config_delete_'.$kind.'_'.$id);
+
+        $this->crud->delete($list, $row, $this->viewer());
+        $this->addFlash('success', sprintf('%s deleted.', $list->singular));
+
+        return $this->redirectToRoute('app_config_list', ['kind' => $kind]);
     }
 
-    private function form(string $kind, ?object $row, Request $request): Response
+    private function form(ConfigListDefinition $list, ?object $row, Request $request, UserRepository $users): Response
     {
-        $values = $row !== null ? $this->settings->valuesFrom($row) : $this->settings->defaults($kind);
+        $values = $row !== null ? $this->crud->valuesFrom($list, $row) : $list->defaults;
         $errors = [];
 
         if ($request->isMethod('POST')) {
-            $this->assertCsrf($request, 'settings_'.$kind);
+            $this->assertCsrf($request, 'config_'.$list->kind);
             $values = $request->request->all();
-            $errors = $this->settings->save($kind, $row, $values, $this->viewer());
+            $errors = $this->crud->save($list, $row, $values, $this->viewer());
             if ($errors === []) {
-                $this->addFlash('success', sprintf('%s saved.', WorkSettingsService::LABELS[$kind]['singular']));
+                $this->addFlash('success', sprintf('%s saved.', $list->singular));
 
-                return $this->redirectToRoute(self::routeName($kind));
+                return $this->redirectToRoute('app_config_list', ['kind' => $list->kind]);
             }
         }
 
-        return $this->render('config/form.html.twig', $this->common($kind) + [
+        return $this->render('config/form.html.twig', [
+            'list'   => $list,
             'row'    => $row,
             'values' => $values,
             'errors' => $errors,
+            'people' => $users->findActiveOrderedByName(),
         ], new Response(status: $errors === [] ? 200 : 422));
-    }
-
-    /** @return array{kind: string, label: array{plural: string, singular: string}, routeBase: string} */
-    private function common(string $kind): array
-    {
-        return ['kind' => $kind, 'label' => WorkSettingsService::LABELS[$kind], 'routeBase' => self::routeName($kind)];
     }
 }

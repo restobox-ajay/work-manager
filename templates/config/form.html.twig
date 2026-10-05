@@ -1,36 +1,54 @@
 {% extends 'base.html.twig' %}
 {% import '_work/macros.html.twig' as ui %}
 
-{# Add / Edit one Config row (ADR-073), on its own page like the client and project forms. #}
-{% block title %}{{ row ? 'Edit ' ~ label.singular|lower : 'Add ' ~ label.singular|lower }}{% endblock %}
+{# Add / Edit one Config row (ADR-075): the list's fields from ConfigListRegistry, on its own page. #}
+{% block title %}{{ row ? 'Edit' : 'Add' }} {{ list.singular|lower }}{% endblock %}
 
 {% block body %}
-{% set back = path(routeBase) %}
+{% set back = path('app_config_list', {kind: list.kind}) %}
 <div class="page-head">
     <div class="ph-main">
-        <div class="eyebrow">Config · {{ label.plural }}</div>
-        <div class="ph-title"><h1>{{ row ? 'Edit ' : 'Add ' }}{{ label.singular|lower }}</h1></div>
+        <div class="eyebrow">Config · {{ list.plural }}</div>
+        <div class="ph-title"><h1>{{ row ? 'Edit' : 'Add' }} {{ list.singular|lower }}</h1></div>
     </div>
     <div class="ph-actions"><a class="btn outline back" href="{{ back }}">Back</a></div>
 </div>
 
 {{ ui.errors(errors) }}
 
-<form class="card mx-form" method="post" style="max-width:640px">
-    <input type="hidden" name="_token" value="{{ csrf_token('settings_' ~ kind) }}">
+<form class="card mx-form" method="post" style="max-width:760px">
+    <input type="hidden" name="_token" value="{{ csrf_token('config_' ~ list.kind) }}">
     <div class="form-grid">
-        {% if kind == 'currencies' %}
-            <div class="field"><label for="s-name">Short name <span class="req">*</span></label><input type="text" id="s-name" name="name" value="{{ values.name ?? '' }}" required maxlength="10" autofocus></div>
-            <div class="field"><label for="s-fx">FX rate <span class="req">*</span></label><input type="text" id="s-fx" name="fxRate" value="{{ values.fxRate ?? '' }}" required inputmode="decimal"><small>For CAD: how many CAD make 1 USD.</small></div>
-        {% else %}
-            <div class="field{{ kind == 'task-types' ? ' span-2' }}"><label for="s-name">Name <span class="req">*</span></label><input type="text" id="s-name" name="name" value="{{ values.name ?? '' }}" required maxlength="{{ kind == 'task-types' ? 60 : 50 }}" autofocus></div>
-            {% if kind == 'task-statuses' %}
-                <div class="field"><label for="s-order">Order</label><input type="number" id="s-order" name="order" value="{{ values.order ?? '' }}" min="0" max="9999"></div>
+        {% for field in list.fields %}
+            {% set id = 'cf-' ~ field.name %}
+            {% set value = values[field.name] ?? null %}
+            {% if field.type == 'checkbox' %}
+                <label class="mx-check span-2"><span>{{ field.label }}{% if field.help %} <small>({{ field.help }})</small>{% endif %}</span><input type="checkbox" name="{{ field.name }}" value="1" {{ value ? 'checked' }}></label>
             {% else %}
-                <div class="field span-2"><label for="s-desc">Description</label><input type="text" id="s-desc" name="description" value="{{ values.description ?? '' }}" maxlength="255"></div>
+                <div class="field{{ field.type == 'textarea' or loop.length == 1 ? ' span-2' }}">
+                    <label for="{{ id }}">{{ field.label }}{% if field.required %} <span class="req">*</span>{% endif %}</label>
+                    {% if field.type == 'textarea' %}
+                        <textarea id="{{ id }}" name="{{ field.name }}" rows="{{ field.name == 'body' ? 12 : 4 }}" {{ field.required ? 'required' }}>{{ value }}</textarea>
+                    {% elseif field.type == 'choice' %}
+                        <select id="{{ id }}" name="{{ field.name }}" {{ field.required ? 'required' }}>
+                            {% for key, label in field.choices %}<option value="{{ key }}" {{ value == key ? 'selected' }}>{{ label }}</option>{% endfor %}
+                        </select>
+                    {% elseif field.type == 'user' %}
+                        <select id="{{ id }}" name="{{ field.name }}">
+                            <option value="">—</option>
+                            {% for person in people %}<option value="{{ person.id }}" {{ value == person.id ? 'selected' }}>{{ person.name ?: person.email }} — {{ person.email }}</option>{% endfor %}
+                        </select>
+                    {% else %}
+                        <input id="{{ id }}" name="{{ field.name }}" value="{{ value }}"
+                               type="{{ field.type == 'integer' ? 'number' : 'text' }}"
+                               {{ field.type == 'decimal' ? 'inputmode=decimal' }}
+                               {{ field.maxLength ? 'maxlength=' ~ field.maxLength }}
+                               {{ field.required ? 'required' }}{{ loop.first ? ' autofocus' }}>
+                    {% endif %}
+                    {% if field.help %}<small>{{ field.help }}</small>{% endif %}
+                </div>
             {% endif %}
-            <label class="mx-check span-2"><span>Active <small>(offered on task forms)</small></span><input type="checkbox" name="isActive" value="1" {{ (values.isActive ?? false) ? 'checked' }}></label>
-        {% endif %}
+        {% endfor %}
     </div>
     <div class="form-actions" style="margin-top:16px">
         <a class="btn outline" href="{{ back }}">Cancel</a>

@@ -1,54 +1,64 @@
 {% extends 'base.html.twig' %}
 {% import '_work/macros.html.twig' as ui %}
 
-{# One Config list (ADR-073): its own page, CRUD style — the table here, Add and Edit on their own form pages. #}
-{% block title %}{{ label.plural }}{% endblock %}
+{# One Config list (ADR-075): its own CRUD page, columns from ConfigListRegistry. Add/Edit are separate form pages. #}
+{% block title %}{{ list.plural }}{% endblock %}
 
 {% block body %}
+{% set columns = list.listedFields %}
 <div class="page-head">
     <div class="ph-main">
         <div class="eyebrow">Config</div>
-        <div class="ph-title"><h1>{{ label.plural }}</h1></div>
-        <p class="lead">
-            {% if kind == 'task-statuses' %}Task forms offer the active ones, in this order. Paid is set by the payment flow, not by hand.
-            {% elseif kind == 'task-types' %}Task forms offer the active ones. Switch one off rather than removing it: existing tasks keep it.
-            {% else %}The currencies a task's payout can be in. CAD's FX rate is CAD per 1 USD.{% endif %}
-        </p>
+        <div class="ph-title"><h1>{{ list.plural }}</h1></div>
+        <p class="lead">{{ list.lead }}</p>
     </div>
-    <div class="ph-actions"><a class="btn success" href="{{ path(routeBase ~ '_new') }}">+ Add {{ label.singular|lower }}</a></div>
+    <div class="ph-actions"><a class="btn success" href="{{ path('app_config_new', {kind: list.kind}) }}">+ Add {{ list.singular|lower }}</a></div>
 </div>
 
 {{ ui.flashes() }}
 
-<div class="table-card" style="max-width:900px">
-    <table class="t">
-        <thead>
-            <tr>
-                <th style="width:60px">ID</th>
-                {% if kind == 'task-statuses' %}<th>Order</th><th>Name</th><th>Active</th>
-                {% elseif kind == 'task-types' %}<th>Name</th><th>Description</th><th>Active</th>
-                {% else %}<th>Short name</th><th>FX rate</th>{% endif %}
-                <th></th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for row in rows %}
+<div class="table-card">
+    <div class="tscroll">
+        <table class="t">
+            <thead>
                 <tr>
-                    <td class="muted">{{ row.id }}</td>
-                    {% if kind == 'task-statuses' %}
-                        <td>{{ row.order }}</td><td class="bold">{{ row.name }}</td><td>{{ ui.activeBadge(row.active) }}</td>
-                    {% elseif kind == 'task-types' %}
-                        <td class="bold">{{ row.name }}</td><td>{{ row.description ?? '—' }}</td><td>{{ ui.activeBadge(row.status) }}</td>
-                    {% else %}
-                        <td class="bold"><code>{{ row.shortName }}</code></td><td>{{ row.fxRate }}</td>
-                    {% endif %}
-                    <td class="actions"><a class="btn sm" href="{{ path(routeBase ~ '_edit', {id: row.id}) }}">Edit</a></td>
+                    <th style="width:60px">ID</th>
+                    {% for field in columns %}<th>{{ field.label }}</th>{% endfor %}
+                    <th></th>
                 </tr>
-            {% else %}
-                <tr><td colspan="5" class="empty"><b>Nothing here yet.</b></td></tr>
-            {% endfor %}
-        </tbody>
-    </table>
-    <div class="table-foot"><span>{{ rows|length }} {{ rows|length == 1 ? label.singular|lower : label.plural|lower }}</span></div>
+            </thead>
+            <tbody>
+                {% for row in rows %}
+                    <tr>
+                        <td class="muted">{{ row.id }}</td>
+                        {% for field in columns %}
+                            {% set value = attribute(row, field.getter) %}
+                            <td{{ loop.first ? ' class="bold"' }}>
+                                {%- if field.type == 'checkbox' -%}{{ ui.activeBadge(value) }}
+                                {%- elseif field.type == 'choice' -%}{{ field.choices[value.value ?? value] ?? (value.value ?? value) }}
+                                {%- elseif field.type == 'user' -%}{{ value ? (people[value] ?? '#' ~ value) : '—' }}
+                                {%- else -%}{{ value is same as(null) or value is same as('') ? '—' : ui.short(value ~ '', 80) }}
+                                {%- endif -%}
+                            </td>
+                        {% endfor %}
+                        <td class="actions">
+                            <span class="btn-row" style="justify-content:flex-end">
+                                <a class="btn sm" href="{{ path('app_config_edit', {kind: list.kind, id: row.id}) }}">Edit</a>
+                                {% if list.deletable %}
+                                    <form class="mx-form" method="post" action="{{ path('app_config_delete', {kind: list.kind, id: row.id}) }}" onsubmit="return confirm('Delete this {{ list.singular|lower }}?');">
+                                        <input type="hidden" name="_token" value="{{ csrf_token('config_delete_' ~ list.kind ~ '_' ~ row.id) }}">
+                                        <button class="btn sm danger" type="submit">Delete</button>
+                                    </form>
+                                {% endif %}
+                            </span>
+                        </td>
+                    </tr>
+                {% else %}
+                    <tr><td colspan="{{ columns|length + 2 }}" class="empty"><b>Nothing here yet.</b> <a href="{{ path('app_config_new', {kind: list.kind}) }}">Add the first one</a>.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <div class="table-foot"><span>{{ rows|length }} {{ rows|length == 1 ? list.singular|lower : list.plural|lower }}</span></div>
 </div>
 {% endblock %}

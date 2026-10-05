@@ -2313,3 +2313,26 @@ each list has its own routes: `/config/<list>` (`app_config_<list>`), `/config/<
 `/settings/{kind}` (`?add=1` / `?edit=` query flags). Controller `ConfigListController`, template `config/list`.
 The Administration item for the app's general config page is labelled "General Config" so two menu entries are
 not both called "Config".
+
+## ADR-075: Config holds all of work-platform's reference lists, through one generic CRUD (owner request, 2026-10-07)
+
+**Context.** The owner asked for work-platform's tags, payer entities, wallet entities, payment methods, email
+templates, currencies and countries under Config, next to task statuses and task types. ADR-073 gave each list its
+own controller actions and templates; nine lists that way would be nine near-identical copies.
+
+**Decision.**
+- One `ConfigListController` serves every list at `/config/{kind}` (list), `/config/{kind}/new`,
+  `/config/{kind}/{id}/edit` and `/config/{kind}/{id}/delete` (POST, CSRF). Route names `app_config_list|new|edit|delete`. Admins only.
+- `ConfigListRegistry` describes each list (`ConfigListDefinition` + `ConfigField`s): fields, types, limits,
+  uniqueness and messages taken from work-platform's Settings controllers and entity constraints. `ConfigCrudService`
+  does the save: normalise → field rules → list rule (payer of type User needs a user) → entity `#[Assert]` rules →
+  flush → audit `config.<kind>_create|update|delete`.
+- Lists referenced from tasks by id (task statuses, task types, currencies, payers) cannot be deleted; switch off or edit.
+- Menu order follows work-platform's Settings menu: Tags, Payer Entities, Wallet Entities, Payment Methods, Task Types,
+  Task Status, Email Templates, Currency, Country — each with a "+".
+- Entities copied from work-platform with the same tables and columns. Migration `Version20261008130000` creates
+  `tag`, `payer`, `wallet_entity`, `payment_method`, `email_template` and `country` empty (work-platform seeds none).
+  `WorkSettingsService` (ADR-073) is removed.
+
+**Consequences.** A new reference list is one registry entry plus its entity. The payment tables (`task_payment`,
+`payment_request`) come with the payment system, not here.
