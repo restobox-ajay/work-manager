@@ -10,9 +10,9 @@
         <div class="ph-title"><h1>{{ client.name }}</h1> {{ ui.activeBadge(client.active) }}{% if client.deleted %} <span class="badge warn">Removed from the list</span>{% endif %}</div>
     </div>
     <div class="ph-actions">
-        <a class="btn outline" href="{{ path('app_task_index', {clientId: client.id}) }}">Tasks</a>
+        <a class="btn info" href="{{ path('app_task_index', {clientId: client.id}) }}">Tasks</a>
         {% if is_granted('PROJECT_CREATE', client) %}<a class="btn success" href="{{ path('app_project_create', {clientId: client.id}) }}">+ New project</a>{% endif %}
-        {% if is_granted('CLIENT_EDIT', client) %}<a class="btn" href="{{ path('app_client_edit', {id: client.id}) }}">Edit</a>{% endif %}
+        {% if is_granted('CLIENT_EDIT', client) %}<a class="btn warning" href="{{ path('app_client_edit', {id: client.id}) }}">Edit</a>{% endif %}
     </div>
 </div>
 
@@ -31,7 +31,7 @@
                                 <td><a class="bold" href="{{ path('app_project_view', {id: project.id}) }}">{{ project.name }}</a></td>
                                 <td>{{ ui.activeBadge(project.active) }}</td>
                                 <td class="nowrap">{{ ui.ts(project.createdAt) }}</td>
-                                <td class="actions"><a class="btn xs outline" href="{{ path('app_task_index', {projectId: project.id}) }}">Tasks</a></td>
+                                <td class="actions"><a class="btn info xs" href="{{ path('app_task_index', {projectId: project.id}) }}">Tasks</a></td>
                             </tr>
                         {% else %}
                             <tr><td colspan="4" class="empty"><b>No projects yet.</b></td></tr>
@@ -45,6 +45,7 @@
         <div class="card">
             <h2>Details</h2>
             <dl class="kv">
+                <dt>Company Name</dt><dd>{{ client.companyName ?? '—' }}</dd>
                 <dt>Email</dt><dd>{{ client.email ? client.email : '—' }}</dd>
                 <dt>Phone</dt><dd>{{ client.phone ?? '—' }}</dd>
                 <dt>Website</dt><dd>{% if client.website and (client.website starts with 'http://' or client.website starts with 'https://') %}<a href="{{ client.website }}" rel="noopener noreferrer" target="_blank">{{ client.website }}</a>{% else %}{{ client.website ?? '—' }}{% endif %}</dd>

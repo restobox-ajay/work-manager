@@ -45,7 +45,7 @@
             (as {{ app.session.get('_impersonating_by') }})
             <form method="post" action="{{ path('app_impersonate_exit') }}">
                 <input type="hidden" name="_token" value="{{ csrf_token('impersonate_exit') }}">
-                <button type="submit" class="exit-impersonation-btn">Exit Impersonation</button>
+                <button type="submit" class="btn warning exit-impersonation-btn">Exit Impersonation</button>
             </form>
         </div>
         {% endif %}

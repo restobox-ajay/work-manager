@@ -1,0 +1,149 @@
+{% extends 'base.html.twig' %}
+{% import '_work/macros.html.twig' as ui %}
+
+{% set isTasks = kind.value == 'tasks' %}
+{% set backHref = invoice ? path('app_invoice_view', {id: invoice.id}) : path(isTasks ? 'app_invoice_tasks' : 'app_invoice_independent') %}
+{% block title %}{{ invoice ? 'Edit invoice ' ~ invoice.number : 'New ' ~ kind.label|lower }}{% endblock %}
+
+{% macro line(index, line, isTasks, gstChoices) %}
+    <tr class="inv-line">
+        <td class="inv-pos"></td>
+        <td>
+            {% if line.taskId %}
+                <input type="hidden" name="lines[{{ index }}][taskId]" value="{{ line.taskId }}">
+                <span class="badge info" title="Billed from an approved task">Task #{{ line.taskId }}</span>
+            {% endif %}
+            <input type="text" name="lines[{{ index }}][name]" value="{{ line.name }}" maxlength="255" required aria-label="Item" placeholder="Item">
+            <textarea name="lines[{{ index }}][description]" rows="1" aria-label="Item description" placeholder="Description (optional)">{{ line.description }}</textarea>
+        </td>
+        <td>
+            {# GST is chosen from Settings › Tax Rates (ADR-078). #}
+            <select name="lines[{{ index }}][gstRate]" class="inv-num" data-gst aria-label="GST %">
+                {% for value, label in gstChoices %}<option value="{{ value }}" {{ (value + 0) == (line.gstRate + 0) ? 'selected' }}>{{ label }}</option>{% endfor %}
+            </select>
+        </td>
+        <td><input type="text" inputmode="decimal" name="lines[{{ index }}][quantity]" value="{{ line.quantity }}" class="inv-num" data-qty aria-label="Quantity"></td>
+        <td><input type="text" inputmode="decimal" name="lines[{{ index }}][rate]" value="{{ line.rate }}" class="inv-num" data-rate aria-label="Rate"></td>
+        <td><input type="text" inputmode="decimal" name="lines[{{ index }}][amount]" value="{{ line.amount ?? '' }}" class="inv-num" data-amount aria-label="Amount"></td>
+        <td class="num nowrap" data-total>—</td>
+        <td><button type="button" class="btn danger xs" data-remove aria-label="Remove item">✕</button></td>
+    </tr>
+{% endmacro %}
+
+{% block body %}
+{% import _self as f %}
+<div class="page-head">
+    <div class="ph-main">
+        <div class="eyebrow">Invoices · {{ kind.label }}</div>
+        <div class="ph-title"><h1>{{ invoice ? 'Edit invoice ' ~ invoice.number : (isTasks ? 'Invoice approved tasks' : 'New independent invoice') }}</h1></div>
+        {% if not invoice %}<p class="lead">The invoice number is given on save, from the billing profile's prefix and next number.</p>{% endif %}
+    </div>
+    <div class="ph-actions"><a class="btn secondary back" href="{{ backHref }}">Back</a></div>
+</div>
+
+{{ ui.errors(errors) }}
+
+<form class="card mx-form invoice-form" method="post" id="invoice-form" style="max-width:1100px">
+    <input type="hidden" name="_token" value="{{ csrf_token('invoice_form') }}">
+    <div class="form-grid">
+        {# Name / email / phone rows (below) are three across and stack on narrow screens. #}
+        <div class="field">
+            <label for="f-invoiceDate">Invoice Date <span class="req">*</span></label>
+            <input type="date" id="f-invoiceDate" name="invoiceDate" value="{{ input.invoiceDate }}" required>
+        </div>
+        <div class="field">
+            <label for="f-dueDate">Due Date</label>
+            <input type="date" id="f-dueDate" name="dueDate" value="{{ input.dueDate }}">
+        </div>
+
+        <div class="section-label">Billed By</div>
+        <div class="field span-all">
+            <label for="f-billingProfileId">Billing Profile <span class="req">*</span></label>
+            <select id="f-billingProfileId" name="billingProfileId" required data-profile>
+                <option value="">— Choose —</option>
+                {% for p in profiles %}<option value="{{ p.id }}" {{ input.billingProfileId == p.id ? 'selected' }}>{{ p.name }} ({{ p.invoicePrefix }}{{ p.nextNumber }}…)</option>{% endfor %}
+            </select>
+            {% if profiles is empty %}<small>No billing profiles yet: <a href="{{ path('app_config_new', {kind: 'billing-profiles'}) }}">add one under Config</a>.</small>
+            {% else %}<small>Choosing one fills the fields below; edit them for this invoice if needed.</small>{% endif %}
+        </div>
+        <div class="form-grid three span-all inv-head-row">
+            <div class="field"><label for="f-fromName">Name <span class="req">*</span></label><input type="text" id="f-fromName" name="fromName" value="{{ input.fromName }}" maxlength="255" required></div>
+            <div class="field"><label for="f-fromEmail">Email</label><input type="email" id="f-fromEmail" name="fromEmail" value="{{ input.fromEmail }}" maxlength="255"></div>
+            <div class="field"><label for="f-fromPhone">Phone</label><input type="text" id="f-fromPhone" name="fromPhone" value="{{ input.fromPhone }}" maxlength="30"></div>
+        </div>
+        <div class="field"><label for="f-fromTaxNumber">Tax Number (GSTIN)</label><input type="text" id="f-fromTaxNumber" name="fromTaxNumber" value="{{ input.fromTaxNumber }}" maxlength="50"></div>
+        <div class="field span-all"><label for="f-fromAddress">Address</label><textarea id="f-fromAddress" name="fromAddress" rows="3">{{ input.fromAddress }}</textarea></div>
+
+        <div class="section-label">Billed To</div>
+        <div class="field span-all">
+            <label for="f-clientId">Client{% if isTasks %} <span class="req">*</span>{% endif %}</label>
+            {% if isTasks %}
+                <input type="hidden" name="clientId" value="{{ input.clientId }}">
+                <select id="f-clientId" disabled>{% for c in clients %}{% if c.id == input.clientId %}<option selected>{{ c.name }}</option>{% endif %}{% endfor %}</select>
+                <small>The tasks' client.</small>
+            {% else %}
+                <select id="f-clientId" name="clientId" data-client>
+                    <option value="">— None: type the details below —</option>
+                    {% for c in clients %}<option value="{{ c.id }}" {{ input.clientId == c.id ? 'selected' }}>{{ c.name }}</option>{% endfor %}
+                </select>
+                <small>Choosing a client fills the fields below from its saved address.</small>
+            {% endif %}
+        </div>
+        <div class="form-grid three span-all inv-head-row">
+            <div class="field"><label for="f-toName">Name <span class="req">*</span></label><input type="text" id="f-toName" name="toName" value="{{ input.toName }}" maxlength="255" required></div>
+            <div class="field"><label for="f-toEmail">Email</label><input type="email" id="f-toEmail" name="toEmail" value="{{ input.toEmail }}" maxlength="255"></div>
+            <div class="field"><label for="f-toPhone">Phone</label><input type="text" id="f-toPhone" name="toPhone" value="{{ input.toPhone }}" maxlength="30"></div>
+        </div>
+        <div class="field span-all"><label for="f-toAddress">Address</label><textarea id="f-toAddress" name="toAddress" rows="3">{{ input.toAddress }}</textarea></div>
+
+        <div class="section-label">Items</div>
+        {# The items' currency (USD unless changed): every amount on the invoice is in it. #}
+        <div class="field">
+            <label for="f-currency">Currency <span class="req">*</span></label>
+            {% if isTasks %}
+                <input type="hidden" name="currency" value="{{ input.currency }}">
+                <input type="text" id="f-currency" value="{{ input.currency }}" disabled>
+                <small>The tasks' currency.</small>
+            {% else %}
+                <select id="f-currency" name="currency" required data-currency>
+                    {% for code in currencies %}<option value="{{ code }}" {{ code == input.currency ? 'selected' }}>{{ code }}</option>{% endfor %}
+                </select>
+            {% endif %}
+        </div>
+        <div class="field span-all">
+            <div class="tscroll">
+                <table class="t inv-lines">
+                    <thead>
+                        <tr><th></th><th>Item</th><th style="width:150px">GST %</th><th style="width:90px">Quantity</th><th style="width:110px">Rate (<span data-currency-label>{{ input.currency }}</span>)</th><th style="width:120px">Amount (<span data-currency-label>{{ input.currency }}</span>)</th><th class="num" style="width:110px">Total</th><th></th></tr>
+                    </thead>
+                    <tbody data-lines>
+                        {% for line in input.lines %}{{ f.line(loop.index0, line, isTasks, gstChoices) }}{% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr><td colspan="6" class="num">Amount</td><td class="num nowrap" data-sum="amount">—</td><td></td></tr>
+                        <tr data-tax-row><td colspan="6" class="num">CGST</td><td class="num nowrap" data-sum="cgst">—</td><td></td></tr>
+                        <tr data-tax-row><td colspan="6" class="num">SGST</td><td class="num nowrap" data-sum="sgst">—</td><td></td></tr>
+                        <tr><td colspan="6" class="num bold">Total (<span data-currency-label>{{ input.currency }}</span>)</td><td class="num nowrap bold" data-sum="total">—</td><td></td></tr>
+                    </tfoot>
+                </table>
+            </div>
+            <div style="margin-top:8px"><button type="button" class="btn success sm" data-add-line>+ Add item</button></div>
+            <small>GST rates come from <a href="{{ path('app_settings_tax_rates') }}">Settings › Tax Rates</a> and are split equally into CGST and SGST. Amount is Quantity × Rate; type an amount to set it yourself (the rate then follows). Quantity and Rate can be left empty when you enter the amount. Total adds the GST.</small>
+        </div>
+
+        <div class="field span-all">
+            <label for="f-description">Description / Notes</label>
+            <textarea id="f-description" name="description" rows="3" placeholder="Printed under the items, e.g. payment terms or bank details">{{ input.description }}</textarea>
+        </div>
+    </div>
+    <div class="form-actions" style="margin-top:16px">
+        <a class="btn secondary" href="{{ backHref }}">Cancel</a>
+        <button class="btn primary" type="submit">{{ invoice ? 'Save' : 'Create invoice' }}</button>
+    </div>
+
+    <template id="inv-line-template">{{ f.line('__i__', {taskId: null, name: '', description: '', gstRate: '0', quantity: '1', rate: ''}, isTasks, gstChoices) }}</template>
+    <script type="application/json" id="inv-profiles">{{ profiles|map(p => {id: p.id, fromName: p.name, fromAddress: p.addressText, fromEmail: p.email ?? '', fromPhone: p.phone ?? '', fromTaxNumber: p.taxNumber ?? ''})|json_encode(constant('JSON_HEX_TAG') b-or constant('JSON_HEX_AMP'))|raw }}</script>
+    <script type="application/json" id="inv-clients">{{ clientCards|json_encode(constant('JSON_HEX_TAG') b-or constant('JSON_HEX_AMP'))|raw }}</script>
+</form>
+<script src="{{ versioned('/js/invoice-form.js') }}" defer></script>
+{% endblock %}

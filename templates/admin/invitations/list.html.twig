@@ -35,7 +35,7 @@
             <td>
                 <form method="post" action="{{ path('app_admin_users_invitations_resend', {id: invitation.id}) }}" style="display:inline">
                     <input type="hidden" name="_token" value="{{ csrf_token('admin_invite_resend_' ~ invitation.id) }}">
-                    <button type="submit" class="resend-btn">Resend</button>
+                    <button type="submit" class="btn info resend-btn">Resend</button>
                 </form>
             </td>
         </tr>

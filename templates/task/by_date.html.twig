@@ -30,7 +30,7 @@
         <input type="date" id="bd-from" name="startDate" value="{{ startDate }}" required>
         <label for="bd-to">To</label>
         <input type="date" id="bd-to" name="endDate" value="{{ endDate }}" required>
-        <button class="btn sm" type="submit">Show</button>
+        <button class="btn info sm" type="submit">Show</button>
         <span class="grow"></span>
         <span class="muted small">{{ groups|length }} day{{ groups|length == 1 ? '' : 's' }}, {{ groups|reduce((n, g) => n + g.tasks|length, 0) }} task{{ groups|reduce((n, g) => n + g.tasks|length, 0) == 1 ? '' : 's' }}</span>
     </form>

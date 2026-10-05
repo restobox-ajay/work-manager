@@ -10,9 +10,9 @@
         <div class="ph-title"><h1>{{ project.name }}</h1> {{ ui.activeBadge(project.active) }}</div>
     </div>
     <div class="ph-actions">
-        <a class="btn outline" href="{{ path('app_task_index', {projectId: project.id}) }}">All tasks</a>
+        <a class="btn info" href="{{ path('app_task_index', {projectId: project.id}) }}">All tasks</a>
         {% if is_granted('TASK_CREATE') and canEdit %}<a class="btn success" href="{{ path('app_task_create', {projectId: project.id}) }}">+ New task</a>{% endif %}
-        {% if canEdit %}<a class="btn" href="{{ path('app_project_edit', {id: project.id}) }}">Edit</a>{% endif %}
+        {% if canEdit %}<a class="btn warning" href="{{ path('app_project_edit', {id: project.id}) }}">Edit</a>{% endif %}
     </div>
 </div>
 
@@ -81,8 +81,8 @@
                                     </select>
                                     <label class="check"><input type="checkbox" name="canAccessTaskFee" value="1" {{ row.canAccessTaskFee == 1 ? 'checked' }}> Can see task fees</label>
                                     <span class="grow" style="flex:1"></span>
-                                    <button class="btn sm" type="submit">Save</button>
-                                    <button class="btn sm danger" type="submit" name="remove" value="1" onclick="return confirm('Remove this person from the project?');">Remove</button>
+                                    <button class="btn primary sm" type="submit">Save</button>
+                                    <button class="btn danger sm" type="submit" name="remove" value="1" onclick="return confirm('Remove this person from the project?');">Remove</button>
                                 </form>
                             </td>
                         {% else %}
@@ -109,7 +109,7 @@
                 {% for permission in permissions %}<option>{{ permission }}</option>{% endfor %}
             </select>
             <label class="check"><input type="checkbox" name="canAccessTaskFee" value="1"> Can see task fees</label>
-            <button class="btn sm success" type="submit">Add to project</button>
+            <button class="btn success sm" type="submit">Add to project</button>
         </form>
     {% endif %}
 </div>

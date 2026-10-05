@@ -19,7 +19,7 @@
         {% if client %}<p class="lead">{{ client.name }}</p>{% endif %}
     </div>
     <div class="ph-actions">
-        <a class="btn outline back" href="{{ client ? path('app_client_view', {id: client.id}) : path('app_client_index') }}">Back</a>
+        <a class="btn secondary back" href="{{ client ? path('app_client_view', {id: client.id}) : path('app_client_index') }}">Back</a>
     </div>
 </div>
 
@@ -39,6 +39,7 @@
                    {% if not client %}data-suggest-url="{{ path('app_client_code') }}"{% endif %}>
             <small>Three letters identify the client on tasks.{% if not client %} Leave blank and type the name to get a suggestion.{% endif %}</small>
         </div>
+        {{ f.text('companyName', 'Company Name', values, 'maxlength="255" placeholder="Registered business name"') }}
         {{ f.text('email', 'Email', values, 'maxlength="100" inputmode="email"') }}
         {{ f.text('phone', 'Phone', values, 'maxlength="20" inputmode="tel"') }}
         {{ f.text('website', 'Website', values, 'maxlength="255" placeholder="example.com"') }}
@@ -73,8 +74,8 @@
         {% endif %}
     </div>
     <div class="form-actions" style="margin-top:16px">
-        <a class="btn outline" href="{{ client ? path('app_client_view', {id: client.id}) : path('app_client_index') }}">Cancel</a>
-        <button class="btn" type="submit">{{ client ? 'Save' : 'Create client' }}</button>
+        <a class="btn secondary" href="{{ client ? path('app_client_view', {id: client.id}) : path('app_client_index') }}">Cancel</a>
+        <button class="btn primary" type="submit">{{ client ? 'Save' : 'Create client' }}</button>
     </div>
 </form>
 

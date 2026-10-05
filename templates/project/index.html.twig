@@ -30,8 +30,8 @@
             <option value="active" {{ status == 'active' ? 'selected' }}>Active</option>
             <option value="archived" {{ status == 'archived' ? 'selected' }}>Archive</option>
         </select>
-        <button class="btn sm" type="submit">Filter</button>
-        {% if filters.term or filters.clientId or status %}<a class="btn sm outline" href="{{ path('app_project_index') }}">Reset</a>{% endif %}
+        <button class="btn primary sm" type="submit">Filter</button>
+        {% if filters.term or filters.clientId or status %}<a class="btn secondary sm" href="{{ path('app_project_index') }}">Reset</a>{% endif %}
         <span class="grow"></span>
     </form>
     <div class="tscroll">
@@ -55,8 +55,8 @@
                         <td>{{ ui.activeBadge(project.active) }}</td>
                         <td>{{ (contractors[project.id] ?? [])|map(u => u.name ?: u.email)|join(', ') ?: '—' }}</td>
                         <td class="actions">
-                            <a class="btn xs outline" href="{{ path('app_task_index', {projectId: project.id}) }}">Tasks</a>
-                            {% if is_granted('PROJECT_EDIT', project) %}<a class="btn xs" href="{{ path('app_project_edit', {id: project.id}) }}">Edit</a>{% endif %}
+                            <a class="btn info xs" href="{{ path('app_task_index', {projectId: project.id}) }}">Tasks</a>
+                            {% if is_granted('PROJECT_EDIT', project) %}<a class="btn warning xs" href="{{ path('app_project_edit', {id: project.id}) }}">Edit</a>{% endif %}
                         </td>
                     </tr>
                 {% else %}

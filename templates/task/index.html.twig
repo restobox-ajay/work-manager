@@ -82,8 +82,8 @@
             <option value="">All types</option>
             {% for id, name in types %}<option value="{{ id }}" {{ filters.taskTypeId == id ? 'selected' }}>{{ name }}</option>{% endfor %}
         </select>
-        <button class="btn sm" type="submit">Filter</button>
-        {% if params|length > 1 %}<a class="btn sm outline" href="{{ path(listRoute) }}">Reset</a>{% endif %}
+        <button class="btn primary sm" type="submit">Filter</button>
+        {% if params|length > 1 %}<a class="btn secondary sm" href="{{ path(listRoute) }}">Reset</a>{% endif %}
     </form>
     <div class="tscroll">
         <table class="t">
@@ -129,7 +129,7 @@
                             <td colspan="4" class="muted small center">—</td>
                         {% endif %}
                         <td class="actions">
-                            {% if row.canEdit %}<a class="btn xs" href="{{ path('app_task_edit', {id: task.id}) }}">Edit</a>{% endif %}
+                            {% if row.canEdit %}<a class="btn warning xs" href="{{ path('app_task_edit', {id: task.id}) }}">Edit</a>{% endif %}
                         </td>
                     </tr>
                 {% else %}

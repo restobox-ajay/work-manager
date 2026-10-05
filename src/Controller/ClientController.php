@@ -26,7 +26,7 @@ final class ClientController extends AbstractWorkController
 {
     /** The form's fields, as ClientService names them. */
     private const FORM_FIELDS = [
-        'name', 'email', 'clientCode', 'website', 'phone', 'streetAddress1', 'streetAddress2',
+        'name', 'companyName', 'email', 'clientCode', 'website', 'phone', 'streetAddress1', 'streetAddress2',
         'city', 'province', 'state', 'zipCode', 'country', 'isActive',
     ];
 

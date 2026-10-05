@@ -11,7 +11,7 @@
         <div class="ph-title"><h1>{{ project ? 'Edit project' : 'New project' }}</h1></div>
         {% if project %}<p class="lead">{{ project.name }}</p>{% endif %}
     </div>
-    <div class="ph-actions"><a class="btn outline back" href="{{ back }}">Back</a></div>
+    <div class="ph-actions"><a class="btn secondary back" href="{{ back }}">Back</a></div>
 </div>
 
 {{ ui.errors(errors) }}
@@ -52,8 +52,8 @@
         </div>
     </div>
     <div class="form-actions" style="margin-top:16px">
-        <a class="btn outline" href="{{ back }}">Cancel</a>
-        <button class="btn" type="submit">{{ project ? 'Save' : 'Create project' }}</button>
+        <a class="btn secondary" href="{{ back }}">Cancel</a>
+        <button class="btn primary" type="submit">{{ project ? 'Save' : 'Create project' }}</button>
     </div>
 </form>
 {% endblock %}

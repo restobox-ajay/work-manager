@@ -1,0 +1,66 @@
+{% extends 'base.html.twig' %}
+{% import '_work/macros.html.twig' as ui %}
+
+{% block title %}Settings · Tax Rates{% endblock %}
+
+{% macro row(index, row, saved) %}
+    <tr>
+        <td>
+            {% if row.id ?? null %}
+                <input type="hidden" name="rows[{{ index }}][id]" value="{{ row.id }}">
+                <code>{{ row.code ?? (saved[row.id] is defined ? saved[row.id].code : '') }}</code>
+            {% else %}
+                <input type="text" name="rows[{{ index }}][code]" value="{{ row.code ?? '' }}" maxlength="10" pattern="[A-Za-z0-9_\-]{1,10}" title="1 to 10 letters, digits, - or _" placeholder="GST18" aria-label="Code" style="width:110px">
+            {% endif %}
+        </td>
+        <td><input type="text" name="rows[{{ index }}][name]" value="{{ row.name ?? '' }}" maxlength="60" required aria-label="Name"></td>
+        <td><input type="text" inputmode="decimal" name="rows[{{ index }}][rate]" value="{{ row.rate ?? '' }}" required aria-label="Rate (%)" style="width:90px"></td>
+        <td><input type="checkbox" name="rows[{{ index }}][isActive]" value="1" {{ (row.isActive ?? true) ? 'checked' }} aria-label="Active"></td>
+        <td class="muted nowrap">{% set entity = (row.id ?? null) ? saved[row.id] ?? null : null %}{{ entity and entity.updatedAt ? entity.updatedAt|date('M j, Y g:i a') : '—' }}</td>
+    </tr>
+{% endmacro %}
+
+{% block body %}
+{% import _self as f %}
+<div class="page-head">
+    <div class="ph-main">
+        <div class="eyebrow">Settings</div>
+        <div class="ph-title"><h1>Settings</h1></div>
+        <p class="lead">Values the app applies. Reference lists (task statuses, currencies, …) are under Config.</p>
+    </div>
+</div>
+
+{% include 'settings/_tabs.html.twig' with { current: 'app_settings_tax_rates' } %}
+
+{{ ui.flashes() }}
+{{ ui.errors(errors) }}
+
+<form class="table-card mx-form" method="post" style="max-width:760px" id="tax-rates-form">
+    <input type="hidden" name="_token" value="{{ csrf_token('settings_tax_rates') }}">
+    <div class="tscroll">
+        <table class="t">
+            <thead><tr><th>Code</th><th>Name</th><th>Rate (%)</th><th>Active</th><th>Last updated</th></tr></thead>
+            <tbody data-rows>
+                {% for row in rows %}{{ f.row(loop.index0, row, saved) }}{% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <div class="table-foot">
+        <span class="grow">Invoice lines choose their GST % from the active rates. A saved invoice keeps the rate it was saved with. Switch a rate off rather than removing it.</span>
+        <button type="button" class="btn success" data-add-row>+ Add rate</button>
+        <button class="btn primary" type="submit">Save tax rates</button>
+    </div>
+    <template id="tax-rate-row">{{ f.row('__i__', {}, saved) }}</template>
+</form>
+<script>
+    (function () {
+        var form = document.getElementById('tax-rates-form');
+        var body = form.querySelector('[data-rows]');
+        var next = body.rows.length;
+        form.querySelector('[data-add-row]').addEventListener('click', function () {
+            body.insertAdjacentHTML('beforeend', document.getElementById('tax-rate-row').innerHTML.replace(/__i__/g, String(next++)));
+            body.lastElementChild.querySelector('input[type="text"]').focus();
+        });
+    })();
+</script>
+{% endblock %}

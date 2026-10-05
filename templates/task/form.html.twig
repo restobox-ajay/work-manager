@@ -17,7 +17,7 @@
         <div class="ph-title"><h1>{{ task ? 'Edit task' : 'New task' }}</h1></div>
         {% if task %}<p class="lead">#{{ task.id }} {{ ui.short(task.name, 120) }}</p>{% endif %}
     </div>
-    <div class="ph-actions"><a class="btn outline back" href="{{ back }}">Back</a></div>
+    <div class="ph-actions"><a class="btn secondary back" href="{{ back }}">Back</a></div>
 </div>
 
 {{ ui.errors(errors) }}
@@ -116,8 +116,8 @@
         </div>
     </div>
     <div class="form-actions" style="margin-top:16px">
-        <a class="btn outline" href="{{ back }}">Cancel</a>
-        <button class="btn" type="submit">{{ task ? 'Save' : 'Create task' }}</button>
+        <a class="btn secondary" href="{{ back }}">Cancel</a>
+        <button class="btn primary" type="submit">{{ task ? 'Save' : 'Create task' }}</button>
     </div>
 </form>
 {% endblock %}

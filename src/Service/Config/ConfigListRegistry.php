@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service\Config;
 
+use App\Entity\Settings\BillingProfile;
 use App\Entity\Settings\Country;
 use App\Entity\Settings\Currency;
 use App\Entity\Settings\EmailTemplate;
@@ -26,7 +27,7 @@ use App\Service\Config\ConfigField as F;
 final class ConfigListRegistry
 {
     /** The URL slugs, for the route requirement. */
-    public const KINDS = 'task-statuses|task-types|currencies|tags|payers|wallet-entities|payment-methods|email-templates|countries';
+    public const KINDS = 'task-statuses|task-types|currencies|tags|payers|wallet-entities|payment-methods|email-templates|countries|billing-profiles';
 
     /** @var array<string, ConfigListDefinition>|null */
     private ?array $definitions = null;
@@ -123,6 +124,29 @@ final class ConfigListRegistry
                 new F('sortOrder', 'Sort Order', 'getSortOrder', 'setSortOrder', F::INTEGER),
             ], ['sortOrder' => 'ASC', 'name' => 'ASC'], true,
                 'Countries offered in address forms, in this order.'),
+            new ConfigListDefinition('billing-profiles', BillingProfile::class, 'Billing Profiles', 'Billing profile', [
+                new F('name', 'Business Name', 'getName', 'setName', required: true, maxLength: 100),
+                new F('streetAddress1', 'Street Address 1', 'getStreetAddress1', 'setStreetAddress1', maxLength: 255, listed: false),
+                new F('streetAddress2', 'Street Address 2', 'getStreetAddress2', 'setStreetAddress2', maxLength: 255, listed: false),
+                new F('city', 'City', 'getCity', 'setCity', maxLength: 100),
+                new F('state', 'State', 'getState', 'setState', maxLength: 100, listed: false),
+                new F('zipCode', 'Zip / PIN Code', 'getZipCode', 'setZipCode', maxLength: 20, listed: false),
+                new F('country', 'Country', 'getCountry', 'setCountry', maxLength: 100),
+                new F('email', 'Email', 'getEmail', 'setEmail', maxLength: 255),
+                new F('phone', 'Phone', 'getPhone', 'setPhone', maxLength: 30, listed: false),
+                new F('taxNumber', 'Tax Number (GSTIN)', 'getTaxNumber', 'setTaxNumber', maxLength: 50, listed: false, help: 'Printed under the address when set.'),
+                new F('invoicePrefix', 'Invoice Prefix', 'getInvoicePrefix', 'setInvoicePrefix', required: true, maxLength: 20,
+                    unique: 'Another billing profile already uses this prefix.', help: 'phpINV gives numbers like phpINV1057.'),
+                new F('nextNumber', 'Next Number', 'getNextNumber', 'setNextNumber', F::INTEGER, help: 'The number the next invoice from this profile gets.'),
+                $active('isActive', 'setIsActive'),
+            ], ['name' => 'ASC'], false,
+                'Your own businesses: an invoice is "Billed By" one of these, and numbered from its prefix and next number.',
+                check: static fn (array $values) => [
+                    ...(($values['email'] ?? null) !== null && filter_var($values['email'], FILTER_VALIDATE_EMAIL) === false ? ['Enter a valid email address.'] : []),
+                    ...(($values['nextNumber'] ?? 0) < 1 ? ['Next Number must be 1 or more.'] : []),
+                    ...(preg_match('/^[A-Za-z0-9\/_-]*$/', (string) ($values['invoicePrefix'] ?? '')) !== 1 ? ['Invoice Prefix can use letters, digits, "-", "_" and "/" only.'] : []),
+                ],
+                defaults: ['invoicePrefix' => 'INV', 'nextNumber' => 1, 'isActive' => true]),
         ];
 
         $byKind = [];

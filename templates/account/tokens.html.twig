@@ -23,7 +23,7 @@
         <label for="name">Token Name</label>
         <input type="text" id="name" name="name" required>
     </div>
-    <button type="submit">Create Token</button>
+    <button type="submit" class="btn success">Create Token</button>
 </form>
 
 <h2>Active Tokens</h2>
@@ -50,7 +50,7 @@
                 <td>
                     <form method="post" action="{{ path('app_account_tokens_revoke', {id: token.id}) }}" style="display:inline">
                         <input type="hidden" name="_token" value="{{ csrf_token('token_revoke_' ~ token.id) }}">
-                        <button type="submit" class="token-revoke-btn">Revoke</button>
+                        <button type="submit" class="btn danger token-revoke-btn">Revoke</button>
                     </form>
                 </td>
             </tr>

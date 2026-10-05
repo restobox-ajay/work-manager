@@ -1,0 +1,125 @@
+{% extends 'base.html.twig' %}
+{% import '_work/macros.html.twig' as ui %}
+
+{# kind null = List Invoices (both kinds). #}
+{% set listRoute = kind is null ? 'app_invoice_index' : (kind.value == 'tasks' ? 'app_invoice_tasks' : 'app_invoice_independent') %}
+{% block title %}{{ kind ? kind.label : 'Invoices' }}{% endblock %}
+
+{% macro row(invoice, kind) %}
+{% import '_work/macros.html.twig' as ui %}
+        <tr>
+                        <td><a class="bold" href="{{ path('app_invoice_view', {id: invoice.id}) }}">{{ invoice.number }}</a></td>
+                        {% if kind is null %}<td>{{ invoice.kind.value == 'tasks' ? 'Approved tasks' : 'Independent' }}</td>{% endif %}
+                        <td class="nowrap">{{ invoice.invoiceDate ? invoice.invoiceDate|date('M j, Y') : '—' }}</td>
+                        <td>{{ invoice.fromName }}</td>
+                        <td>{{ invoice.toName }}</td>
+                        <td class="num nowrap">{{ invoice.total|invoice_money(invoice.currency) }}</td>
+                        <td>{% if invoice.cancelled %}<span class="badge plain">Cancelled</span>{% else %}<span class="badge success">Issued</span>{% endif %}</td>
+                        <td class="nowrap">{{ ui.ts(invoice.emailedAt, 'M j, Y') }}</td>
+                        <td class="actions">
+                            <a class="btn dark xs" href="{{ path('app_invoice_pdf', {id: invoice.id}) }}" title="Download the PDF">Download</a>
+                            {% if not invoice.cancelled %}
+                                <a class="btn info xs" href="{{ path('app_invoice_email', {id: invoice.id}) }}" title="Email the invoice with its PDF">Email</a>
+                                <a class="btn warning xs" href="{{ path('app_invoice_edit', {id: invoice.id}) }}">Edit</a>
+                            {% endif %}
+                        </td>
+                    </tr>
+{% endmacro %}
+
+{% block body %}
+{% import _self as list %}
+{% set params = {q: filters.term, clientId: filters.clientId, status: filters.status} %}
+{% set hasFilter = groups is not null %}
+<div class="page-head">
+    <div class="ph-main">
+        <div class="eyebrow">Invoices</div>
+        <div class="ph-title"><h1>{{ kind ? kind.label : 'All Invoices' }}</h1></div>
+        <p class="lead">{{ kind is null
+            ? 'Every invoice, independent and approved-tasks, newest first.'
+            : (kind.value == 'tasks'
+                ? 'Invoices billing approved tasks. A task can be on one invoice at a time; cancelling the invoice frees it.'
+                : 'Invoices with items typed by hand.') }}</p>
+    </div>
+    <div class="ph-actions">
+        {% if kind is null or kind.value == 'independent' %}<a class="btn success" href="{{ path('app_invoice_new_independent') }}">+ New independent invoice</a>{% endif %}
+        {% if kind is null or kind.value == 'tasks' %}<a class="btn success" href="{{ path('app_invoice_new_tasks') }}">+ Invoice approved tasks</a>{% endif %}
+    </div>
+</div>
+
+{{ ui.flashes() }}
+
+<div class="table-card">
+    <form class="table-header mx-form" method="get" action="{{ path(listRoute) }}">
+        <input type="search" name="q" value="{{ filters.term }}" placeholder="Number, billed to or by" aria-label="Search invoices">
+        <select name="clientId" aria-label="Client" style="width:auto">
+            <option value="">All clients</option>
+            {% for client in clients %}<option value="{{ client.id }}" {{ filters.clientId == client.id ? 'selected' }}>{{ client.name }}</option>{% endfor %}
+        </select>
+        <select name="status" aria-label="Status" style="width:auto">
+            <option value="">All statuses</option>
+            {% for status in statuses %}<option value="{{ status.value }}" {{ filters.status == status.value ? 'selected' }}>{{ status.label }}</option>{% endfor %}
+        </select>
+        <select name="year" aria-label="Year" style="width:auto">
+            <option value="">All years</option>
+            {% for y in years %}<option value="{{ y }}" {{ filters.year == y ? 'selected' }}>{{ y }}</option>{% endfor %}
+        </select>
+        <select name="month" aria-label="Month" style="width:auto">
+            <option value="">All months</option>
+            {% for m in 1..12 %}<option value="{{ m }}" {{ filters.month == m ? 'selected' }}>{{ ('2000-' ~ m ~ '-01')|date('F') }}</option>{% endfor %}
+        </select>
+        <select name="group" aria-label="Group by" style="width:auto">
+            <option value="">No grouping</option>
+            <option value="month" {{ groupBy == 'month' ? 'selected' }}>Group by month</option>
+            <option value="year" {{ groupBy == 'year' ? 'selected' }}>Group by year</option>
+        </select>
+        <button class="btn primary sm" type="submit">Filter</button>
+        {% if hasFilter %}<a class="btn secondary sm" href="{{ path(listRoute) }}">Reset</a>{% endif %}
+        <span class="grow"></span>
+    </form>
+    <div class="tscroll">
+        <table class="t">
+            <thead>
+                <tr>
+                    <th>Number</th>
+                    {% if kind is null %}<th>Type</th>{% endif %}
+                    <th>Date</th>
+                    <th>Billed By</th>
+                    <th>Billed To</th>
+                    <th class="num">Total</th>
+                    <th>Status</th>
+                    <th>Emailed</th>
+                    <th></th>
+                </tr>
+            </thead>
+            {% if hasFilter %}
+                {% for group in groups %}
+                    <tbody>
+                        {% if groupBy %}<tr class="group-head"><th colspan="{{ kind is null ? 9 : 8 }}">{{ group.label }}</th></tr>{% endif %}
+                        {% for invoice in group.invoices %}{{ list.row(invoice, kind) }}{% endfor %}
+                        <tr class="group-total">
+                            <td colspan="{{ kind is null ? 5 : 4 }}" class="bold">{{ groupBy ? group.label ~ ' total' : 'Total' }} <span class="muted small">({{ group.count }} invoice{{ group.count == 1 ? '' : 's' }}, cancelled not counted)</span></td>
+                            <td class="num nowrap bold">{% for currency, cents in group.totals %}<div>{{ cents|invoice_money(currency) }} <span class="muted small">{{ currency }}</span></div>{% else %}—{% endfor %}</td>
+                            <td colspan="3"></td>
+                        </tr>
+                    </tbody>
+                {% else %}
+                    <tbody><tr><td colspan="{{ kind is null ? 9 : 8 }}" class="empty"><b>No invoices found.</b> Try clearing the filters.</td></tr></tbody>
+                {% endfor %}
+                {% if groups|length > 1 %}
+                    {% set grand = {} %}
+                    {% for group in groups %}{% for currency, cents in group.totals %}{% set grand = grand|merge({(currency): (grand[currency] ?? 0) + cents}) %}{% endfor %}{% endfor %}
+                    <tbody><tr class="group-total grand"><td colspan="{{ kind is null ? 5 : 4 }}" class="bold">Grand total</td><td class="num nowrap bold">{% for currency, cents in grand %}<div>{{ cents|invoice_money(currency) }} <span class="muted small">{{ currency }}</span></div>{% else %}—{% endfor %}</td><td colspan="3"></td></tr></tbody>
+                {% endif %}
+            {% else %}
+            <tbody>
+                {% for invoice in page.items %}{{ list.row(invoice, kind) }}
+                {% else %}
+                    <tr><td colspan="{{ kind is null ? 9 : 8 }}" class="empty"><b>No invoices found.</b> Use the buttons above to create one.</td></tr>
+                {% endfor %}
+            </tbody>
+            {% endif %}
+        </table>
+    </div>
+    {% if not hasFilter %}{{ ui.pager(page, listRoute, params) }}{% endif %}
+</div>
+{% endblock %}

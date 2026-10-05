@@ -1,0 +1,112 @@
+{#
+    The invoice itself (ADR-077), laid out like the Modexbyte sample: title, number and date; Billed By / Billed To
+    panels; the item table (Item, GST, Quantity, Rate, Amount, CGST, SGST, Total); totals; notes; footer line.
+    Tables only, no flexbox or grid, because Dompdf renders this same markup into the PDF.
+    Expects: invoice.
+#}
+{% set cur = invoice.currency %}
+{% set hasTax = invoice.cgstTotal != '0.00' or invoice.sgstTotal != '0.00' %}
+<style>
+    .inv-doc { font-family: "DejaVu Sans", "Segoe UI", Arial, sans-serif; color: #222; font-size: 12px; line-height: 1.45; }
+    .inv-doc h1 { color: #6b3fc8; font-size: 30px; font-weight: normal; margin: 0 0 10px; }
+    .inv-doc .meta td { padding: 2px 16px 2px 0; }
+    .inv-doc .meta .k { color: #666; }
+    .inv-doc .meta .v { font-weight: bold; }
+    .inv-doc .parties { width: 100%; border-collapse: separate; border-spacing: 0; margin: 18px 0; }
+    .inv-doc .party { width: 49%; background: #ede8f8; border-radius: 6px; padding: 12px 14px; vertical-align: top; }
+    .inv-doc .gap { width: 2%; }
+    .inv-doc .party h2 { color: #6b3fc8; font-size: 16px; font-weight: normal; margin: 0 0 4px; }
+    .inv-doc .party .name { font-weight: bold; }
+    .inv-doc .items { width: 100%; border-collapse: collapse; }
+    .inv-doc .items th { background: #6b3fc8; color: #fff; font-weight: bold; padding: 7px 8px; text-align: right; }
+    .inv-doc .items th.l, .inv-doc .items td.l { text-align: left; }
+    .inv-doc .items td { padding: 7px 8px; text-align: right; vertical-align: top; }
+    .inv-doc .items tbody tr { background: #f4f1fb; }
+    .inv-doc .items tbody tr:nth-child(even) { background: #fff; }
+    .inv-doc .items .desc { color: #666; font-size: 11px; white-space: pre-line; }
+    .inv-doc .totals { width: 45%; margin: 12px 0 0 auto; border-collapse: collapse; }
+    .inv-doc .totals td { padding: 5px 8px; text-align: right; }
+    .inv-doc .totals td.k { text-align: left; }
+    .inv-doc .totals .grand td { border-top: 1px solid #222; border-bottom: 1px solid #222; font-size: 17px; font-weight: bold; padding: 8px; }
+    .inv-doc .notes { margin-top: 22px; white-space: pre-line; }
+    .inv-doc .notes h3 { font-size: 13px; color: #6b3fc8; margin: 0 0 4px; }
+    .inv-doc .foot { margin-top: 40px; text-align: center; font-size: 10px; color: #444; }
+    .inv-doc .cancelled { color: #b0413e; border: 2px solid #b0413e; display: inline-block; padding: 2px 10px; font-weight: bold; letter-spacing: 1px; margin-bottom: 8px; }
+    .inv-doc .pre { white-space: pre-line; }
+</style>
+<div class="inv-doc">
+    {% if invoice.cancelled %}<div class="cancelled">CANCELLED</div>{% endif %}
+    <h1>Invoice</h1>
+    <table class="meta">
+        <tr><td class="k">Invoice No #</td><td class="v">{{ invoice.number }}</td></tr>
+        <tr><td class="k">Invoice Date</td><td class="v">{{ invoice.invoiceDate ? invoice.invoiceDate|date('M j, Y') : '' }}</td></tr>
+        {% if invoice.dueDate %}<tr><td class="k">Due Date</td><td class="v">{{ invoice.dueDate|date('M j, Y') }}</td></tr>{% endif %}
+    </table>
+
+    <table class="parties">
+        <tr>
+            <td class="party">
+                <h2>Billed By</h2>
+                <div class="name">{{ invoice.fromName }}</div>
+                {% if invoice.fromAddress %}<div class="pre">{{ invoice.fromAddress }}</div>{% endif %}
+                {% if invoice.fromEmail %}<div><b>Email:</b> {{ invoice.fromEmail }}</div>{% endif %}
+                {% if invoice.fromPhone %}<div><b>Phone:</b> {{ invoice.fromPhone }}</div>{% endif %}
+                {% if invoice.fromTaxNumber %}<div><b>GSTIN:</b> {{ invoice.fromTaxNumber }}</div>{% endif %}
+            </td>
+            <td class="gap"></td>
+            <td class="party">
+                <h2>Billed To</h2>
+                <div class="name">{{ invoice.toName }}</div>
+                {% if invoice.toAddress %}<div class="pre">{{ invoice.toAddress }}</div>{% endif %}
+                {% if invoice.toEmail %}<div><b>Email:</b> {{ invoice.toEmail }}</div>{% endif %}
+                {% if invoice.toPhone %}<div><b>Phone:</b> {{ invoice.toPhone }}</div>{% endif %}
+            </td>
+        </tr>
+    </table>
+
+    <table class="items">
+        <thead>
+            <tr>
+                <th class="l" style="width:22px"></th>
+                <th class="l">Item</th>
+                <th>GST</th>
+                <th>Quantity</th>
+                <th>Rate</th>
+                <th>Amount</th>
+                <th>CGST</th>
+                <th>SGST</th>
+                <th>Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in invoice.items %}
+                <tr>
+                    <td class="l">{{ loop.index }}.</td>
+                    <td class="l">{{ item.name }}{% if item.description %}<div class="desc">{{ item.description }}</div>{% endif %}</td>
+                    <td>{{ item.gstRate|number_format(2)|trim('0', 'right')|trim('.', 'right') }}%</td>
+                    <td>{{ item.quantity is not null ? item.quantity|number_format(2)|trim('0', 'right')|trim('.', 'right') : '' }}</td>
+                    <td>{{ item.rate is not null ? item.rate|invoice_money(cur)|replace({'.00': ''}) : '' }}</td>
+                    <td>{{ item.amount|invoice_money(cur) }}</td>
+                    <td>{{ item.cgst|invoice_money(cur) }}</td>
+                    <td>{{ item.sgst|invoice_money(cur) }}</td>
+                    <td>{{ item.total|invoice_money(cur) }}</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <table class="totals">
+        <tr><td class="k">Amount</td><td>{{ invoice.subtotal|invoice_money(cur) }}</td></tr>
+        {% if hasTax %}
+            <tr><td class="k">CGST</td><td>{{ invoice.cgstTotal|invoice_money(cur) }}</td></tr>
+            <tr><td class="k">SGST</td><td>{{ invoice.sgstTotal|invoice_money(cur) }}</td></tr>
+        {% endif %}
+        <tr class="grand"><td class="k">Total ({{ cur }})</td><td>{{ invoice.total|invoice_money(cur) }}</td></tr>
+    </table>
+
+    {% if invoice.description %}
+        <div class="notes"><h3>Notes</h3>{{ invoice.description }}</div>
+    {% endif %}
+
+    <div class="foot">This is an electronically generated document, no signature is required.</div>
+</div>

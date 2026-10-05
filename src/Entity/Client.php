@@ -28,6 +28,10 @@ class Client
     #[ORM\Column(length: 100)]
     private string $name = '';
 
+    /** The registered business name, printed as Billed To on invoices when set (ADR-080). */
+    #[ORM\Column(name: 'company_name', length: 255, nullable: true)]
+    private ?string $companyName = null;
+
     #[ORM\Column(length: 100, nullable: true)]
     private ?string $email = null;
 
@@ -125,6 +129,18 @@ class Client
     public function setClientCode(?string $clientCode): static
     {
         $this->clientCode = $clientCode;
+
+        return $this;
+    }
+
+    public function getCompanyName(): ?string
+    {
+        return $this->companyName;
+    }
+
+    public function setCompanyName(?string $companyName): static
+    {
+        $this->companyName = $companyName;
 
         return $this;
     }

@@ -18,20 +18,20 @@
 
     <form method="post" action="{{ path('app_admin_db_open') }}">
         <input type="hidden" name="_token" value="{{ csrf_token('db_console_open') }}">
-        <button type="submit">Open the database console</button>
+        <button type="submit" class="btn info">Open the database console</button>
     </form>
 
     <form method="post" action="{{ path('app_admin_db_enable') }}">
         <input type="hidden" name="_token" value="{{ csrf_token('db_console_enable') }}">
         <input type="hidden" name="_disarm" value="1">
-        <button type="submit" class="danger">Disable now (revokes open sessions)</button>
+        <button type="submit" class="btn danger danger">Disable now (revokes open sessions)</button>
     </form>
 {% else %}
     <div class="warning">The console is disabled.</div>
 
     <form method="post" action="{{ path('app_admin_db_enable') }}">
         <input type="hidden" name="_token" value="{{ csrf_token('db_console_enable') }}">
-        <button type="submit">Arm for {{ windowMinutes }} minutes</button>
+        <button type="submit" class="btn warning">Arm for {{ windowMinutes }} minutes</button>
     </form>
 {% endif %}
 {% endblock %}

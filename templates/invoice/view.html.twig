@@ -1,0 +1,73 @@
+{% extends 'base.html.twig' %}
+{% import '_work/macros.html.twig' as ui %}
+
+{% block title %}Invoice {{ invoice.number }}{% endblock %}
+
+{% block body %}
+<div class="page-head">
+    <div class="ph-main">
+        <div class="eyebrow">Invoices · {{ invoice.kind.label }}</div>
+        <div class="ph-title">
+            <h1>Invoice {{ invoice.number }}</h1>
+            {% if invoice.cancelled %}<span class="badge plain">Cancelled</span>{% else %}<span class="badge success">Issued</span>{% endif %}
+        </div>
+        <p class="lead">{{ invoice.toName }} · {{ invoice.total|invoice_money(invoice.currency) }}{% if invoice.emailedAt %} · last emailed {{ invoice.emailedAt|date('M j, Y H:i') }}{% endif %}</p>
+    </div>
+    <div class="ph-actions">
+        <a class="btn secondary back" href="{{ path(invoice.kind.value == 'tasks' ? 'app_invoice_tasks' : 'app_invoice_independent') }}">Back</a>
+        <a class="btn light" href="{{ path('app_invoice_print', {id: invoice.id}) }}" target="_blank" rel="noopener">Print</a>
+        <a class="btn dark" href="{{ path('app_invoice_pdf', {id: invoice.id}) }}">Download PDF</a>
+        {% if not invoice.cancelled %}
+            <a class="btn info" href="{{ path('app_invoice_email', {id: invoice.id}) }}">Email</a>
+            <a class="btn warning" href="{{ path('app_invoice_edit', {id: invoice.id}) }}">Edit</a>
+        {% endif %}
+    </div>
+</div>
+
+{{ ui.flashes() }}
+{% if not pdfAvailable %}
+    <div class="alert warning">PDF download and email need the PDF library: run <code>composer require dompdf/dompdf</code>. Print still works (your browser's "Save as PDF").</div>
+{% endif %}
+
+{# In a frame, so the app's own table and heading styles don't restyle the invoice: it looks as it prints. #}
+<div class="card" style="max-width:900px;padding:0;overflow:hidden">
+    <iframe src="{{ path('app_invoice_print', {id: invoice.id, embed: 1}) }}" title="Invoice {{ invoice.number }}" style="width:100%;height:1000px;border:0;display:block"
+            onload="try { this.style.height = this.contentDocument.documentElement.scrollHeight + 'px'; } catch (e) {}"></iframe>
+</div>
+
+{% if not invoice.cancelled %}
+<form class="card mx-form" method="post" action="{{ path('app_invoice_cancel', {id: invoice.id}) }}" style="max-width:900px;margin-top:16px"
+      onsubmit="return confirm('Cancel invoice {{ invoice.number|e('js') }}? Its tasks can then be put on another invoice.');">
+    <input type="hidden" name="_token" value="{{ csrf_token('invoice_cancel_' ~ invoice.id) }}">
+    <div class="form-grid">
+        <div class="field span-all">
+            <label for="f-reason">Cancel this invoice</label>
+            <input type="text" id="f-reason" name="reason" maxlength="255" placeholder="Reason (kept in the history)">
+            <small>The invoice and its number stay on record; {{ invoice.taskIds|length > 0 ? 'its ' ~ invoice.taskIds|length ~ ' task(s) can be invoiced again' : 'nothing else changes' }}.</small>
+        </div>
+    </div>
+    <div class="form-actions" style="margin-top:8px"><button class="btn danger" type="submit">Cancel invoice</button></div>
+</form>
+{% endif %}
+
+<div class="table-card" style="max-width:900px;margin-top:16px">
+    <div class="table-header"><b>History</b></div>
+    <div class="tscroll">
+        <table class="t">
+            <thead><tr><th>When</th><th>Action</th><th>By</th><th>Details</th></tr></thead>
+            <tbody>
+                {% for log in logs %}
+                    <tr>
+                        <td class="nowrap">{{ log.createdAt|date('Y-m-d H:i') }}</td>
+                        <td>{{ actions[log.action] ?? log.action }}</td>
+                        <td>{{ log.userId ? (people[log.userId] ?? '#' ~ log.userId) : '—' }}</td>
+                        <td>{{ log.detail ?? '' }}</td>
+                    </tr>
+                {% else %}
+                    <tr><td colspan="4" class="empty">No history.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

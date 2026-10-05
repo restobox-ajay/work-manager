@@ -15,7 +15,7 @@
 
 <form method="POST" action="{{ path('app_account_sessions_terminate_all') }}">
     <input type="hidden" name="_token" value="{{ csrf_token('session_terminate_all') }}">
-    <button type="submit">Logout Everywhere</button>
+    <button type="submit" class="btn danger">Logout Everywhere</button>
 </form>
 
 <table>
@@ -39,7 +39,7 @@
                 {% else %}
                     <form method="POST" action="{{ path('app_account_sessions_terminate', {id: session.id}) }}">
                         <input type="hidden" name="_token" value="{{ csrf_token('session_terminate_' ~ session.id) }}">
-                        <button type="submit">Terminate</button>
+                        <button type="submit" class="btn danger">Terminate</button>
                     </form>
                 {% endif %}
             </td>

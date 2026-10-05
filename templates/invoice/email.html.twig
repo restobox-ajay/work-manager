@@ -1,0 +1,38 @@
+{% extends 'base.html.twig' %}
+{% import '_work/macros.html.twig' as ui %}
+
+{% block title %}Email invoice {{ invoice.number }}{% endblock %}
+
+{% block body %}
+<div class="page-head">
+    <div class="ph-main">
+        <div class="eyebrow">Invoices · {{ invoice.number }}</div>
+        <div class="ph-title"><h1>Email invoice</h1></div>
+        <p class="lead">The PDF is attached. Replies go to {{ invoice.fromEmail ?: 'the app\'s sender address' }}.
+            The starting text comes from the "{{ constant('App\\Service\\Invoice\\InvoiceMailer::TEMPLATE_MODULE') }}" email template when one exists
+            (<a href="{{ path('app_config_list', {kind: 'email-templates'}) }}">Config › Email Templates</a>; placeholders %invoice_number%, %client_name%, %billed_by%, %total%, %invoice_date%, %due_date%).</p>
+    </div>
+    <div class="ph-actions"><a class="btn secondary back" href="{{ path('app_invoice_view', {id: invoice.id}) }}">Back</a></div>
+</div>
+
+{{ ui.errors(errors) }}
+
+<form class="card mx-form" method="post" style="max-width:900px">
+    <input type="hidden" name="_token" value="{{ csrf_token('invoice_email_' ~ invoice.id) }}">
+    <div class="form-grid">
+        <div class="field span-all">
+            <label for="f-to">To <span class="req">*</span></label>
+            <input type="text" id="f-to" name="to" value="{{ values.to }}" required placeholder="name@example.com">
+            <small>Separate several addresses with commas.</small>
+        </div>
+        <div class="field span-all"><label for="f-cc">Cc</label><input type="text" id="f-cc" name="cc" value="{{ values.cc }}"></div>
+        <div class="field span-all"><label for="f-subject">Subject <span class="req">*</span></label><input type="text" id="f-subject" name="subject" value="{{ values.subject }}" maxlength="255" required></div>
+        <div class="field span-all"><label for="f-message">Message <span class="req">*</span></label><textarea id="f-message" name="message" rows="9" required>{{ values.message }}</textarea></div>
+        <div class="field span-all"><small>Attachment: {{ 'invoice-' ~ invoice.number ~ '.pdf' }}</small></div>
+    </div>
+    <div class="form-actions" style="margin-top:16px">
+        <a class="btn secondary" href="{{ path('app_invoice_view', {id: invoice.id}) }}">Cancel</a>
+        <button class="btn primary" type="submit">Send</button>
+    </div>
+</form>
+{% endblock %}

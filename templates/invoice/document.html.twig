@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Invoice {{ invoice.number }}</title>
+    <style>
+        @page { margin: 28px 32px; }
+        body { margin: 0; background: #fff; }
+        {% if embed|default(false) %}
+        body { padding: 32px 36px; }
+        {% elseif not forPdf %}
+        body { background: #eceaf2; padding: 24px 12px; }
+        .sheet { background: #fff; max-width: 794px; margin: 0 auto; padding: 36px 40px; box-shadow: 0 2px 12px rgba(0,0,0,.12); box-sizing: border-box; }
+        .bar { max-width: 794px; margin: 0 auto 12px; text-align: right; font-family: Arial, sans-serif; }
+        .bar button, .bar a { font: inherit; font-size: 14px; padding: 7px 14px; border-radius: 6px; border: 1px solid #6b3fc8; background: #6b3fc8; color: #fff; text-decoration: none; cursor: pointer; margin-left: 6px; }
+        .bar a { background: #fff; color: #6b3fc8; }
+        @media print { body { background: #fff; padding: 0; } .sheet { box-shadow: none; padding: 0; max-width: none; } .bar { display: none; } }
+        {% endif %}
+    </style>
+</head>
+<body>
+{% if embed|default(false) %}
+    {% include 'invoice/_document.html.twig' %}
+{% elseif not forPdf %}
+    <div class="bar">
+        <a href="{{ path('app_invoice_view', {id: invoice.id}) }}">Back</a>
+        <button type="button" onclick="window.print()">Print / Save as PDF</button>
+    </div>
+    <div class="sheet">{% include 'invoice/_document.html.twig' %}</div>
+{% else %}
+    {% include 'invoice/_document.html.twig' %}
+{% endif %}
+</body>
+</html>

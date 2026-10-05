@@ -24,7 +24,7 @@
                {% if user.loginNotificationsEnabled %}checked{% endif %}>
     </div>
 
-    <button type="submit">Save Settings</button>
+    <button type="submit" class="btn primary">Save Settings</button>
 </form>
 
 {# The 2FA section links point at auth-2fa-bundle routes, so render it only when the bundle is present
@@ -39,7 +39,7 @@
     <a href="{{ path('app_2fa_setup', {reconfigure: 1}) }}">Reconfigure 2FA</a>
     <form method="post" action="{{ path('app_2fa_disable') }}" style="display:inline">
         <input type="hidden" name="_token" value="{{ csrf_token('2fa_disable') }}">
-        <button type="submit" class="2fa-disable-btn">Disable 2FA</button>
+        <button type="submit" class="btn danger 2fa-disable-btn">Disable 2FA</button>
     </form>
 {% else %}
     <p class="2fa-status">Two-factor authentication is <strong>disabled</strong>.</p>

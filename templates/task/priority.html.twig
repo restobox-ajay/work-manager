@@ -21,7 +21,7 @@
                 <option value="{{ app.user.id }}">Me</option>
                 {% for person in peopleList %}{% if person.id != app.user.id %}<option value="{{ person.id }}" {{ targetId == person.id ? 'selected' }}>{{ person.name ?: person.email }}</option>{% endif %}{% endfor %}
             </select>
-            <noscript><button class="btn sm" type="submit">Show</button></noscript>
+            <noscript><button class="btn info sm" type="submit">Show</button></noscript>
         </form>
     {% endif %}
 </div>
@@ -53,8 +53,8 @@
                             <td class="right nowrap">{{ fee[task.id] ? (task.totalAmount ?? '0.00') ~ ' ' ~ (currencies[task.currencyId] ?? '') : '—' }}</td>
                             {% if canReorder %}
                                 <td class="actions">
-                                    <button class="btn xs outline" form="sort-{{ key }}" type="submit" name="taskId" value="{{ task.id }}" formaction="{{ path('app_task_priority_sort', {userId: targetId}) }}?move=top" {{ loop.first ? 'disabled' }}>To top</button>
-                                    <button class="btn xs outline" form="sort-{{ key }}" type="submit" name="taskId" value="{{ task.id }}" formaction="{{ path('app_task_priority_sort', {userId: targetId}) }}?move=bottom" {{ loop.last ? 'disabled' }}>To bottom</button>
+                                    <button class="btn light xs" form="sort-{{ key }}" type="submit" name="taskId" value="{{ task.id }}" formaction="{{ path('app_task_priority_sort', {userId: targetId}) }}?move=top" {{ loop.first ? 'disabled' }}>To top</button>
+                                    <button class="btn light xs" form="sort-{{ key }}" type="submit" name="taskId" value="{{ task.id }}" formaction="{{ path('app_task_priority_sort', {userId: targetId}) }}?move=bottom" {{ loop.last ? 'disabled' }}>To bottom</button>
                                 </td>
                             {% endif %}
                         </tr>

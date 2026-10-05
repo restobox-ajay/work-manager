@@ -4192,3 +4192,13 @@ task statuses, email templates, currencies, countries) on one generic CRUD. Migr
 Browser-checked add/edit/delete/validation on every list. No tests yet.
 ADR-076 (2026-10-05): projects get local/dev/prod/doc URLs (migration Version20261009120000, InputValue::url()
 shared with the client website). Tests: tests/Functional/Project/ProjectLinksTest.php.
+ADR-077 (2026-10-07): Invoices menu — Independent Invoice and Approved Tasks Invoice; Billing Profiles under Config;
+print view, PDF (needs dompdf/dompdf), email, cancel, per-invoice history + audit log. Migration Version20261008140000.
+Browser-checked create/edit/validation/double-billing/cancel; PDF itself untested here (dompdf not installable in the
+cloud workspace). Not committed (owner's instruction). No tests yet.
+ADR-078 (2026-10-07): Settings menu (after Config) with a Tax Rates tab, Maxeme Auto layout; invoice GST % is a
+select of active tax rates; Amount/Total read-only fields. Migration Version20261008150000. Browser-checked. Not committed.
+ADR-079 (2026-10-07): invoice Amount editable, Quantity/Rate optional, Total display-only. Migration Version20261008160000.
+ADR-080 (2026-10-07): client company name (Billed To on invoices); currency in invoice Items; list Download/Email buttons. Migration Version20261009130000. Not committed.
+ADR-081/082 (2026-10-07): invoice list year/month filters + month/year grouping with totals, no paging when filtered;
+all buttons in Bootstrap 5 colours by action. Not committed.

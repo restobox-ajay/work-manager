@@ -1,0 +1,12 @@
+{#
+    The Settings tabs (ADR-078), as on the Maxeme Auto settings page; each tab is its own URL and Settings menu entry.
+    Expects: current (the active tab's route).
+#}
+{% set tabs = [
+    { route: 'app_settings_tax_rates', label: 'Tax Rates' },
+] %}
+<nav class="tabs" aria-label="Settings">
+    {% for tab in tabs %}
+        <a href="{{ path(tab.route) }}"{% if tab.route == current %} class="active" aria-current="page"{% endif %}>{{ tab.label }}</a>
+    {% endfor %}
+</nav>

@@ -43,11 +43,11 @@
                         {% endfor %}
                         <td class="actions">
                             <span class="btn-row" style="justify-content:flex-end">
-                                <a class="btn sm" href="{{ path('app_config_edit', {kind: list.kind, id: row.id}) }}">Edit</a>
+                                <a class="btn warning sm" href="{{ path('app_config_edit', {kind: list.kind, id: row.id}) }}">Edit</a>
                                 {% if list.deletable %}
                                     <form class="mx-form" method="post" action="{{ path('app_config_delete', {kind: list.kind, id: row.id}) }}" onsubmit="return confirm('Delete this {{ list.singular|lower }}?');">
                                         <input type="hidden" name="_token" value="{{ csrf_token('config_delete_' ~ list.kind ~ '_' ~ row.id) }}">
-                                        <button class="btn sm danger" type="submit">Delete</button>
+                                        <button class="btn danger sm" type="submit">Delete</button>
                                     </form>
                                 {% endif %}
                             </span>

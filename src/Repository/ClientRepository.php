@@ -132,7 +132,7 @@ class ClientRepository extends ServiceEntityRepository
             $qb->andWhere('c.id IN (:ids)')->setParameter('ids', $visibleIds);
         }
         if (($filters['term'] ?? null) !== null) {
-            $qb->andWhere('c.name LIKE :term OR c.email LIKE :term OR c.clientCode LIKE :term')
+            $qb->andWhere('c.name LIKE :term OR c.companyName LIKE :term OR c.email LIKE :term OR c.clientCode LIKE :term')
                 ->setParameter('term', '%'.addcslashes($filters['term'], '%_').'%');
         }
         if (($filters['isActive'] ?? null) !== null) {

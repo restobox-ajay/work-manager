@@ -20,14 +20,14 @@
 
 <div class="table-card">
     <form class="table-header mx-form" method="get" action="{{ path('app_client_index') }}">
-        <input type="search" name="q" value="{{ q }}" placeholder="Name, email or code" aria-label="Search clients">
+        <input type="search" name="q" value="{{ q }}" placeholder="Name, company, email or code" aria-label="Search clients">
         <select name="status" aria-label="Status" style="width:auto">
             <option value="">All statuses</option>
             <option value="active" {{ status == 'active' ? 'selected' }}>Active</option>
             <option value="archived" {{ status == 'archived' ? 'selected' }}>Archive</option>
         </select>
-        <button class="btn sm" type="submit">Filter</button>
-        {% if q or status %}<a class="btn sm outline" href="{{ path('app_client_index') }}">Reset</a>{% endif %}
+        <button class="btn primary sm" type="submit">Filter</button>
+        {% if q or status %}<a class="btn secondary sm" href="{{ path('app_client_index') }}">Reset</a>{% endif %}
         <span class="grow"></span>
     </form>
     <div class="tscroll">
@@ -47,7 +47,7 @@
             <tbody>
                 {% for client in page.items %}
                     <tr>
-                        <td><a href="{{ path('app_client_view', {id: client.id}) }}" class="bold">{{ client.name }}</a></td>
+                        <td><a href="{{ path('app_client_view', {id: client.id}) }}" class="bold">{{ client.name }}</a>{% if client.companyName %}<div class="muted small">{{ client.companyName }}</div>{% endif %}</td>
                         <td>{{ client.clientCode ?? '—' }}</td>
                         <td>
                             {% set count = details.projectCounts[client.id] ?? 0 %}
@@ -58,8 +58,8 @@
                         <td>{{ ui.activeBadge(client.active) }}</td>
                         <td class="nowrap">{{ ui.ts(client.createdAt) }}</td>
                         <td class="actions">
-                            <a class="btn xs outline" href="{{ path('app_task_index', {clientId: client.id}) }}">Tasks</a>
-                            {% if is_granted('CLIENT_EDIT', client) %}<a class="btn xs" href="{{ path('app_client_edit', {id: client.id}) }}">Edit</a>{% endif %}
+                            <a class="btn info xs" href="{{ path('app_task_index', {clientId: client.id}) }}">Tasks</a>
+                            {% if is_granted('CLIENT_EDIT', client) %}<a class="btn warning xs" href="{{ path('app_client_edit', {id: client.id}) }}">Edit</a>{% endif %}
                         </td>
                     </tr>
                 {% else %}

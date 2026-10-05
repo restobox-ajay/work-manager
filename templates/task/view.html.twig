@@ -16,8 +16,8 @@
         <div class="ph-title"><h1 style="text-transform:none;letter-spacing:0;font-size:1.05rem">{{ task.name }}</h1> {{ ui.statusBadge(task.taskStatusId, statuses) }} {{ ui.archivedTag(archivedReasons) }}</div>
     </div>
     <div class="ph-actions">
-        <a class="btn outline back" href="{{ path('app_task_index') }}">Tasks</a>
-        {% if is_granted('TASK_EDIT', task) %}<a class="btn" href="{{ path('app_task_edit', {id: task.id}) }}">Edit</a>{% endif %}
+        <a class="btn secondary back" href="{{ path('app_task_index') }}">Tasks</a>
+        {% if is_granted('TASK_EDIT', task) %}<a class="btn warning" href="{{ path('app_task_edit', {id: task.id}) }}">Edit</a>{% endif %}
     </div>
 </div>
 
@@ -41,7 +41,7 @@
                 <form class="mx-form btn-row" method="post" action="{{ path('app_task_status_detail', {id: task.id}) }}">
                     <input type="hidden" name="_token" value="{{ csrf_token('task_status_detail_' ~ task.id) }}">
                     <input type="text" name="statusDetail" value="{{ task.statusDetail }}" aria-label="Status detail" placeholder="Where this task stands" style="flex:1">
-                    <button class="btn" type="submit">Save</button>
+                    <button class="btn primary" type="submit">Save</button>
                 </form>
             {% else %}
                 <p>{{ task.statusDetail ?? '—' }}</p>

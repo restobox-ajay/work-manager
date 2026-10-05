@@ -1,0 +1,91 @@
+{% extends 'base.html.twig' %}
+{% import '_work/macros.html.twig' as ui %}
+
+{% block title %}Invoice approved tasks{% endblock %}
+
+{% block body %}
+<div class="page-head">
+    <div class="ph-main">
+        <div class="eyebrow">Invoices · Approved Tasks Invoice</div>
+        <div class="ph-title"><h1>Invoice approved tasks</h1></div>
+        <p class="lead">Pick the client and currency, then tick the tasks to bill. Only approved tasks that are not on another invoice are listed.</p>
+    </div>
+    <div class="ph-actions"><a class="btn secondary back" href="{{ path('app_invoice_tasks') }}">Back</a></div>
+</div>
+
+{{ ui.flashes() }}
+
+<form class="card mx-form" method="get" action="{{ path('app_invoice_new_tasks') }}" style="max-width:900px;margin-bottom:16px">
+    <div class="form-grid">
+        <div class="field">
+            <label for="f-client">Client <span class="req">*</span></label>
+            <select id="f-client" name="clientId" required onchange="this.form.submit()">
+                <option value="">— Choose a client —</option>
+                {% for c in clients %}<option value="{{ c.id }}" {{ client and client.id == c.id ? 'selected' }}>{{ c.name }}</option>{% endfor %}
+            </select>
+        </div>
+        <div class="field">
+            <label for="f-currency">Currency</label>
+            <select id="f-currency" name="currency" onchange="this.form.submit()">
+                {% for code in currencies %}<option value="{{ code }}" {{ code == currency ? 'selected' }}>{{ code }}</option>{% endfor %}
+            </select>
+        </div>
+    </div>
+    <noscript><div class="form-actions" style="margin-top:12px"><button class="btn info" type="submit">Show tasks</button></div></noscript>
+</form>
+
+{% if client %}
+<form method="get" action="{{ path('app_invoice_new_tasks') }}" class="mx-form" id="task-pick">
+    <input type="hidden" name="clientId" value="{{ client.id }}">
+    <input type="hidden" name="currency" value="{{ currency }}">
+    <div class="table-card">
+        <div class="table-header">
+            <b>{{ tasks|length }} approved task{{ tasks|length == 1 ? '' : 's' }} for {{ client.name }} in {{ currency }}</b>
+            <span class="grow"></span>
+            <button class="btn success sm" type="submit" {{ tasks is empty ? 'disabled' }}>Create invoice from selected</button>
+        </div>
+        <div class="tscroll">
+            <table class="t">
+                <thead>
+                    <tr>
+                        <th style="width:32px"><input type="checkbox" aria-label="Select all" data-check-all {{ tasks is empty ? 'disabled' }}></th>
+                        <th>Task</th>
+                        <th>Project</th>
+                        <th>Assignee</th>
+                        <th>Status</th>
+                        <th>Billable Date</th>
+                        <th class="num">Amount</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for task in tasks %}
+                        <tr>
+                            <td><input type="checkbox" name="taskIds[]" value="{{ task.id }}" aria-label="Select task #{{ task.id }}" checked></td>
+                            <td><a href="{{ path('app_task_view', {id: task.id}) }}">#{{ task.id }}</a> {{ ui.short(task.name, 80) }}</td>
+                            <td>{{ task.project ? task.project.name : '—' }}</td>
+                            <td>{{ task.assignee ? (task.assignee.name ?: task.assignee.email) : '—' }}</td>
+                            <td>{{ ui.statusBadge(task.taskStatusId, statuses) }}</td>
+                            <td class="nowrap">{{ task.billableDate ? task.billableDate|date('Y-m-d') : '—' }}</td>
+                            <td class="num nowrap">{{ (task.totalAmount ?? '0')|invoice_money(currency) }}</td>
+                        </tr>
+                    {% else %}
+                        <tr><td colspan="7" class="empty"><b>No approved tasks to invoice.</b> Tasks already on an invoice, or in another currency, are not listed.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</form>
+<script>
+    (function () {
+        var all = document.querySelector('[data-check-all]');
+        if (!all) { return; }
+        var boxes = document.querySelectorAll('#task-pick input[name="taskIds[]"]');
+        var sync = function () { all.checked = Array.prototype.every.call(boxes, function (b) { return b.checked; }); };
+        all.addEventListener('change', function () { boxes.forEach(function (b) { b.checked = all.checked; }); });
+        boxes.forEach(function (b) { b.addEventListener('change', sync); });
+        sync();
+    })();
+</script>
+{% endif %}
+{% endblock %}

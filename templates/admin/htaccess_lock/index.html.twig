@@ -74,7 +74,7 @@
         <p><small>With 404 selected the file (or a blank body) also applies to the web server's own 404s while the lock is on.</small></p>
     </fieldset>
 
-    <button type="submit">Save</button>
+    <button type="submit" class="btn primary">Save</button>
 </form>
 
 <hr>
@@ -88,7 +88,7 @@
 </p>
 <form method="post" action="{{ path('app_admin_htaccess_lock_test') }}">
     <input type="hidden" name="_token" value="{{ csrf_token('htaccess_lock_test') }}">
-    <button type="submit">Run enforcement self-test</button>
+    <button type="submit" class="btn info">Run enforcement self-test</button>
 </form>
 
 {% if lastTest %}

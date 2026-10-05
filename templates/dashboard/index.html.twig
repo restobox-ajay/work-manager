@@ -16,7 +16,7 @@
         <p class="lead">Welcome, {{ app.user.name ?: app.user.email }}.</p>
     </div>
     <div class="ph-actions">
-        <a class="btn outline" href="{{ path('app_dashboard', {view: 'mine'}) }}">My work</a>
+        <a class="btn primary" href="{{ path('app_dashboard', {view: 'mine'}) }}">My work</a>
         {% if is_granted('TASK_CREATE') %}<a class="btn success" href="{{ path('app_task_create', {projectId: filters.projectId > 0 ? filters.projectId : null}) }}">+ New task</a>{% endif %}
     </div>
 </div>
@@ -56,7 +56,7 @@
             <div class="table-foot">
                 <span>Showing {{ page.items|length }} of {{ page.total }} task{{ page.total == 1 ? '' : 's' }}.</span>
                 <span class="grow"></span>
-                <a class="btn sm" href="{{ path('app_task_index', base|merge({taskStatusId: filters.taskStatusId})) }}">View more</a>
+                <a class="btn info sm" href="{{ path('app_task_index', base|merge({taskStatusId: filters.taskStatusId})) }}">View more</a>
             </div>
         </div>
     </div>

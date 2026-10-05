@@ -18,7 +18,7 @@
 
     <form method="post" action="{{ path('app_2fa_disable') }}">
         <input type="hidden" name="_token" value="{{ csrf_token('2fa_disable') }}">
-        <button type="submit" class="2fa-disable-btn">Disable 2FA</button>
+        <button type="submit" class="btn danger 2fa-disable-btn">Disable 2FA</button>
     </form>
 
     <p><a href="{{ path('app_account_settings') }}">Back to settings</a></p>
@@ -60,7 +60,7 @@
                    required>
         </div>
 
-        <button type="submit">Verify and Enable 2FA</button>
+        <button type="submit" class="btn primary">Verify and Enable 2FA</button>
     </form>
 {% endif %}
 {% endblock %}

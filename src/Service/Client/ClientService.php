@@ -32,6 +32,7 @@ final class ClientService
     /** Form field => [label, max length] for the plain string columns. */
     private const STRING_FIELDS = [
         'name'           => ['Name', 100],
+        'companyName'    => ['Company Name', 255],
         'email'          => ['Email', 100],
         'clientCode'     => ['Client Code', 10],
         'website'        => ['Website', 255],
@@ -113,6 +114,7 @@ final class ClientService
     {
         return [
             'name'           => $client->getName(),
+            'companyName'    => $client->getCompanyName(),
             'email'          => $client->getEmail(),
             'clientCode'     => $client->getClientCode(),
             'website'        => $client->getWebsite(),

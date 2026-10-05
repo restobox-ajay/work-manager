@@ -54,13 +54,24 @@
 ] %}
 {# Config: one CRUD page per list (ADR-075), in work-platform's Settings menu order. #}
 {% set kind = app.request.attributes.get('kind') %}
+{# On an invoice's own pages, the menu entry of its kind is the current one. #}
+{% set invoiceKind = app.request.attributes.get('_invoice_kind') %}
 {% set configLinks = [] %}
-{% for l in [['tags','Tags','New tag'],['payers','Payer Entities','New payer entity'],['wallet-entities','Wallet Entities','New wallet entity'],['payment-methods','Payment Methods','New payment method'],['task-types','Task Types','New task type'],['task-statuses','Task Status','New task status'],['email-templates','Email Templates','New email template'],['currencies','Currency','New currency'],['countries','Country','New country']] %}
+{% for l in [['tags','Tags','New tag'],['payers','Payer Entities','New payer entity'],['wallet-entities','Wallet Entities','New wallet entity'],['payment-methods','Payment Methods','New payment method'],['task-types','Task Types','New task type'],['task-statuses','Task Status','New task status'],['email-templates','Email Templates','New email template'],['currencies','Currency','New currency'],['countries','Country','New country'],['billing-profiles','Billing Profiles','New billing profile']] %}
     {% set configLinks = configLinks|merge([{ label: l[1], href: path('app_config_list', {kind: l[0]}), current: cur starts with 'app_config_' and kind == l[0],
       add: { label: l[2], href: path('app_config_new', {kind: l[0]}) } }]) %}
 {% endfor %}
 {% if is_granted('ROLE_ADMIN') %}
     {% set items = items|merge([
+        { label: 'Invoices', icon: 'receipt', children: [
+            { label: 'List Invoices', href: path('app_invoice_index'), current: cur == 'app_invoice_index' },
+            { label: 'Independent Invoice', href: path('app_invoice_independent'),
+              current: cur starts with 'app_invoice_' and (cur == 'app_invoice_independent' or cur == 'app_invoice_new_independent' or (invoiceKind ?? '') == 'independent'),
+              add: { label: 'New independent invoice', href: path('app_invoice_new_independent') } },
+            { label: 'Approved Tasks Invoice', href: path('app_invoice_tasks'),
+              current: cur starts with 'app_invoice_' and (cur == 'app_invoice_tasks' or cur == 'app_invoice_new_tasks' or (invoiceKind ?? '') == 'tasks'),
+              add: { label: 'Invoice approved tasks', href: path('app_invoice_new_tasks') } },
+        ] },
         { label: 'Users', icon: 'users', children: [
             { label: 'All Users', href: path('app_admin_users'), current: cur starts with 'app_admin_users' and cur != 'app_admin_users_invite' and cur != 'app_admin_users_invitations',
               add: { label: 'New user', href: path('app_admin_users_new') } },
@@ -68,6 +79,9 @@
             { label: 'Invitations', href: path('app_admin_users_invitations'), current: cur == 'app_admin_users_invitations' },
         ] },
         { label: 'Config', icon: 'sliders', children: configLinks },
+        { label: 'Settings', icon: 'toggle', children: [
+            { label: 'Tax Rates', href: path('app_settings_tax_rates'), current: cur == 'app_settings_tax_rates' },
+        ] },
         { label: 'Administration', icon: 'settings', children: [
             { label: 'Overview', href: path('app_admin_dashboard'), current: cur == 'app_admin_dashboard' },
             { label: 'Audit Log', href: path('app_admin_audit_log'), current: cur == 'app_admin_audit_log' },

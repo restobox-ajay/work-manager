@@ -2349,3 +2349,75 @@ lists them under "Links" and makes only http(s) values clickable (`rel="noopener
 
 **Tripwire:** verifiable — Verified by `tests/Functional/Project/ProjectLinksTest.php` (create with scheme
 completion and blank → NULL, invalid URL refused with 422, edit/clear, only http(s) rendered as a link).
+
+## ADR-077: Invoices — independent and approved-tasks, with PDF, email and history (owner request, 2026-10-07)
+
+**Context.** The owner wants an Invoices menu with two entries: an independent invoice (items typed by hand) and an
+invoice for approved tasks. Each needs From/To addresses, items, a description, PDF, email and an audit log. Their
+sample (phpINV1057) sets the layout: Billed By / Billed To panels and Item, GST, Quantity, Rate, Amount, CGST, SGST,
+Total columns.
+
+**Decision (owner's choices).**
+- **From** = a new Config list, *Billing Profiles* (your businesses: address, email, phone, GSTIN, invoice prefix and
+  next number). **To** = a client (its saved address), or typed by hand on an independent invoice. Both blocks are
+  copied onto the invoice when it is saved and can be edited per invoice, so later profile/client edits never change
+  a sent invoice.
+- **Numbering**: profile prefix + next number (phpINV1057), taken under a row lock on the profile; a number already
+  in use is skipped. Numbers are never reused, including after a cancel.
+- **Tax**: GST % per line, split equally into CGST and SGST; 0 % prints like the sample. All arithmetic in whole
+  hundredths (InvoiceMoney), each line rounded before summing.
+- **Approved tasks**: pick client + currency, tick approved tasks not on a live invoice. A line keeps its task id;
+  the save checks every task is approved, the client's, in the invoice currency and on no other non-cancelled
+  invoice, with the task rows locked FOR UPDATE. Task status is not changed. Cancelling an invoice frees its tasks.
+- **PDF**: Dompdf (as work-platform), from the same template as the Print page; remote resources off, DejaVu Sans
+  for ₹/€/£. The package must be installed (`composer require dompdf/dompdf`); until it is, PDF and email say so and
+  Print (browser "Save as PDF") still works.
+- **Email**: To/Cc/Subject/Message, PDF attached, Reply-To = Billed By email. Starting text from the `invoice`
+  email template when present (%invoice_number%, %client_name%, %billed_by%, %total%, %invoice_date%, %due_date%).
+- **Audit**: `invoice_log` per invoice (created, updated with old→new total, PDF downloaded, emailed, email failed,
+  cancelled — who/when/detail), shown on the invoice; each also goes to the audit log as `invoice.<action>`.
+- Admins only (`/invoice`). Migration `Version20261008140000`.
+
+**Consequences.** Payments (still to come) can later mark invoiced tasks paid. No tests yet (owner's instruction).
+
+## ADR-078: Settings menu (Maxeme Auto layout) with Tax Rates; invoice GST chosen from it (owner request, 2026-10-07)
+
+**Decision.**
+- A **Settings** menu group, after Config, for values the app applies (reference lists stay in Config). Laid out
+  like the Maxeme Auto settings page: one page with tabs, each tab its own URL and menu entry. First tab:
+  **Tax Rates** (`/settings/tax-rates`) — Code, Name, Rate (%), Active, Last updated; the whole table is saved at
+  once, rows can be added, a rate is switched off rather than deleted. Codes are fixed once saved.
+- `tax_rate` table, seeded with the GST slabs 0, 5, 12, 18, 28 % (migration `Version20261008150000`).
+- Invoice items: GST % is a select of the active tax rates, checked on the server; an invoice being edited still
+  offers the rates its lines were saved with. Amount and Total are read-only text fields, worked out as you type.
+- Changes are audited as `settings.tax_rates_update` (old → new per rate). Admins only.
+
+## ADR-079: Invoice item Amount is editable; Quantity and Rate are optional (owner request, 2026-10-07)
+
+**Decision.** On an invoice line, typing Quantity or Rate fills Amount (Quantity × Rate); typing Amount keeps it and
+sets Rate = Amount ÷ Quantity. The saved line bills the Amount as typed. Quantity and Rate may be left empty, as
+long as there is an Amount; empty ones print blank. Total (Amount + GST) is shown, not edited. `invoice_item`
+`quantity`/`rate` become nullable (migration `Version20261008160000`).
+
+## ADR-080: Clients have a company name; invoice item currency sits with the items (owner request, 2026-10-07)
+
+**Decision.** `client.company_name` (VARCHAR 255, optional; migration `Version20261009130000`) on the client form,
+view, list (under the name) and search. An invoice's Billed To name is the client's company name when set, else its
+name. On the invoice form the Currency select (USD by default) moved into the Items section and the Rate/Amount
+headings show it; one currency per invoice, since its totals add the lines up. The invoice lists' row actions are
+Download (PDF), Email and Edit.
+
+## ADR-081: Invoice lists filter by year and month, group by month or year, with totals (owner request, 2026-10-07)
+
+**Decision.** The invoice lists get Year, Month and Group by (month / year) filters. With any filter or grouping the
+list shows every matching invoice, no paging, so the totals cover them all: a heading and a total row per group,
+and a grand total when there is more than one group. Totals are per currency and leave cancelled invoices out.
+Year (and month) filter the invoice date as a range; a month without a year matches that month in every year.
+
+## ADR-082: Buttons in Bootstrap 5 colours, one colour per kind of action (owner request, 2026-10-07)
+
+**Decision.** Every button in the app carries a colour class by what it does, in Bootstrap 5 colours (app-bridge.css):
+primary (save, submit, filter, sign in), success (add, create, approve, unlock), warning (edit, reset, arm),
+danger (delete, remove, cancel, revoke, terminate, disable), secondary (back, cancel link, reset filters),
+info (view, email, tasks, show, resend), dark (download, impersonate), light (print, move). Plain <button>s were given
+`btn <colour>` with their old classes kept (tests and the old CSS hooks still find them).

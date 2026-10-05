@@ -31,7 +31,7 @@
             <option value="">All clients</option>
             {% for client in clients %}<option value="{{ client.id }}" {{ clientId == client.id ? 'selected' }}>{{ client.name }}</option>{% endfor %}
         </select>
-        <button class="btn sm" type="submit">Filter</button>
+        <button class="btn primary sm" type="submit">Filter</button>
     </form>
     <div class="tscroll">
         <table class="t">
@@ -51,8 +51,8 @@
                             {% elseif canReview[task.id] %}
                                 <form class="mx-form btn-row" method="post" action="{{ path('app_task_authorization', {id: task.id}) }}">
                                     <input type="hidden" name="_token" value="{{ csrf_token('task_authorization_' ~ task.id) }}">
-                                    <button class="btn sm success" type="submit" name="decision" value="Approve">Approve</button>
-                                    <button class="btn sm danger" type="submit" name="decision" value="Deny">Deny</button>
+                                    <button class="btn success sm" type="submit" name="decision" value="Approve">Approve</button>
+                                    <button class="btn danger sm" type="submit" name="decision" value="Deny">Deny</button>
                                 </form>
                             {% else %}
                                 <span class="muted small">Waiting for a reviewer</span>

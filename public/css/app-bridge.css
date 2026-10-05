@@ -317,8 +317,8 @@ html:not(.js) .user-menu:focus-within .dropdown {
 
 /* ── Page body: buttons ────────────────────────────────────────────────────── */
 /* A page action on a plain page is a bare anchor in the flow: the mockup's outline button. */
-.site-app .page-body > a,
-.site-app .page-body > p > a:only-child {
+.site-app .page-body > a:not(.btn),
+.site-app .page-body > p > a:only-child:not(.btn) {
     display: inline-flex;
     align-items: center;
     height: 32px;
@@ -333,8 +333,8 @@ html:not(.js) .user-menu:focus-within .dropdown {
     text-decoration: none;
 }
 
-.site-app .page-body > a:hover,
-.site-app .page-body > p > a:only-child:hover {
+.site-app .page-body > a:not(.btn):hover,
+.site-app .page-body > p > a:only-child:not(.btn):hover {
     background: #e6e6e6;
     text-decoration: none;
 }
@@ -365,15 +365,15 @@ html:not(.js) .user-menu:focus-within .dropdown {
 }
 
 /* Destructive actions are the mockup's .btn.danger, recognised by the class names the pages already use. */
-.page-body button[class*="delete"],
-.page-body button[class*="revoke"],
-.page-body button[class*="disable"] {
+.page-body button:not(.btn)[class*="delete"],
+.page-body button:not(.btn)[class*="revoke"],
+.page-body button:not(.btn)[class*="disable"] {
     background: var(--danger);
 }
 
-.page-body button[class*="delete"]:hover,
-.page-body button[class*="revoke"]:hover,
-.page-body button[class*="disable"]:hover {
+.page-body button:not(.btn)[class*="delete"]:hover,
+.page-body button:not(.btn)[class*="revoke"]:hover,
+.page-body button:not(.btn)[class*="disable"]:hover {
     background: var(--danger-hover);
 }
 
@@ -625,6 +625,17 @@ html:not(.js) .user-menu:focus-within .dropdown {
     text-decoration: none;
 }
 
+/* A hovered "+" gets no background box (app.css painted it white): only its colour changes. */
+.nav-group li .add:hover {
+    background: transparent;
+    color: var(--primary);
+}
+
+.nav-group li.active .add:hover {
+    background: transparent;
+    color: #fff;
+}
+
 .user-menu > .quick-create-toggle {
     width: 28px;
     height: 28px;
@@ -666,3 +677,44 @@ html:not(.js) .user-menu:focus-within .dropdown {
         flex-wrap: wrap;
     }
 }
+
+/* Invoice form item rows (ADR-077): a one-line description under each item name. */
+.inv-lines textarea { min-height: 0; height: 2.6em; margin-top: 4px; resize: vertical; }
+.inv-lines td { vertical-align: top; }
+/* Invoice form: date, due date and currency in one row; stacked on narrow screens. */
+@media (max-width:900px) { .form-grid.three.inv-head-row { grid-template-columns: 1fr; } }
+/* Invoice item Amount: an editable field, right-aligned like the totals (ADR-078). */
+.inv-lines input[data-amount] { text-align: right; }
+.inv-lines select.inv-num { width: 100%; }
+/* Invoice list grouped by month/year: a heading row and a totals row per group (ADR-081). */
+table.t .group-head th { background: var(--primary-soft); color: var(--primary); font-size: .8rem; text-transform: none; letter-spacing: 0; }
+table.t .group-total td { background: #f7f7f9; border-top: 1px solid var(--line); }
+table.t .group-total.grand td { background: #ecebf3; font-size: .95rem; }
+/* ── Buttons in Bootstrap 5 colours (ADR-082) ──────────────────────────────────
+   Every button names its colour by what it does: primary = save / submit / filter, success = add / create /
+   approve, warning = edit / reset, danger = delete / remove / cancel / revoke, secondary = back / cancel link /
+   reset filters, info = view / email / show, dark = download / impersonate, light = print / move (purple). Text is
+   white on every colour; warning and info use Bootstrap's deeper shades so white text stays readable. A bare .btn
+   is primary. */
+.btn, .btn.primary { background: #0d6efd; border-color: #0d6efd; color: #fff; }
+.btn:hover, .btn.primary:hover { background: #0b5ed7; border-color: #0a58ca; color: #fff; }
+.btn.secondary { background: #6c757d; border-color: #6c757d; color: #fff; }
+.btn.secondary:hover { background: #5c636a; border-color: #565e64; color: #fff; }
+.btn.success { background: #198754; border-color: #198754; color: #fff; }
+.btn.success:hover { background: #157347; border-color: #146c43; color: #fff; }
+.btn.danger { background: #dc3545; border-color: #dc3545; color: #fff; }
+.btn.danger:hover { background: #bb2d3b; border-color: #b02a37; color: #fff; }
+.btn.warning { background: #e0a800; border-color: #e0a800; color: #fff; }
+.btn.warning:hover { background: #c69500; border-color: #b98b00; color: #fff; }
+.btn.info { background: #0aa2c0; border-color: #0aa2c0; color: #fff; }
+.btn.info:hover { background: #087f97; border-color: #08788e; color: #fff; }
+.btn.light { background: #6f42c1; border-color: #6f42c1; color: #fff; }
+.btn.light:hover { background: #59359a; border-color: #533291; color: #fff; }
+.btn.dark { background: #212529; border-color: #212529; color: #fff; }
+.btn.dark:hover { background: #424649; border-color: #373b3e; color: #fff; }
+.btn:focus-visible { outline: 0; box-shadow: 0 0 0 .2rem rgba(13, 110, 253, .35); }
+
+/* Buttons that were plain <button>s keep their old sizes: small in table cells, full width on sign-in cards. */
+.page-body td button.btn:not(.xs):not(.sm) { height: 28px; padding: 0 9px; border-radius: 5px; font-size: .76rem; }
+.auth-card button.btn { width: 100%; height: 40px; }
+.impersonation-banner button.btn { height: 26px; font-size: .75rem; }
