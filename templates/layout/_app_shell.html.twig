@@ -61,18 +61,18 @@
             { label: 'Invite User', href: path('app_admin_users_invite'), current: cur == 'app_admin_users_invite' },
             { label: 'Invitations', href: path('app_admin_users_invitations'), current: cur == 'app_admin_users_invitations' },
         ] },
-        { label: 'Settings', icon: 'sliders', children: [
-            { label: 'Task Statuses', href: path('app_settings_list', {kind: 'task-statuses'}), current: cur starts with 'app_settings_' and app.request.attributes.get('kind') == 'task-statuses',
-              add: { label: 'New task status', href: path('app_settings_list', {kind: 'task-statuses', add: 1}) } },
-            { label: 'Task Types', href: path('app_settings_list', {kind: 'task-types'}), current: cur starts with 'app_settings_' and app.request.attributes.get('kind') == 'task-types',
-              add: { label: 'New task type', href: path('app_settings_list', {kind: 'task-types', add: 1}) } },
-            { label: 'Currencies', href: path('app_settings_list', {kind: 'currencies'}), current: cur starts with 'app_settings_' and app.request.attributes.get('kind') == 'currencies',
-              add: { label: 'New currency', href: path('app_settings_list', {kind: 'currencies', add: 1}) } },
+        { label: 'Config', icon: 'sliders', children: [
+            { label: 'Task Statuses', href: path('app_config_task_statuses'), current: cur starts with 'app_config_task_statuses',
+              add: { label: 'New task status', href: path('app_config_task_statuses_new') } },
+            { label: 'Task Types', href: path('app_config_task_types'), current: cur starts with 'app_config_task_types',
+              add: { label: 'New task type', href: path('app_config_task_types_new') } },
+            { label: 'Currencies', href: path('app_config_currencies'), current: cur starts with 'app_config_currencies',
+              add: { label: 'New currency', href: path('app_config_currencies_new') } },
         ] },
         { label: 'Administration', icon: 'settings', children: [
             { label: 'Overview', href: path('app_admin_dashboard'), current: cur == 'app_admin_dashboard' },
             { label: 'Audit Log', href: path('app_admin_audit_log'), current: cur == 'app_admin_audit_log' },
-            { label: 'Config', href: path('app_admin_config'), current: cur == 'app_admin_config' },
+            { label: 'General Config', href: path('app_admin_config'), current: cur == 'app_admin_config' },
             { label: 'API Docs', href: path('app_admin_api_docs'), current: cur starts with 'app_admin_api_docs' },
         ] },
     ]) %}

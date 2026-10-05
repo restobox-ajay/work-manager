@@ -2303,3 +2303,12 @@ Priority rows are created when an admin first moves a task (work-platform seeded
 
 **Menu:** Clients (Add Client, List Clients), Projects (Add Project, List Projects), Tasks (the eight above);
 manager-only entries (Quick Add, Task Created By Manager) need `WORK_MANAGE`.
+
+## ADR-073: Task reference lists live under /config, one route set per list (owner request, 2026-10-06)
+
+"Settings" is reserved for other things. The menu group is **Config** (Task Statuses, Task Types, Currencies) and
+each list has its own routes: `/config/<list>` (`app_config_<list>`), `/config/<list>/new` (`…_new`) and
+`/config/<list>/{id}/edit` (`…_edit`) — GET shows the table with the popup open, POST saves. Replaces
+`/settings/{kind}` (`?add=1` / `?edit=` query flags). Controller `ConfigListController`, template `config/list`.
+The Administration item for the app's general config page is labelled "General Config" so two menu entries are
+not both called "Config".
