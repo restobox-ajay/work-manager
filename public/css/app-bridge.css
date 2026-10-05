@@ -1,0 +1,563 @@
+/* ============================================================================
+   App bridge: this app's markup → the Maxeme Auto mockup look (app.css).
+
+   app.css is the mockup's stylesheet, copied unchanged so the two share one palette and can be refreshed from
+   there. Two things it does not cover live here:
+     1. The shell pieces the mockup never needed: a top-level menu link, <details> menu groups (open/close with
+        no script), a working collapse toggle, a mobile menu button, the impersonation banner.
+     2. This app's pages are mostly bare elements — an <h1>, a <form> of <div>s, a <table> — where the mockup
+        uses classed markup (.ph-title, .card, table.t, .btn, .alert). The rules under "Page body" give those
+        elements the same treatment, scoped to .page-body, without editing every page template.
+
+   Colours, radii and sizes come from app.css's custom properties; nothing here defines a new colour.
+   ============================================================================ */
+
+/* ── Shell: skip link ──────────────────────────────────────────────────────── */
+.skip-link {
+    position: absolute;
+    left: -9999px;
+    top: 8px;
+    z-index: 100;
+    padding: 6px 12px;
+    border-radius: 6px;
+    background: var(--primary);
+    color: #fff;
+}
+
+.skip-link:focus {
+    left: 8px;
+}
+
+/* ── Shell: sidebar menu ───────────────────────────────────────────────────── */
+.brand {
+    display: block;
+    text-decoration: none !important;
+}
+
+.brand b,
+.brand span {
+    color: #fff;
+}
+
+.brand-short {
+    display: none;
+    font-style: normal;
+    font-weight: 800;
+    font-size: 1rem;
+}
+
+/* A group is a <details>: same look as the mockup's group <button>, minus the browser's disclosure marker. */
+.nav-group > summary,
+.nav > .nav-link {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    width: 100%;
+    padding: 7px 12px;
+    cursor: pointer;
+    list-style: none;
+    font-size: .8125rem;
+    font-weight: 500;
+    color: var(--sb-text);
+    text-decoration: none;
+}
+
+.nav-group > summary::-webkit-details-marker {
+    display: none;
+}
+
+.nav-group > summary:hover,
+.nav > .nav-link:hover {
+    background: var(--sb-hover);
+    text-decoration: none;
+}
+
+.nav-group > summary svg,
+.nav > .nav-link svg {
+    width: 18px;
+    height: 18px;
+    flex: none;
+    color: var(--sb-muted);
+}
+
+.nav-group > summary .chev {
+    margin-left: auto;
+    font-size: .7rem;
+    color: var(--sb-muted);
+    transition: transform .15s;
+}
+
+.nav-group[open] > summary .chev {
+    transform: rotate(90deg);
+}
+
+/* <details> already hides a closed group's list (and takes its links out of the tab order). */
+.nav-group > ul {
+    display: block;
+}
+
+.nav > .nav-link.active {
+    background: var(--primary);
+    color: #fff;
+    font-weight: 600;
+}
+
+.nav > .nav-link.active svg {
+    color: #fff;
+}
+
+.nav-group > summary:focus-visible,
+.nav > .nav-link:focus-visible,
+.nav-group li a:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: -2px;
+}
+
+/* The collapse toggle needs app.js; without it the button would do nothing, so it is not shown. */
+.sidebar-collapse-toggle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    border: 0;
+    border-top: 1px solid var(--sb-border);
+    background: none;
+    font: inherit;
+    font-size: .75rem;
+    text-align: left;
+    cursor: pointer;
+}
+
+.sidebar-collapse-toggle:hover {
+    background: var(--sb-hover);
+}
+
+html:not(.js) .sidebar-collapse-toggle {
+    display: none;
+}
+
+/* ── Shell: collapsed sidebar (desktop only) ───────────────────────────────── */
+/* The sidebar's width and the frame's margin both read --sb-w, so one variable moves both with no reflow
+   of anything else. Set on <html> before the first paint (base.html.twig), so a collapsed sidebar never
+   flashes open. */
+@media (min-width: 901px) {
+    html.sidebar-collapsed {
+        --sb-w: 56px;
+    }
+
+    html.sidebar-collapsed .sidebar .nav-label,
+    html.sidebar-collapsed .sidebar .chev,
+    html.sidebar-collapsed .brand b,
+    html.sidebar-collapsed .brand span,
+    html.sidebar-collapsed .nav-group > ul {
+        display: none;
+    }
+
+    html.sidebar-collapsed .brand {
+        padding: 12px 0;
+    }
+
+    html.sidebar-collapsed .brand-short {
+        display: block;
+    }
+
+    html.sidebar-collapsed .nav-group > summary,
+    html.sidebar-collapsed .nav > .nav-link,
+    html.sidebar-collapsed .sidebar-collapse-toggle {
+        justify-content: center;
+        padding-left: 0;
+        padding-right: 0;
+    }
+
+    /* The group holding the current page stays marked while its links are hidden. */
+    html.sidebar-collapsed .nav-group:has(li.active) > summary {
+        background: var(--primary-soft);
+    }
+
+    html.sidebar-collapsed .sb-foot-icon {
+        transform: rotate(180deg);
+    }
+}
+
+/* ── Shell: top bar ────────────────────────────────────────────────────────── */
+.nav-toggle {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: #fff;
+    cursor: pointer;
+}
+
+.nav-toggle-bars {
+    display: grid;
+    gap: 3px;
+}
+
+.nav-toggle-bars span {
+    display: block;
+    width: 16px;
+    height: 2px;
+    border-radius: 1px;
+    background: var(--text);
+}
+
+.dropdown a svg {
+    flex: none;
+    color: var(--muted);
+}
+
+/* Without app.js the account menu still opens: focusing its button reveals it. */
+html:not(.js) .user-menu:focus-within .dropdown {
+    display: block;
+}
+
+/* ── Shell: mobile ─────────────────────────────────────────────────────────── */
+@media (max-width: 900px) {
+    .sidebar {
+        transition: transform .2s ease;
+    }
+
+    html.nav-open .sidebar {
+        transform: none;
+        box-shadow: 0 0 40px rgba(0, 0, 0, .2);
+    }
+
+    .nav-toggle {
+        display: inline-flex;
+    }
+
+    .sidebar-collapse-toggle {
+        display: none;
+    }
+
+    .topbar {
+        padding: 9px 14px;
+    }
+
+    .user-menu-name {
+        display: none;
+    }
+
+    .content {
+        padding: 6px 14px 24px;
+    }
+}
+
+/* ── Impersonation banner ──────────────────────────────────────────────────── */
+.impersonation-banner {
+    position: relative;
+    z-index: 15;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 7px 16px;
+    border-bottom: 1px solid #faebcc;
+    background: var(--warning-soft);
+    color: #8a6d3b;
+    font-size: .82rem;
+    font-weight: 600;
+}
+
+.site-app .impersonation-banner {
+    margin-left: var(--sb-w);
+}
+
+@media (max-width: 900px) {
+    .site-app .impersonation-banner {
+        margin-left: 0;
+    }
+}
+
+.impersonation-banner form {
+    display: inline-flex;
+    margin: 0;
+}
+
+/* ── Page body: headings and text ──────────────────────────────────────────── */
+/* A bare <h1> reads as the mockup's page title (.ph-title h1), and the paragraph under it as its .lead. */
+.site-app .page-body > h1 {
+    margin: 10px 0 2px;
+    font-size: .92rem;
+    font-weight: 800;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+}
+
+.site-app .page-body > h1 + p {
+    margin: 0 0 14px;
+    color: var(--muted);
+    font-size: .78rem;
+}
+
+.site-app .page-body > h1:only-of-type:not(:has(+ p)) {
+    margin-bottom: 14px;
+}
+
+.page-body h2 {
+    margin: 20px 0 10px;
+    font-size: .95rem;
+    font-weight: 700;
+}
+
+.page-body h3 {
+    margin: 16px 0 6px;
+    font-size: .88rem;
+    font-weight: 700;
+}
+
+.page-body p {
+    margin: 0 0 10px;
+}
+
+/* ── Page body: buttons ────────────────────────────────────────────────────── */
+/* A page action on a plain page is a bare anchor in the flow: the mockup's outline button. */
+.site-app .page-body > a,
+.site-app .page-body > p > a:only-child {
+    display: inline-flex;
+    align-items: center;
+    height: 32px;
+    margin: 0 6px 12px 0;
+    padding: 0 12px;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    background: #fff;
+    color: #333;
+    font-size: .8125rem;
+    font-weight: 500;
+    text-decoration: none;
+}
+
+.site-app .page-body > a:hover,
+.site-app .page-body > p > a:only-child:hover {
+    background: #e6e6e6;
+    text-decoration: none;
+}
+
+/* Every plain <button> on a page is an action: the mockup's primary .btn. */
+.page-body button:not(.btn),
+.impersonation-banner button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    height: 32px;
+    padding: 0 12px;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    background: var(--primary);
+    color: #fff;
+    font: inherit;
+    font-size: .8125rem;
+    font-weight: 500;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.page-body button:not(.btn):hover,
+.impersonation-banner button:hover {
+    background: var(--primary-hover);
+}
+
+/* Destructive actions are the mockup's .btn.danger, recognised by the class names the pages already use. */
+.page-body button[class*="delete"],
+.page-body button[class*="revoke"],
+.page-body button[class*="disable"] {
+    background: var(--danger);
+}
+
+.page-body button[class*="delete"]:hover,
+.page-body button[class*="revoke"]:hover,
+.page-body button[class*="disable"]:hover {
+    background: var(--danger-hover);
+}
+
+.impersonation-banner button {
+    height: 26px;
+    background: var(--warning);
+    font-size: .75rem;
+}
+
+.impersonation-banner button:hover {
+    background: var(--warning-hover);
+}
+
+/* ── Page body: forms ──────────────────────────────────────────────────────── */
+/* A bare form on a signed-in page is a .card with label-above fields, as in the mockup's forms. */
+.site-app .page-body > form:not([style*="inline"]),
+.site-app .page-body > section > form:not([style*="inline"]) {
+    display: grid;
+    gap: 12px;
+    max-width: 640px;
+    margin: 0 0 16px;
+    padding: 20px 22px;
+    border: 1.5px solid var(--line);
+    border-radius: 12px;
+    background: #fff;
+}
+
+.page-body form > div {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.page-body form > button,
+.page-body form > div > button {
+    align-self: flex-start;
+    justify-self: start;
+}
+
+.checkbox-row,
+.page-body label.checkbox-row {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-weight: 500;
+}
+
+.page-body input[type="checkbox"],
+.page-body input[type="radio"] {
+    width: auto;
+    align-self: flex-start;
+}
+
+.field-error {
+    color: var(--danger);
+    font-size: .74rem;
+    font-weight: 600;
+}
+
+/* ── Page body: tables ─────────────────────────────────────────────────────── */
+/* A bare <table> is the mockup's table.t inside a .table-card. */
+.page-body table:not(.t) {
+    width: 100%;
+    margin: 0 0 18px;
+    border: 1px solid var(--line);
+    border-collapse: collapse;
+    background: #fff;
+    font-size: .82rem;
+}
+
+.page-body table:not(.t) th {
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--line);
+    background: var(--th-bg);
+    color: var(--muted);
+    font-size: .7rem;
+    font-weight: 500;
+    letter-spacing: .04em;
+    text-align: left;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.page-body table:not(.t) td {
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--line-light);
+    vertical-align: middle;
+}
+
+.page-body table:not(.t) tbody tr:hover td {
+    background: var(--primary-soft);
+}
+
+/* Action clusters in a cell: several one-button POST forms in a row, at the mockup's .btn.sm size. */
+.page-body td form {
+    display: inline-flex;
+    margin: 2px 4px 2px 0;
+}
+
+.page-body td button:not(.btn) {
+    height: 28px;
+    padding: 0 9px;
+    border-radius: 5px;
+    font-size: .76rem;
+}
+
+/* ── Page body: alerts ─────────────────────────────────────────────────────── */
+/* The class names the pages already use, given the mockup's .alert variants. */
+.page-body .error,
+.page-body .flash-error,
+.page-body .alert-error,
+.page-body .success,
+.page-body .flash-success,
+.page-body .alert-success,
+.page-body .confirmation,
+.page-body .warning {
+    margin: 0 0 12px;
+    padding: 10px 14px;
+    border: 1px solid;
+    border-radius: 8px;
+    font-size: .82rem;
+}
+
+.page-body .error,
+.page-body .flash-error,
+.page-body .alert-error {
+    border-color: #ebccd1;
+    background: var(--danger-soft);
+    color: #a94442;
+}
+
+.page-body .success,
+.page-body .flash-success,
+.page-body .alert-success {
+    border-color: #d6e9c6;
+    background: var(--success-soft);
+    color: #3c763d;
+}
+
+.page-body .confirmation {
+    border-color: #bce8f1;
+    background: var(--info-soft);
+    color: #31708f;
+}
+
+.page-body .warning {
+    border-color: #faebcc;
+    background: var(--warning-soft);
+    color: #8a6d3b;
+}
+
+.page-body .error p,
+.page-body .success p,
+.page-body .warning p {
+    margin: 0;
+    color: inherit;
+}
+
+/* ── Signed-out pages: the mockup's sign-in card ───────────────────────────── */
+.auth-card > h1 {
+    margin: 4px 0 2px;
+    font-size: 1.3rem;
+}
+
+.auth-card form {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin: 16px 0;
+}
+
+.auth-card button:not(.btn) {
+    width: 100%;
+    height: 40px;
+}
+
+.auth-card p {
+    margin: 0 0 6px;
+    font-size: .8rem;
+}
+
+@media (max-width: 760px) {
+    .page-body table:not(.t) {
+        display: block;
+        overflow-x: auto;
+    }
+}

@@ -1,24 +1,27 @@
-{# The slim bar above every signed-in page: the account menu, as in the wholesale-b2b admin console. #}
+{# The top bar above every signed-in page, as in the Maxeme Auto mockup: breadcrumb left, account menu right.
+   `crumb` comes from layout/_app_shell.html.twig. #}
 {% import 'layout/_icons.html.twig' as icons %}
 {% set identifier = app.user.userIdentifier %}
+{% set displayName = app.user.name is defined and app.user.name ? app.user.name : identifier %}
 {% set menuLinks = [
     { label: 'Settings', icon: 'user', href: path('app_account_settings') },
     { label: 'Active Sessions', icon: 'monitor', href: path('app_account_sessions') },
     { label: 'Logout', icon: 'logout', href: path('app_logout') },
 ] %}
-<div class="admin-content-header">
+<header class="topbar">
+    <button class="nav-toggle" type="button" aria-controls="primary-sidebar" aria-expanded="false" aria-label="Open the menu">
+        <span class="nav-toggle-bars" aria-hidden="true"><span></span><span></span><span></span></span>
+    </button>
+    <span class="crumb">{{ crumb }}</span>
+    <span class="spacer"></span>
     <div class="user-menu">
-        <button class="user-menu-toggle" type="button" aria-expanded="false" aria-haspopup="true">
-            <span class="user-menu-avatar" aria-hidden="true">{{ identifier|first|upper }}</span>
-            <span class="user-menu-email">{{ identifier }}</span>
-            <span class="user-menu-caret" aria-hidden="true">
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 8 12 16 20 8"></polyline></svg>
-            </span>
+        <button class="user-menu-toggle" type="button" aria-expanded="false" aria-haspopup="true" title="{{ identifier }}">
+            <span class="avatar" aria-hidden="true">{{ displayName|first|upper }}</span><span class="user-menu-name">{{ displayName }}</span> ▾
         </button>
-        <div class="user-menu-dropdown" role="menu">
+        <div class="dropdown" role="menu">
             {% for link in menuLinks %}
-                <a href="{{ link.href }}" role="menuitem"><span class="user-menu-item-icon">{{ icons.icon(link.icon) }}</span>{{ link.label }}</a>
+                <a href="{{ link.href }}" role="menuitem">{{ icons.icon(link.icon) }}{{ link.label }}</a>
             {% endfor %}
         </div>
     </div>
-</div>
+</header>

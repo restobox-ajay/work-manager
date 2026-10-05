@@ -1,6 +1,15 @@
-{# The sidebar: everyone's own account pages, plus the management pages for accounts holding ROLE_ADMIN (ADR-068).
-   Rendered by layout/_nav_tree.html.twig. Bundle-owned links appear only when their bundle is installed
-   (the `pat_available` / `two_factor_available` Twig globals, issue #14). #}
+{#
+    The signed-in shell, in the Maxeme Auto mockup layout: fixed sidebar (brand band, menu groups, collapse
+    toggle) and a frame holding the top bar (breadcrumb + account menu), the page and the footer.
+
+    One account type (ADR-068): everyone gets their own account pages; ROLE_ADMIN adds the management pages and
+    ROLE_TECH_SUPPORT the maintainer tools. The menu is built here, once, because both the sidebar and the
+    breadcrumb read it. Bundle-owned links appear only when their bundle is installed (the `pat_available` /
+    `two_factor_available` Twig globals, issue #14).
+
+    Expects from base.html.twig: `pageBody` (the rendered page) and `pageTitle` (the title block, used as the
+    breadcrumb for pages that are not in the menu).
+#}
 {% set cur = app.request.attributes.get('_route') %}
 {% set accountLinks = [
     { label: 'Settings', href: path('app_account_settings'), current: cur == 'app_account_settings' },
@@ -44,7 +53,33 @@
         ] },
     ]) %}
 {% endif %}
-{% set items = items|merge([
-    { label: 'Logout', icon: 'logout', href: path('app_logout'), current: false },
-]) %}
-{{ include('layout/_nav_tree.html.twig', { items: items }, with_context = false) }}
+
+{# Breadcrumb, as in the mockup ("Group › Page"): taken from the menu entry for the current page. #}
+{% set currentGroup = items|filter(item => item.children is defined and item.children|filter(child => child.current)|length > 0)|first %}
+{% set currentLink = items|filter(item => item.children is not defined and item.current)|first %}
+{% if currentGroup %}
+    {% set crumb = currentGroup.label ~ ' › ' ~ (currentGroup.children|filter(child => child.current)|first).label %}
+{% elseif currentLink %}
+    {% set crumb = currentLink.label %}
+{% else %}
+    {% set crumb = pageTitle|trim != app_name ? pageTitle|trim : '' %}
+{% endif %}
+
+<a class="skip-link" href="#main-content">Skip to main content</a>
+<aside class="sidebar" id="primary-sidebar">
+    <a class="brand" href="{{ path('app_dashboard') }}" aria-label="{{ app_name }} home">
+        <i class="brand-short" aria-hidden="true">{{ app_name|first }}</i><b>{{ app_name }}</b><span>{{ is_granted('ROLE_ADMIN') ? 'Admin Console' : 'My Account' }}</span>
+    </a>
+    <nav class="nav" aria-label="Primary navigation">
+        {{ include('layout/_nav_tree.html.twig', { items: items }, with_context = false) }}
+    </nav>
+    {# Shown only once app.js is running (html.js): without it the button would do nothing. #}
+    <button class="sb-foot sidebar-collapse-toggle" type="button" aria-controls="primary-sidebar" aria-expanded="true">
+        <span class="sb-foot-icon" aria-hidden="true">‹</span><span class="nav-label">Collapse</span>
+    </button>
+</aside>
+<div class="frame">
+    {% include 'layout/_content_header.html.twig' with { crumb: crumb } %}
+    <main id="main-content" class="content page-body">{{ pageBody }}</main>
+    <footer class="footer">&copy; {{ 'now'|date('Y') }} {{ app_name }}</footer>
+</div>

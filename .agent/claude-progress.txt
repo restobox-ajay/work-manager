@@ -4179,3 +4179,6 @@ AccountManagementPolicy + ManagedAccountFinder for who-manages-whom, /admin-api 
 swap, migration Version20261005120000 folds admins into `user` and drops the admin tables. Smoke-tested in a browser
 (login, management pages, create user with role, impersonate/exit, tech-support 2FA, PAT on /admin-api). Tests NOT
 ported yet (owner request) — the suite is red until they are.
+ADR-069 (2026-10-05): theme switched to the Maxeme Auto mockup (app.css = mx.css copy, app-bridge.css, mockup
+shell markup with breadcrumb). Sidebar flicker fixed (<details> groups, collapse state restored before first paint).
+Browser-checked desktop/collapsed/mobile/login. SidebarTest not updated (owner: tests later).

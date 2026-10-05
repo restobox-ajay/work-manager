@@ -2227,3 +2227,24 @@ removed admin realm and is red until it is ported.
 **Tripwire:** rationale (tests to be ported in a follow-up, by owner decision).
 **Status: decided + implemented (2026-10-05); test port pending.**
 
+
+## ADR-069: UI theme = the Maxeme Auto mockup's palette and shell (owner request, 2026-10-05) — SUPERSEDES ADR-067
+
+**Decision:** `public/css/app.css` is `mockup-maxeme-auto/assets/css/mx.css`, copied unchanged except that its Inter
+`@import` became a `<link>` in base.html.twig (parallel load instead of blocking the stylesheet). The wholesale
+`theme.css` (~600 KB) and `theme-bridge.css` are removed. `public/css/app-bridge.css` maps this app's plain page
+markup onto the mockup's classes/tokens and adds the shell pieces the mockup lacks. The shell markup
+(`layout/_app_shell.html.twig`, `_nav_tree`, `_content_header`) follows the mockup: grey sidebar with the blue brand
+band, groups with ▶ chevrons, filled-blue active row, top bar with breadcrumb + account menu. The menu is built once
+in `_app_shell` because both the sidebar and the breadcrumb read it.
+
+**Sidebar flicker fix:** (1) groups are `<details>` elements — open/close is native, no max-height animation and no
+script re-laying the menu out after the first paint; (2) the collapsed preference is restored by an inline `<head>`
+script on `<html>` before the first paint (previously applied on DOMContentLoaded, so the sidebar drew open and
+then snapped shut); (3) the collapsed width is one variable (`--sb-w`) that both the sidebar and the frame read.
+
+**Behaviour changes:** Logout left the sidebar (it is in the account menu, as in the mockup; the menu also opens
+via `:focus-within` without JS). `theme.js` → `app.js`; localStorage key `adminSidebarCollapsed` → `sidebarCollapsed`.
+
+**Tripwire:** `tests/Functional/Navigation/SidebarTest.php` still asserts the old asset paths and markup — not
+updated (owner: tests later).
