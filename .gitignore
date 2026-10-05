@@ -23,3 +23,6 @@
 
 # Backup of the old boilerplate git history (kept locally, never pushed)
 /.git-old-boilerplate-history/
+
+# IDE settings (PhpStorm)
+/.idea/
