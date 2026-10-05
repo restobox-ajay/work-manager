@@ -51,7 +51,6 @@
           add: is_granted('PROJECT_CREATE') ? { label: 'New project', href: path('app_project_create') } : null },
     ]|filter(link => link) },
     { label: 'Tasks', icon: 'check-square', children: taskLinks },
-    { label: 'My Account', icon: 'user', children: accountLinks },
     { label: 'Security', icon: 'shield', children: securityLinks },
 ] %}
 {% if is_granted('ROLE_ADMIN') %}
@@ -86,6 +85,9 @@
         ] },
     ]) %}
 {% endif %}
+
+{# Your own account settings sit last, at the bottom of the menu. #}
+{% set items = items|merge([{ label: 'My Account', icon: 'user', children: accountLinks }]) %}
 
 {# Breadcrumb, as in the mockup ("Group › Page"): taken from the menu entry for the current page. #}
 {% set currentGroup = items|filter(item => item.children is defined and item.children|filter(child => child.current)|length > 0)|first %}
