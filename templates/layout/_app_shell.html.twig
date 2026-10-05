@@ -51,7 +51,6 @@
           add: is_granted('PROJECT_CREATE') ? { label: 'New project', href: path('app_project_create') } : null },
     ]|filter(link => link) },
     { label: 'Tasks', icon: 'check-square', children: taskLinks },
-    { label: 'Security', icon: 'shield', children: securityLinks },
 ] %}
 {# Config: one CRUD page per list (ADR-075), in work-platform's Settings menu order. #}
 {% set kind = app.request.attributes.get('kind') %}
@@ -86,8 +85,11 @@
     ]) %}
 {% endif %}
 
-{# Your own account settings sit last, at the bottom of the menu. #}
-{% set items = items|merge([{ label: 'My Account', icon: 'user', children: accountLinks }]) %}
+{# Your own security and account settings sit last, at the bottom of the menu. #}
+{% set items = items|merge([
+    { label: 'Security', icon: 'shield', children: securityLinks },
+    { label: 'My Account', icon: 'user', children: accountLinks },
+]) %}
 
 {# Breadcrumb, as in the mockup ("Group › Page"): taken from the menu entry for the current page. #}
 {% set currentGroup = items|filter(item => item.children is defined and item.children|filter(child => child.current)|length > 0)|first %}
