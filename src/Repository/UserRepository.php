@@ -38,6 +38,23 @@ class UserRepository extends ServiceEntityRepository
         return (int) $qb->getQuery()->getSingleScalarResult();
     }
 
+    /**
+     * Active accounts by name — the people a client manager, project staff member, contractor or reviewer
+     * can be picked from (ADR-070).
+     *
+     * @return User[]
+     */
+    public function findActiveOrderedByName(): array
+    {
+        return $this->createQueryBuilder('u')
+            ->andWhere('u.status = :active')
+            ->setParameter('active', AccountStatus::Active->value)
+            ->orderBy('u.name', 'ASC')
+            ->addOrderBy('u.email', 'ASC')
+            ->getQuery()
+            ->getResult();
+    }
+
     public function countAll(): int
     {
         return (int) $this->createQueryBuilder('u')

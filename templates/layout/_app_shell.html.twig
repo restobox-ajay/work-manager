@@ -27,6 +27,11 @@
 {% endif %}
 {% set items = [
     { label: 'Dashboard', icon: 'dashboard', href: path('app_dashboard'), current: cur == 'app_dashboard' },
+    { label: 'Work', icon: 'briefcase', children: [
+        { label: 'Tasks', href: path('app_task_index'), current: cur starts with 'app_task_' },
+        { label: 'Projects', href: path('app_project_index'), current: cur starts with 'app_project_' },
+        { label: 'Clients', href: path('app_client_index'), current: cur starts with 'app_client_' },
+    ] },
     { label: 'My Account', icon: 'user', children: accountLinks },
     { label: 'Security', icon: 'shield', children: securityLinks },
 ] %}
@@ -36,6 +41,11 @@
             { label: 'All Users', href: path('app_admin_users'), current: cur starts with 'app_admin_users' and cur != 'app_admin_users_invite' and cur != 'app_admin_users_invitations' },
             { label: 'Invite User', href: path('app_admin_users_invite'), current: cur == 'app_admin_users_invite' },
             { label: 'Invitations', href: path('app_admin_users_invitations'), current: cur == 'app_admin_users_invitations' },
+        ] },
+        { label: 'Settings', icon: 'sliders', children: [
+            { label: 'Task Statuses', href: path('app_settings_list', {kind: 'task-statuses'}), current: cur starts with 'app_settings_' and app.request.attributes.get('kind') == 'task-statuses' },
+            { label: 'Task Types', href: path('app_settings_list', {kind: 'task-types'}), current: cur starts with 'app_settings_' and app.request.attributes.get('kind') == 'task-types' },
+            { label: 'Currencies', href: path('app_settings_list', {kind: 'currencies'}), current: cur starts with 'app_settings_' and app.request.attributes.get('kind') == 'currencies' },
         ] },
         { label: 'Administration', icon: 'settings', children: [
             { label: 'Overview', href: path('app_admin_dashboard'), current: cur == 'app_admin_dashboard' },

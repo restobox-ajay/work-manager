@@ -1,8 +1,64 @@
 {% extends 'base.html.twig' %}
+{% import '_work/macros.html.twig' as ui %}
 
+{#
+    The manager view (ADR-070), after work-platform's dashboard: clients (and the chosen client's projects) on the
+    left, status filter on top, the newest matching tasks, and "View more" into the task list with the same filters.
+#}
 {% block title %}Dashboard{% endblock %}
 
 {% block body %}
-<h1>Dashboard</h1>
-<p>Welcome, {{ app.user.name }}!</p>
+{% set base = filters|filter((v, k) => v is not null and k in ['clientId', 'projectId']) %}
+<div class="page-head">
+    <div class="ph-main">
+        <div class="eyebrow">Dashboard</div>
+        <div class="ph-title"><h1>Dashboard</h1></div>
+        <p class="lead">Welcome, {{ app.user.name ?: app.user.email }}.</p>
+    </div>
+    <div class="ph-actions">
+        <a class="btn outline" href="{{ path('app_dashboard', {view: 'mine'}) }}">My work</a>
+        {% if is_granted('TASK_CREATE') %}<a class="btn success" href="{{ path('app_task_create', {projectId: filters.projectId > 0 ? filters.projectId : null}) }}">+ New task</a>{% endif %}
+    </div>
+</div>
+
+{{ ui.flashes() }}
+
+<div class="split dash-split">
+    <nav class="card" aria-label="Clients" style="padding:12px 0">
+        <div class="section-label" style="padding:0 14px 4px;margin:0 0 4px">Select client</div>
+        <ul class="dash-clients">
+            <li class="{{ filters.clientId is null ? 'active' }}"><a href="{{ path('app_dashboard') }}">All clients</a></li>
+            {% for client in clients %}
+                <li class="{{ filters.clientId == client.id and filters.projectId is null ? 'active' }}">
+                    <a href="{{ path('app_dashboard', {clientId: client.id}) }}" title="{{ client.name }}">{{ client.name }}</a>
+                    {% if filters.clientId == client.id %}
+                        <ul>
+                            {% for project in projects %}
+                                <li class="{{ filters.projectId == project.id ? 'active' }}"><a href="{{ path('app_dashboard', {clientId: client.id, projectId: project.id}) }}" title="{{ project.name }}">{{ project.name }}</a></li>
+                            {% endfor %}
+                        </ul>
+                    {% endif %}
+                </li>
+            {% endfor %}
+            <li class="{{ filters.clientId == noneId ? 'active' }}"><a href="{{ path('app_dashboard', {clientId: noneId}) }}">(no client)</a></li>
+        </ul>
+    </nav>
+
+    <div>
+        <div class="pills" style="margin-bottom:12px">
+            <a class="pill{{ filters.taskStatusId is null ? ' active' }}" href="{{ path('app_dashboard', base) }}">All</a>
+            {% for id, name in statuses %}
+                <a class="pill{{ filters.taskStatusId == id ? ' active' }}" href="{{ path('app_dashboard', base|merge({taskStatusId: id})) }}">{{ name }}</a>
+            {% endfor %}
+        </div>
+        <div class="table-card">
+            {% include '_work/task_rows.html.twig' with {tasks: page.items, showContractor: true, empty: 'No tasks match.'} %}
+            <div class="table-foot">
+                <span>Showing {{ page.items|length }} of {{ page.total }} task{{ page.total == 1 ? '' : 's' }}.</span>
+                <span class="grow"></span>
+                <a class="btn sm" href="{{ path('app_task_index', base|merge({taskStatusId: filters.taskStatusId})) }}">View more</a>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}

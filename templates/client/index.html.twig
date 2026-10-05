@@ -1,0 +1,73 @@
+{% extends 'base.html.twig' %}
+{% import '_work/macros.html.twig' as ui %}
+
+{% block title %}Clients{% endblock %}
+
+{% block body %}
+{% set params = {q: q, status: status, sort: sort} %}
+<div class="page-head">
+    <div class="ph-main">
+        <div class="eyebrow">Work</div>
+        <div class="ph-title"><h1>Clients</h1></div>
+        <p class="lead">Archived clients stay listed under the Archive filter; their projects' tasks leave the unfiltered task list.</p>
+    </div>
+    {% if is_granted('CLIENT_CREATE') %}
+        <div class="ph-actions"><a class="btn success" href="{{ path('app_client_create') }}">+ Add a new client</a></div>
+    {% endif %}
+</div>
+
+{{ ui.flashes() }}
+
+<div class="table-card">
+    <form class="table-header mx-form" method="get" action="{{ path('app_client_index') }}">
+        <input type="search" name="q" value="{{ q }}" placeholder="Name, email or code" aria-label="Search clients">
+        <select name="status" aria-label="Status" style="width:auto">
+            <option value="">All statuses</option>
+            <option value="active" {{ status == 'active' ? 'selected' }}>Active</option>
+            <option value="archived" {{ status == 'archived' ? 'selected' }}>Archive</option>
+        </select>
+        <button class="btn sm" type="submit">Filter</button>
+        {% if q or status %}<a class="btn sm outline" href="{{ path('app_client_index') }}">Reset</a>{% endif %}
+        <span class="grow"></span>
+    </form>
+    <div class="tscroll">
+        <table class="t">
+            <thead>
+                <tr>
+                    {{ ui.sortHeader('name', 'Name', sort, 'app_client_index', params) }}
+                    {{ ui.sortHeader('clientCode', 'Client Code', sort, 'app_client_index', params) }}
+                    <th>Projects</th>
+                    <th>Client Manager</th>
+                    {{ ui.sortHeader('email', 'Email', sort, 'app_client_index', params) }}
+                    {{ ui.sortHeader('isActive', 'Status', sort, 'app_client_index', params) }}
+                    {{ ui.sortHeader('createdAt', 'Created', sort, 'app_client_index', params) }}
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for client in page.items %}
+                    <tr>
+                        <td><a href="{{ path('app_client_view', {id: client.id}) }}" class="bold">{{ client.name }}</a></td>
+                        <td>{{ client.clientCode ?? '—' }}</td>
+                        <td>
+                            {% set count = details.projectCounts[client.id] ?? 0 %}
+                            {% if count > 0 %}<a href="{{ path('app_project_index', {clientId: client.id}) }}">{{ count }}</a>{% else %}0{% endif %}
+                        </td>
+                        <td>{{ (details.managers[client.id] ?? [])|map(u => u.name ?: u.email)|join(', ') ?: '—' }}</td>
+                        <td>{{ client.email ?? '—' }}</td>
+                        <td>{{ ui.activeBadge(client.active) }}</td>
+                        <td class="nowrap">{{ ui.ts(client.createdAt) }}</td>
+                        <td class="actions">
+                            <a class="btn xs outline" href="{{ path('app_task_index', {clientId: client.id}) }}">Tasks</a>
+                            {% if is_granted('CLIENT_EDIT', client) %}<a class="btn xs" href="{{ path('app_client_edit', {id: client.id}) }}">Edit</a>{% endif %}
+                        </td>
+                    </tr>
+                {% else %}
+                    <tr><td colspan="8" class="empty"><b>No clients found.</b>{% if q or status %} Try clearing the filters.{% endif %}</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {{ ui.pager(page, 'app_client_index', params) }}
+</div>
+{% endblock %}

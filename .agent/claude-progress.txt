@@ -4182,3 +4182,6 @@ ported yet (owner request) — the suite is red until they are.
 ADR-069 (2026-10-05): theme switched to the Maxeme Auto mockup (app.css = mx.css copy, app-bridge.css, mockup
 shell markup with breadcrumb). Sidebar flicker fixed (<details> groups, collapse state restored before first paint).
 Browser-checked desktop/collapsed/mobile/login. SidebarTest not updated (owner: tests later).
+ADR-070 (2026-10-05): clients/projects/tasks/settings/dashboard ported from work-platform-symfony. Migration
+Version20261006120000 (verified up/down, schema:validate in sync). Browser-checked as admin, client manager and
+contractor (visibility, edit/fee rights, archived tagging, settings popups). symfony/validator added. No tests yet.

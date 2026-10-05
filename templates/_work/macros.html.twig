@@ -1,0 +1,77 @@
+{#
+    Shared pieces of the client/project/task/settings pages (ADR-070), in the mockup's markup (app.css).
+    Usage: {% import '_work/macros.html.twig' as ui %}
+#}
+
+{# Flash messages as the mockup's .alert boxes. #}
+{% macro flashes() %}
+    {% for message in app.flashes('success') %}<div class="alert success">{{ message }}</div>{% endfor %}
+    {% for message in app.flashes('error') %}<div class="alert danger">{{ message }}</div>{% endfor %}
+{% endmacro %}
+
+{# A form's refusal messages. #}
+{% macro errors(errors) %}
+    {% if errors is not empty %}
+        <div class="alert danger" role="alert">
+            {% for error in errors %}<div>{{ error }}</div>{% endfor %}
+        </div>
+    {% endif %}
+{% endmacro %}
+
+{# A sortable column header: links to ?sort=key, then ?sort=-key; marks the current direction. #}
+{% macro sortHeader(key, label, sort, route, params) %}
+    {%- set descending = sort == '-' ~ key -%}
+    {%- set ascending = sort == key -%}
+    <th class="sort{{ ascending ? ' asc' }}{{ descending ? ' desc' }}"{% if ascending or descending %} aria-sort="{{ ascending ? 'ascending' : 'descending' }}"{% endif %}>
+        <a href="{{ path(route, params|merge({sort: ascending ? '-' ~ key : key, page: null})) }}" style="color:inherit">{{ label }}</a>
+    </th>
+{%- endmacro %}
+
+{# The table footer: "x–y of n" and page links. #}
+{% macro pager(page, route, params) %}
+    <div class="table-foot">
+        <span>
+            {% if page.total == 0 %}No results{% else %}
+                {{ (page.page - 1) * page.pageSize + 1 }}–{{ min(page.page * page.pageSize, page.total) }} of {{ page.total }}
+            {% endif %}
+        </span>
+        <span class="grow"></span>
+        {% if page.pages > 1 %}
+            <nav class="pager" aria-label="Pages">
+                {% if page.page > 1 %}<a href="{{ path(route, params|merge({page: page.page - 1})) }}" aria-label="Previous page">‹</a>{% endif %}
+                {% for p in max(1, page.page - 3)..min(page.pages, page.page + 3) %}
+                    {% if p == page.page %}<span class="cur" aria-current="page">{{ p }}</span>{% else %}<a href="{{ path(route, params|merge({page: p})) }}">{{ p }}</a>{% endif %}
+                {% endfor %}
+                {% if page.page < page.pages %}<a href="{{ path(route, params|merge({page: page.page + 1})) }}" aria-label="Next page">›</a>{% endif %}
+            </nav>
+        {% endif %}
+    </div>
+{% endmacro %}
+
+{# A unix timestamp (work-platform's integer date columns) as a date, or a dash. #}
+{% macro ts(value, format = 'Y-m-d') %}{{ value ? value|date(format) : '—' }}{% endmacro %}
+
+{# Active/Archive for a 1/0 flag. #}
+{% macro activeBadge(isActive) %}
+    {% if isActive %}<span class="badge success">Active</span>{% else %}<span class="badge plain">Archive</span>{% endif %}
+{% endmacro %}
+
+{# "Archived" tag with its reasons as the tooltip (TaskListService / ProjectService::archivedReasons). #}
+{% macro archivedTag(reasons) %}
+    {% if reasons is not empty %}<span class="badge warn" title="{{ reasons|join(' ') }}">Archived</span>{% endif %}
+{% endmacro %}
+
+{# Text cut to $length characters with an ellipsis (task names run to 5000 characters). #}
+{% macro short(text, length = 90) %}{{ text|length > length ? text|slice(0, length) ~ '…' : text }}{% endmacro %}
+
+{# A task status as a badge: Pending red, Approved/Paid green, Reviewing amber, the rest grey (work-platform's colours). #}
+{% macro statusBadge(statusId, statuses) %}
+    {%- set tone = {
+        (constant('App\\Entity\\Settings\\TaskStatus::PENDING_ID')): 'danger',
+        (constant('App\\Entity\\Settings\\TaskStatus::APPROVED_ID')): 'success',
+        (constant('App\\Entity\\Settings\\TaskStatus::PAID_ID')): 'success',
+        (constant('App\\Entity\\Settings\\TaskStatus::REVIEWING_INTERNAL_ID')): 'warn',
+        (constant('App\\Entity\\Settings\\TaskStatus::REVIEWING_CLIENT_ID')): 'warn',
+    }[statusId] ?? 'plain' -%}
+    <span class="badge {{ tone }}">{{ statuses[statusId] ?? '—' }}</span>
+{%- endmacro %}

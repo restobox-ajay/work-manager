@@ -1,0 +1,32 @@
+{#
+    A compact task table for the dashboard widgets (ADR-070).
+    Expects: tasks, rows (TaskListService::rowDetails), statuses, currencies, people; optional showContractor.
+#}
+{% import '_work/macros.html.twig' as ui %}
+<div class="tscroll">
+    <table class="t">
+        <thead>
+            <tr>
+                <th>Client</th><th>Project</th><th>Task</th>
+                {% if showContractor ?? false %}<th>Contractor</th>{% endif %}
+                <th>Status</th><th>Due</th><th class="right">Payout</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for task in tasks %}
+                {% set row = rows[task.id] %}
+                <tr>
+                    <td>{{ task.project ? task.project.client.name : '—' }}</td>
+                    <td>{% if task.project %}<a href="{{ path('app_project_view', {id: task.project.id}) }}">{{ task.project.name }}</a> {{ ui.archivedTag(row.archived) }}{% else %}—{% endif %}</td>
+                    <td><a class="bold" href="{{ path('app_task_view', {id: task.id}) }}">{{ ui.short(task.name, 70) }}</a></td>
+                    {% if showContractor ?? false %}<td>{{ task.assignee ? (task.assignee.name ?: task.assignee.email) : '—' }}</td>{% endif %}
+                    <td>{{ ui.statusBadge(task.taskStatusId, statuses) }}</td>
+                    <td class="nowrap">{{ ui.ts(task.dueDate) }}</td>
+                    <td class="right nowrap">{{ row.canSeeFee ? (task.totalAmount ?? '0.00') ~ ' ' ~ (currencies[task.currencyId] ?? '') : '—' }}</td>
+                </tr>
+            {% else %}
+                <tr><td colspan="{{ (showContractor ?? false) ? 7 : 6 }}" class="empty">{{ empty ?? 'Nothing here.' }}</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>

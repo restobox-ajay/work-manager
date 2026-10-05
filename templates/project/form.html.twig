@@ -1,0 +1,52 @@
+{% extends 'base.html.twig' %}
+{% import '_work/macros.html.twig' as ui %}
+
+{% block title %}{{ project ? 'Edit ' ~ project.name : 'New project' }}{% endblock %}
+
+{% block body %}
+{% set back = project ? path('app_project_view', {id: project.id}) : path('app_project_index') %}
+<div class="page-head">
+    <div class="ph-main">
+        <div class="eyebrow">Projects</div>
+        <div class="ph-title"><h1>{{ project ? 'Edit project' : 'New project' }}</h1></div>
+        {% if project %}<p class="lead">{{ project.name }}</p>{% endif %}
+    </div>
+    <div class="ph-actions"><a class="btn outline back" href="{{ back }}">Back</a></div>
+</div>
+
+{{ ui.errors(errors) }}
+
+<form class="card mx-form" method="post" style="max-width:760px">
+    <input type="hidden" name="_token" value="{{ csrf_token('project_form') }}">
+    <div class="form-grid">
+        <div class="field">
+            <label for="f-client">Client <span class="req">*</span></label>
+            <select id="f-client" name="clientId" required>
+                <option value="">Choose a client</option>
+                {% for client in clients %}
+                    <option value="{{ client.id }}" {{ (values.clientId ?? '') == client.id ? 'selected' }}>{{ client.name }}{{ client.active ? '' : ' (Archive)' }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="field">
+            <label for="f-status">Status</label>
+            <select id="f-status" name="status">
+                <option value="1" {{ (values.status ?? 1) == 1 ? 'selected' }}>Active</option>
+                <option value="0" {{ (values.status ?? 1) == 0 ? 'selected' }}>Archive</option>
+            </select>
+        </div>
+        <div class="field span-all">
+            <label for="f-name">Name <span class="req">*</span></label>
+            <input type="text" id="f-name" name="name" value="{{ values.name ?? '' }}" required maxlength="100" {{ project ? '' : 'autofocus' }}>
+        </div>
+        <div class="field span-all">
+            <label for="f-description">Description</label>
+            <textarea id="f-description" name="description" rows="5">{{ values.description ?? '' }}</textarea>
+        </div>
+    </div>
+    <div class="form-actions" style="margin-top:16px">
+        <a class="btn outline" href="{{ back }}">Cancel</a>
+        <button class="btn" type="submit">{{ project ? 'Save' : 'Create project' }}</button>
+    </div>
+</form>
+{% endblock %}

@@ -1,0 +1,106 @@
+{% extends 'base.html.twig' %}
+{% import '_work/macros.html.twig' as ui %}
+
+{% block title %}{{ task ? 'Edit task #' ~ task.id : 'New task' }}{% endblock %}
+
+{% macro options(map, selected, blank) %}
+    {% if blank is not null %}<option value="">{{ blank }}</option>{% endif %}
+    {% for id, label in map %}<option value="{{ id }}" {{ selected == id ? 'selected' }}>{{ label }}</option>{% endfor %}
+{% endmacro %}
+
+{% block body %}
+{% import _self as f %}
+{% set back = task ? path('app_task_view', {id: task.id}) : path('app_task_index') %}
+<div class="page-head">
+    <div class="ph-main">
+        <div class="eyebrow">Tasks</div>
+        <div class="ph-title"><h1>{{ task ? 'Edit task' : 'New task' }}</h1></div>
+        {% if task %}<p class="lead">#{{ task.id }} {{ ui.short(task.name, 120) }}</p>{% endif %}
+    </div>
+    <div class="ph-actions"><a class="btn outline back" href="{{ back }}">Back</a></div>
+</div>
+
+{{ ui.errors(errors) }}
+
+<form class="card mx-form" method="post" style="max-width:980px">
+    <input type="hidden" name="_token" value="{{ csrf_token('task_form') }}">
+    <div class="form-grid three">
+        <div class="field span-all">
+            <label for="f-name">Task name <span class="req">*</span></label>
+            <textarea id="f-name" name="name" rows="2" required maxlength="5000" style="min-height:0">{{ input.name }}</textarea>
+        </div>
+        <div class="field span-2">
+            <label for="f-project">Project <span class="req">*</span></label>
+            <select id="f-project" name="projectId" {{ is_granted('ROLE_ADMIN') ? '' : 'required' }}>
+                <option value="">{{ is_granted('ROLE_ADMIN') ? '(no project)' : 'Choose a project' }}</option>
+                {% for project in projects %}
+                    <option value="{{ project.id }}" {{ input.projectId == project.id ? 'selected' }}>{{ project.client.name }} › {{ project.name }}{{ project.active ? '' : ' (Archive)' }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="field">
+            <label for="f-type">Task type</label>
+            <select id="f-type" name="taskTypeId">{{ f.options(types, input.taskTypeId, '—') }}</select>
+        </div>
+        <div class="field">
+            <label for="f-assignee">Contractor</label>
+            <select id="f-assignee" name="assigneeId">{{ f.options(people, input.assigneeId, 'Unassigned') }}</select>
+        </div>
+        <div class="field">
+            <label for="f-reviewer">Reviewer</label>
+            <select id="f-reviewer" name="reviewerUserId">{{ f.options(people, input.reviewerUserId, 'No reviewer') }}</select>
+        </div>
+        <div class="field">
+            <label for="f-status">Status</label>
+            <select id="f-status" name="taskStatusId">{{ f.options(statuses, input.taskStatusId ?? constant('App\\Entity\\Settings\\TaskStatus::PENDING_ID'), null) }}</select>
+        </div>
+        <div class="field">
+            <label for="f-due">Due date</label>
+            <input type="date" id="f-due" name="dueDate" value="{{ input.dueDate ? input.dueDate|date('Y-m-d') : '' }}">
+        </div>
+        <div class="field">
+            <label for="f-creation">Creation date</label>
+            <input type="date" id="f-creation" name="creationDate" value="{{ input.creationDate ? input.creationDate|date('Y-m-d') : '' }}">
+            <small>Blank on a new task means today.</small>
+        </div>
+        <div class="field span-all">
+            <label for="f-status-detail">Status detail</label>
+            <input type="text" id="f-status-detail" name="statusDetail" value="{{ input.statusDetail }}">
+        </div>
+
+        {% if showFees %}
+            <div class="section-label">Payout</div>
+            <div class="field">
+                <label for="f-amount">Contractor payout</label>
+                <input type="text" id="f-amount" name="totalAmount" value="{{ input.totalAmount }}" inputmode="decimal" placeholder="0.00">
+            </div>
+            <div class="field">
+                <label for="f-currency">Currency</label>
+                <select id="f-currency" name="currencyId">{{ f.options(currencies, input.currencyId ?? 1, null) }}</select>
+            </div>
+            <div class="field">
+                <label for="f-time">Billable time (min)</label>
+                <input type="number" id="f-time" name="timeBudget" value="{{ input.timeBudget }}" step="1">
+            </div>
+            <div class="field">
+                <label for="f-billable">Billable date</label>
+                <input type="date" id="f-billable" name="billableDate" value="{{ input.billableDate ? input.billableDate|date('Y-m-d') : '' }}">
+            </div>
+        {% endif %}
+
+        <div class="section-label">Details</div>
+        <div class="field span-all">
+            <label for="f-description">Description</label>
+            <textarea id="f-description" name="description" rows="6">{{ input.description }}</textarea>
+        </div>
+        <div class="field span-all">
+            <label for="f-tutorial">Tutorial</label>
+            <textarea id="f-tutorial" name="tutorial" rows="3">{{ input.tutorial }}</textarea>
+        </div>
+    </div>
+    <div class="form-actions" style="margin-top:16px">
+        <a class="btn outline" href="{{ back }}">Cancel</a>
+        <button class="btn" type="submit">{{ task ? 'Save' : 'Create task' }}</button>
+    </div>
+</form>
+{% endblock %}

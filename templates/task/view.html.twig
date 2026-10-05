@@ -1,0 +1,83 @@
+{% extends 'base.html.twig' %}
+{% import '_work/macros.html.twig' as ui %}
+
+{% block title %}Task #{{ task.id }}{% endblock %}
+
+{% block body %}
+<div class="page-head">
+    <div class="ph-main">
+        <div class="eyebrow">
+            {% if task.project %}
+                <a href="{{ path('app_client_view', {id: task.project.client.id}) }}" style="color:inherit">{{ task.project.client.name }}</a> ›
+                <a href="{{ path('app_project_view', {id: task.project.id}) }}" style="color:inherit">{{ task.project.name }}</a>
+            {% else %}No project{% endif %}
+            · Task #{{ task.id }}
+        </div>
+        <div class="ph-title"><h1 style="text-transform:none;letter-spacing:0;font-size:1.05rem">{{ task.name }}</h1> {{ ui.statusBadge(task.taskStatusId, statuses) }} {{ ui.archivedTag(archivedReasons) }}</div>
+    </div>
+    <div class="ph-actions">
+        <a class="btn outline back" href="{{ path('app_task_index') }}">Tasks</a>
+        {% if is_granted('TASK_EDIT', task) %}<a class="btn" href="{{ path('app_task_edit', {id: task.id}) }}">Edit</a>{% endif %}
+    </div>
+</div>
+
+{{ ui.flashes() }}
+
+{% if archivedReasons is not empty %}
+    <div class="alert warn">
+        <b>This task is hidden from the unfiltered task list.</b>
+        {% for reason in archivedReasons %}<div>{{ reason }}</div>{% endfor %}
+    </div>
+{% endif %}
+
+<div class="detail">
+    <div>
+        {% if task.description %}<div class="card"><h2>Description</h2><div style="white-space:pre-line">{{ task.description }}</div></div>{% endif %}
+        {% if task.tutorial %}<div class="card"><h2>Tutorial</h2><div style="white-space:pre-line">{{ task.tutorial }}</div></div>{% endif %}
+
+        <div class="card">
+            <h2>Status detail</h2>
+            {% if is_granted('TASK_STATUS_DETAIL', task) %}
+                <form class="mx-form btn-row" method="post" action="{{ path('app_task_status_detail', {id: task.id}) }}">
+                    <input type="hidden" name="_token" value="{{ csrf_token('task_status_detail_' ~ task.id) }}">
+                    <input type="text" name="statusDetail" value="{{ task.statusDetail }}" aria-label="Status detail" placeholder="Where this task stands" style="flex:1">
+                    <button class="btn" type="submit">Save</button>
+                </form>
+            {% else %}
+                <p>{{ task.statusDetail ?? '—' }}</p>
+            {% endif %}
+        </div>
+    </div>
+    <div>
+        <div class="card">
+            <h2>Details</h2>
+            <dl class="kv">
+                <dt>Contractor</dt><dd>{{ task.assignee ? (task.assignee.name ?: task.assignee.email) : '—' }}</dd>
+                <dt>Reviewer</dt><dd>{{ people[task.reviewerUserId] ?? '—' }}</dd>
+                <dt>Task type</dt><dd>{{ types[task.taskTypeId] ?? '—' }}</dd>
+                <dt>Due</dt><dd>{{ ui.ts(task.dueDate) }}</dd>
+                <dt>Created</dt><dd>{{ task.creationDate ? task.creationDate|date('Y-m-d') : ui.ts(task.createdAt) }}{% if task.createdBy %} by {{ people[task.createdBy] ?? '#' ~ task.createdBy }}{% endif %}</dd>
+                <dt>Updated</dt><dd>{{ ui.ts(task.updatedAt, 'Y-m-d H:i') }}</dd>
+                {% if task.approvedDate %}<dt>Approved</dt><dd>{{ ui.ts(task.approvedDate) }}{% if task.approvedBy %} by {{ people[task.approvedBy] ?? '#' ~ task.approvedBy }}{% endif %}</dd>{% endif %}
+            </dl>
+        </div>
+        {% if is_granted('TASK_FEE', task) %}
+            <div class="card">
+                <h2>Payout</h2>
+                <dl class="kv">
+                    <dt>Amount</dt><dd>{{ task.totalAmount ?? '0.00' }} {{ currencies[task.currencyId] ?? '' }}</dd>
+                    <dt>Billable time</dt><dd>{{ task.timeBudget is not null ? task.timeBudget ~ ' min' : '—' }}</dd>
+                    <dt>Billable date</dt><dd>{{ task.billableDate ? task.billableDate|date('Y-m-d') : '—' }}</dd>
+                    {% if task.paymentId %}<dt>Payment</dt><dd>{{ task.paymentId }}</dd>{% endif %}
+                </dl>
+            </div>
+        {% endif %}
+        {% if is_granted('TASK_DELETE', task) %}
+            <form class="mx-form" method="post" action="{{ path('app_task_delete', {id: task.id}) }}" onsubmit="return confirm('Delete this task?');">
+                <input type="hidden" name="_token" value="{{ csrf_token('task_delete_' ~ task.id) }}">
+                <button class="btn danger block" type="submit">Delete task</button>
+            </form>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

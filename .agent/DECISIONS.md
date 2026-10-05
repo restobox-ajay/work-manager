@@ -2248,3 +2248,37 @@ via `:focus-within` without JS). `theme.js` → `app.js`; localStorage key `admi
 
 **Tripwire:** `tests/Functional/Navigation/SidebarTest.php` still asserts the old asset paths and markup — not
 updated (owner: tests later).
+
+## ADR-070: Clients, projects, tasks and the dashboard ported from work-platform-symfony (owner request, 2026-10-05)
+
+**Scope (owner choice "core CRUD first"):** clients (+ Client Managers), projects (+ staff), tasks (list with
+filters, create/edit/view, status detail, soft delete), the reference lists (task statuses, task types,
+currencies) and the dashboard. Not yet: payments, messages, custom grid, submissions, followers, priority
+ordering, attachments, the REST API — each its own later step.
+
+**Schema (owner choice "same tables/columns"):** `client`, `client_admin`, `project`, `project_staff`, `task`,
+`task_manager`, `task_status`, `task_type`, `currency` exactly as work-platform's entities map the Yii2 schema
+(unix-int timestamps kept), so data can be copied across later. Migration `Version20261006120000` also seeds
+statuses 1-8 (ids named by `TaskStatus::*_ID`), currencies USD/CAD and one task type. Not carried: the project
+template columns work-platform had already dropped.
+
+**Permissions (owner choice "map onto our roles"):** all rules live in `App\Security\Work\WorkAccess`, exposed via
+`WorkVoter` (CLIENT_*/PROJECT_*/TASK_* attributes). ROLE_ADMIN and above = work-platform Admin/Accountant (every
+record, every fee). Everyone else is decided by relationship rows, which now carry what work-platform's Manager
+*role* carried: a `client_admin` row (Client Manager), a `project_staff` row that is not "Contractor"
+(Project Manager), or a `task_manager` row. Assignee-only / Contractor staff = work-platform Contractor: sees own
+tasks, may update status detail, sees own payout, cannot set fees. Relationships are loaded once per request
+(`WorkRelations`) — no query per row.
+
+**Settled rule carried over verbatim:** archived visibility (`TaskRepository::buildListQuery()` docblock) — hidden
+on the unfiltered task list, shown and tagged when a client or project is named. One deliberate difference: the
+dashboard's "approved but not paid" widget shows archived work (work-platform issue #81, money owed).
+
+**Validation:** `symfony/validator` added (installed from GitHub source: packagist is unreachable from the build
+sandbox; the lock file is normal). `WriteValidator` returns message lists; messages are work-platform's.
+
+**UI:** pages use the mockup's own classes (`.page-head`, `.table-card`, `table.t`, `.btn`, `.modal`); Settings is
+one tabbed page with Add/Edit popups like the mockup's, rendered open server-side so it works without JS.
+
+**Tripwire:** no tests yet (owner: tests later). Payment-related columns on `task` (payment_id, paid_*, payer_id)
+exist but nothing writes them until the payment system is ported.

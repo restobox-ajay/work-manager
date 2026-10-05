@@ -1,0 +1,113 @@
+{% extends 'base.html.twig' %}
+{% import '_work/macros.html.twig' as ui %}
+
+{% block title %}{{ project.name }}{% endblock %}
+
+{% block body %}
+<div class="page-head">
+    <div class="ph-main">
+        <div class="eyebrow"><a href="{{ path('app_client_view', {id: project.client.id}) }}" style="color:inherit">{{ project.client.name }}</a> · Project</div>
+        <div class="ph-title"><h1>{{ project.name }}</h1> {{ ui.activeBadge(project.active) }}</div>
+    </div>
+    <div class="ph-actions">
+        <a class="btn outline" href="{{ path('app_task_index', {projectId: project.id}) }}">All tasks</a>
+        {% if is_granted('TASK_CREATE') and canEdit %}<a class="btn success" href="{{ path('app_task_create', {projectId: project.id}) }}">+ New task</a>{% endif %}
+        {% if canEdit %}<a class="btn" href="{{ path('app_project_edit', {id: project.id}) }}">Edit</a>{% endif %}
+    </div>
+</div>
+
+{{ ui.flashes() }}
+
+{% if archivedReasons is not empty %}
+    <div class="alert warn">
+        <b>This project's tasks are hidden from the task list</b> unless you filter by this client or project.
+        {% for reason in archivedReasons %}<div>{{ reason }}</div>{% endfor %}
+    </div>
+{% endif %}
+
+{% if project.description %}
+    <div class="card"><h2>Description</h2><div style="white-space:pre-line">{{ project.description }}</div></div>
+{% endif %}
+
+<div class="table-card">
+    <div class="table-header"><h2>Tasks</h2><span class="grow"></span><span class="muted small">Newest {{ tasks|length }}</span></div>
+    <div class="tscroll">
+        <table class="t">
+            <thead><tr><th>Task</th><th>Contractor</th><th>Status</th><th>Due</th><th>Created</th></tr></thead>
+            <tbody>
+                {% for task in tasks %}
+                    <tr>
+                        <td><a class="bold" href="{{ path('app_task_view', {id: task.id}) }}">{{ ui.short(task.name) }}</a></td>
+                        <td>{{ task.assignee ? (task.assignee.name ?: task.assignee.email) : '—' }}</td>
+                        <td>{{ ui.statusBadge(task.taskStatusId, statuses) }}</td>
+                        <td class="nowrap">{{ ui.ts(task.dueDate) }}</td>
+                        <td class="nowrap">{{ ui.ts(task.createdAt) }}</td>
+                    </tr>
+                {% else %}
+                    <tr><td colspan="5" class="empty"><b>No tasks yet.</b></td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="table-card" id="staff">
+    <div class="table-header"><h2>Staff</h2><span class="grow"></span><span class="muted small">Client Managers are added automatically</span></div>
+    <div class="tscroll">
+        <table class="t">
+            <thead><tr><th>Person</th><th>Role on project</th><th>Task fee access</th>{% if canEdit %}<th></th>{% endif %}</tr></thead>
+            <tbody>
+                {% for row in staff %}
+                    {% set automatic = row.permission == 'Client Manager' %}
+                    <tr>
+                        <td>{{ row.user.name ?: row.user.email }} <span class="muted small">{{ row.user.email }}</span></td>
+                        {% if canEdit and not automatic %}
+                            <td colspan="3">
+                                <form class="mx-form btn-row" method="post" action="{{ path('app_project_staff_update', {staffId: row.id}) }}">
+                                    <input type="hidden" name="_token" value="{{ csrf_token('project_staff_row_' ~ row.id) }}">
+                                    <select name="permission" aria-label="Role on project" style="width:auto">
+                                        {% for permission in permissions %}<option {{ row.permission == permission ? 'selected' }}>{{ permission }}</option>{% endfor %}
+                                    </select>
+                                    <label class="check"><input type="checkbox" name="canAccessTaskFee" value="1" {{ row.canAccessTaskFee == 1 ? 'checked' }}> Can see task fees</label>
+                                    <span class="grow" style="flex:1"></span>
+                                    <button class="btn sm" type="submit">Save</button>
+                                    <button class="btn sm danger" type="submit" name="remove" value="1" onclick="return confirm('Remove this person from the project?');">Remove</button>
+                                </form>
+                            </td>
+                        {% else %}
+                            <td>{{ row.permission ?? 'Staff' }}{% if automatic %} <span class="muted small">(automatic)</span>{% endif %}</td>
+                            <td>{{ row.canAccessTaskFee == 1 ? 'Yes' : 'No' }}</td>
+                            {% if canEdit %}<td></td>{% endif %}
+                        {% endif %}
+                    </tr>
+                {% else %}
+                    <tr><td colspan="4" class="empty"><b>No staff yet.</b></td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% if canEdit %}
+        <form class="mx-form table-foot" method="post" action="{{ path('app_project_staff_add', {id: project.id}) }}" style="flex-wrap:wrap">
+            <input type="hidden" name="_token" value="{{ csrf_token('project_staff_' ~ project.id) }}">
+            <b style="color:var(--text)">Add</b>
+            <select name="userId" required aria-label="Person" style="width:auto;max-width:260px">
+                <option value="">Choose a person</option>
+                {% for person in selectableUsers %}<option value="{{ person.id }}">{{ person.name ?: person.email }}</option>{% endfor %}
+            </select>
+            <select name="permission" aria-label="Role on project" style="width:auto">
+                {% for permission in permissions %}<option>{{ permission }}</option>{% endfor %}
+            </select>
+            <label class="check"><input type="checkbox" name="canAccessTaskFee" value="1"> Can see task fees</label>
+            <button class="btn sm success" type="submit">Add to project</button>
+        </form>
+    {% endif %}
+</div>
+
+{% if canEdit and not project.isDeleted %}
+    <form class="mx-form" method="post" action="{{ path('app_project_remove', {id: project.id}) }}" style="text-align:right"
+          onsubmit="return confirm('Archive this project and remove it from the list? This cannot be undone here.');">
+        <input type="hidden" name="_token" value="{{ csrf_token('project_remove_' ~ project.id) }}">
+        <button class="btn danger sm" type="submit">Archive and remove from the list</button>
+    </form>
+{% endif %}
+{% endblock %}

@@ -401,14 +401,15 @@ html:not(.js) .user-menu:focus-within .dropdown {
     background: #fff;
 }
 
-.page-body form > div {
+/* Pages written for the mockup's own classes mark their forms .mx-form and lay them out themselves. */
+.page-body form:not(.mx-form) > div {
     display: flex;
     flex-direction: column;
     gap: 4px;
 }
 
-.page-body form > button,
-.page-body form > div > button {
+.page-body form:not(.mx-form) > button,
+.page-body form:not(.mx-form) > div > button {
     align-self: flex-start;
     justify-self: start;
 }
@@ -481,15 +482,16 @@ html:not(.js) .user-menu:focus-within .dropdown {
 }
 
 /* ── Page body: alerts ─────────────────────────────────────────────────────── */
-/* The class names the pages already use, given the mockup's .alert variants. */
-.page-body .error,
+/* The class names the pages already use, given the mockup's .alert variants. Not on .btn/.badge/.alert, which
+   carry the same words ("success", "danger") as their own modifiers. */
+.page-body .error:not(.btn):not(.badge):not(.alert),
 .page-body .flash-error,
 .page-body .alert-error,
-.page-body .success,
+.page-body .success:not(.btn):not(.badge):not(.alert),
 .page-body .flash-success,
 .page-body .alert-success,
-.page-body .confirmation,
-.page-body .warning {
+.page-body .confirmation:not(.btn):not(.badge):not(.alert),
+.page-body .warning:not(.btn):not(.badge):not(.alert) {
     margin: 0 0 12px;
     padding: 10px 14px;
     border: 1px solid;
@@ -497,7 +499,7 @@ html:not(.js) .user-menu:focus-within .dropdown {
     font-size: .82rem;
 }
 
-.page-body .error,
+.page-body .error:not(.btn):not(.badge):not(.alert),
 .page-body .flash-error,
 .page-body .alert-error {
     border-color: #ebccd1;
@@ -505,7 +507,7 @@ html:not(.js) .user-menu:focus-within .dropdown {
     color: #a94442;
 }
 
-.page-body .success,
+.page-body .success:not(.btn):not(.badge):not(.alert),
 .page-body .flash-success,
 .page-body .alert-success {
     border-color: #d6e9c6;
@@ -513,21 +515,21 @@ html:not(.js) .user-menu:focus-within .dropdown {
     color: #3c763d;
 }
 
-.page-body .confirmation {
+.page-body .confirmation:not(.btn):not(.badge):not(.alert) {
     border-color: #bce8f1;
     background: var(--info-soft);
     color: #31708f;
 }
 
-.page-body .warning {
+.page-body .warning:not(.btn):not(.badge):not(.alert) {
     border-color: #faebcc;
     background: var(--warning-soft);
     color: #8a6d3b;
 }
 
-.page-body .error p,
-.page-body .success p,
-.page-body .warning p {
+.page-body .error:not(.btn):not(.badge):not(.alert) p,
+.page-body .success:not(.btn):not(.badge):not(.alert) p,
+.page-body .warning:not(.btn):not(.badge):not(.alert) p {
     margin: 0;
     color: inherit;
 }
@@ -559,5 +561,49 @@ html:not(.js) .user-menu:focus-within .dropdown {
     .page-body table:not(.t) {
         display: block;
         overflow-x: auto;
+    }
+}
+
+/* ── Dashboard: client / project side list (ADR-070) ───────────────────────── */
+.dash-clients,
+.dash-clients ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.dash-clients a {
+    display: block;
+    overflow: hidden;
+    padding: 4px 14px;
+    color: var(--text);
+    font-size: .8rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.dash-clients ul a {
+    padding-left: 28px;
+    font-size: .76rem;
+}
+
+.dash-clients a:hover {
+    background: var(--primary-soft);
+    text-decoration: none;
+}
+
+.dash-clients li.active > a {
+    background: var(--primary);
+    color: #fff;
+    font-weight: 600;
+}
+
+.dash-split {
+    grid-template-columns: 220px minmax(0, 1fr);
+}
+
+@media (max-width: 900px) {
+    .dash-split {
+        grid-template-columns: 1fr;
     }
 }

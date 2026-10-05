@@ -1,0 +1,108 @@
+{% extends 'base.html.twig' %}
+{% import '_work/macros.html.twig' as ui %}
+
+{#
+    Settings, as the Maxeme Auto mockup's Settings page: tabs, a read-only table per list, and Add/Edit in a popup.
+    The popup is open when the server says so (modal.open), so Add and Edit work without JavaScript.
+#}
+{% block title %}Settings · {{ labels[kind].plural }}{% endblock %}
+
+{% block body %}
+{% set label = labels[kind] %}
+{% set listUrl = path('app_settings_list', {kind: kind}) %}
+<div class="page-head">
+    <div class="ph-main">
+        <div class="eyebrow">Config</div>
+        <div class="ph-title">
+            <h1>Settings</h1>
+            <a class="btn success sm" href="{{ path('app_settings_list', {kind: kind, add: 1}) }}">+ Add {{ label.singular|lower }}</a>
+        </div>
+        <p class="lead">The lists task forms offer: statuses, types and payout currencies.</p>
+    </div>
+</div>
+
+{{ ui.flashes() }}
+
+<nav class="tabs" aria-label="Settings">
+    {% for k, l in labels %}
+        <a href="{{ path('app_settings_list', {kind: k}) }}" class="{{ k == kind ? 'active' }}"{{ k == kind ? ' aria-current="page"' }}>{{ l.plural }}</a>
+    {% endfor %}
+</nav>
+
+<div class="table-card" style="max-width:760px">
+    <table class="t">
+        <thead>
+            <tr>
+                {% if kind == 'task-statuses' %}<th>Order</th><th>Name</th><th>Active</th>
+                {% elseif kind == 'task-types' %}<th>Name</th><th>Description</th><th>Active</th>
+                {% else %}<th>Short name</th><th>FX rate</th>{% endif %}
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in rows %}
+                <tr>
+                    {% if kind == 'task-statuses' %}
+                        <td>{{ row.order }}</td><td class="bold">{{ row.name }}</td><td>{{ ui.activeBadge(row.active) }}</td>
+                    {% elseif kind == 'task-types' %}
+                        <td class="bold">{{ row.name }}</td><td>{{ row.description ?? '—' }}</td><td>{{ ui.activeBadge(row.status) }}</td>
+                    {% else %}
+                        <td class="bold"><code>{{ row.shortName }}</code></td><td>{{ row.fxRate }}</td>
+                    {% endif %}
+                    <td class="actions"><a class="btn sm success" href="{{ path('app_settings_list', {kind: kind, edit: row.id}) }}">Edit</a></td>
+                </tr>
+            {% else %}
+                <tr><td colspan="4" class="empty"><b>Nothing here yet.</b></td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <div class="table-foot">
+        {% if kind == 'task-statuses' %}Task forms offer the active ones, in this order. Paid is set by the payment flow, not by hand.
+        {% elseif kind == 'task-types' %}Task forms offer the active ones. Switch one off rather than removing it: existing tasks keep it.
+        {% else %}The currencies a task's payout can be in.{% endif %}
+    </div>
+</div>
+
+{% set m = modal %}
+<div class="modal{{ m.open ? ' show' }}" id="settings-modal" role="dialog" aria-modal="true" aria-labelledby="settings-modal-title"{{ m.open ? '' : ' hidden' }}>
+    <form class="modal-box mx-form" method="post" action="{{ path('app_settings_save', {kind: kind, id: m.row ? m.row.id : 'new'}) }}">
+        <input type="hidden" name="_token" value="{{ csrf_token('settings_' ~ kind) }}">
+        <div class="modal-head">
+            <h2 id="settings-modal-title">{{ m.row ? 'Edit' : 'Add' }} {{ label.singular|lower }}</h2>
+            <a class="x" href="{{ listUrl }}" aria-label="Close">×</a>
+        </div>
+        <div class="modal-body">
+            {{ ui.errors(m.errors) }}
+            <div class="form-grid">
+                {% if kind == 'currencies' %}
+                    <div class="field"><label for="s-name">Short name <span class="req">*</span></label><input type="text" id="s-name" name="name" value="{{ m.values.name ?? '' }}" required maxlength="10" autofocus></div>
+                    <div class="field"><label for="s-fx">FX rate <span class="req">*</span></label><input type="text" id="s-fx" name="fxRate" value="{{ m.values.fxRate ?? '' }}" required inputmode="decimal"></div>
+                {% else %}
+                    <div class="field{{ kind == 'task-types' ? ' span-2' }}"><label for="s-name">Name <span class="req">*</span></label><input type="text" id="s-name" name="name" value="{{ m.values.name ?? '' }}" required maxlength="{{ kind == 'task-types' ? 60 : 50 }}" autofocus></div>
+                    {% if kind == 'task-statuses' %}
+                        <div class="field"><label for="s-order">Order</label><input type="number" id="s-order" name="order" value="{{ m.values.order ?? '' }}" min="0" max="9999"></div>
+                    {% else %}
+                        <div class="field span-2"><label for="s-desc">Description</label><input type="text" id="s-desc" name="description" value="{{ m.values.description ?? '' }}" maxlength="255"></div>
+                    {% endif %}
+                    <label class="mx-check span-2"><span>Active <small>(offered on task forms)</small></span><input type="checkbox" name="isActive" value="1" {{ (m.values.isActive ?? false) ? 'checked' }}></label>
+                {% endif %}
+            </div>
+        </div>
+        <div class="modal-foot">
+            <a class="btn outline" href="{{ listUrl }}">Cancel</a>
+            <button class="btn" type="submit">{{ m.row ? 'Save' : 'Add' }}</button>
+        </div>
+    </form>
+</div>
+{% if m.open %}
+<script>
+    // Enhancement: Escape or a click on the backdrop closes the popup, as in the mockup.
+    (function () {
+        var modal = document.getElementById('settings-modal');
+        var close = function () { window.location.href = {{ listUrl|json_encode|raw }}; };
+        document.addEventListener('keydown', function (e) { if (e.key === 'Escape') { close(); } });
+        modal.addEventListener('click', function (e) { if (e.target === modal) { close(); } });
+    })();
+</script>
+{% endif %}
+{% endblock %}

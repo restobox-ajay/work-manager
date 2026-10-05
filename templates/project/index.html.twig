@@ -1,0 +1,70 @@
+{% extends 'base.html.twig' %}
+{% import '_work/macros.html.twig' as ui %}
+
+{% block title %}Projects{% endblock %}
+
+{% block body %}
+{% set params = {q: filters.term, clientId: filters.clientId, status: status, sort: sort} %}
+<div class="page-head">
+    <div class="ph-main">
+        <div class="eyebrow">Work</div>
+        <div class="ph-title"><h1>Projects</h1></div>
+        <p class="lead">Archived projects stay listed under the Archive filter; their tasks leave the unfiltered task list.</p>
+    </div>
+    {% if is_granted('PROJECT_CREATE') %}
+        <div class="ph-actions"><a class="btn success" href="{{ path('app_project_create', {clientId: filters.clientId}) }}">+ New project</a></div>
+    {% endif %}
+</div>
+
+{{ ui.flashes() }}
+
+<div class="table-card">
+    <form class="table-header mx-form" method="get" action="{{ path('app_project_index') }}">
+        <input type="search" name="q" value="{{ filters.term }}" placeholder="Project or client" aria-label="Search projects">
+        <select name="clientId" aria-label="Client" style="width:auto;max-width:220px">
+            <option value="">All clients</option>
+            {% for client in clients %}<option value="{{ client.id }}" {{ filters.clientId == client.id ? 'selected' }}>{{ client.name }}</option>{% endfor %}
+        </select>
+        <select name="status" aria-label="Status" style="width:auto">
+            <option value="">All statuses</option>
+            <option value="active" {{ status == 'active' ? 'selected' }}>Active</option>
+            <option value="archived" {{ status == 'archived' ? 'selected' }}>Archive</option>
+        </select>
+        <button class="btn sm" type="submit">Filter</button>
+        {% if filters.term or filters.clientId or status %}<a class="btn sm outline" href="{{ path('app_project_index') }}">Reset</a>{% endif %}
+        <span class="grow"></span>
+    </form>
+    <div class="tscroll">
+        <table class="t">
+            <thead>
+                <tr>
+                    {{ ui.sortHeader('client', 'Client', sort, 'app_project_index', params) }}
+                    {{ ui.sortHeader('name', 'Project', sort, 'app_project_index', params) }}
+                    {{ ui.sortHeader('createdAt', 'Created', sort, 'app_project_index', params) }}
+                    {{ ui.sortHeader('status', 'Status', sort, 'app_project_index', params) }}
+                    <th>Contractors</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for project in page.items %}
+                    <tr>
+                        <td><a href="{{ path('app_client_view', {id: project.client.id}) }}">{{ project.client.name }}</a></td>
+                        <td><a class="bold" href="{{ path('app_project_view', {id: project.id}) }}">{{ project.name }}</a></td>
+                        <td class="nowrap">{{ ui.ts(project.createdAt) }}</td>
+                        <td>{{ ui.activeBadge(project.active) }}</td>
+                        <td>{{ (contractors[project.id] ?? [])|map(u => u.name ?: u.email)|join(', ') ?: '—' }}</td>
+                        <td class="actions">
+                            <a class="btn xs outline" href="{{ path('app_task_index', {projectId: project.id}) }}">Tasks</a>
+                            {% if is_granted('PROJECT_EDIT', project) %}<a class="btn xs" href="{{ path('app_project_edit', {id: project.id}) }}">Edit</a>{% endif %}
+                        </td>
+                    </tr>
+                {% else %}
+                    <tr><td colspan="6" class="empty"><b>No projects found.</b></td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {{ ui.pager(page, 'app_project_index', params) }}
+</div>
+{% endblock %}

@@ -1,0 +1,37 @@
+{% extends 'base.html.twig' %}
+{% import '_work/macros.html.twig' as ui %}
+
+{# The contractor view (ADR-070): what is on you, what waits for review, what is approved but not yet paid. #}
+{% block title %}Dashboard{% endblock %}
+
+{% block body %}
+{% set me = app.user.id %}
+<div class="page-head">
+    <div class="ph-main">
+        <div class="eyebrow">Dashboard</div>
+        <div class="ph-title"><h1>My work</h1></div>
+        <p class="lead">Welcome, {{ app.user.name ?: app.user.email }}.</p>
+    </div>
+    {% if canManage %}<div class="ph-actions"><a class="btn outline" href="{{ path('app_dashboard') }}">Manager view</a></div>{% endif %}
+</div>
+
+{{ ui.flashes() }}
+
+<div class="grid2">
+    <div class="table-card">
+        <div class="table-header"><h2>Tasks pending on you</h2><span class="grow"></span><span class="muted small">Top {{ work.pending|length }}, soonest due first</span></div>
+        {% include '_work/task_rows.html.twig' with {tasks: work.pending, empty: 'Nothing pending — nice.'} %}
+        <div class="table-foot"><span class="grow"></span><a class="btn sm" href="{{ path('app_task_index', {assigneeId: me, taskStatusId: constant('App\\Entity\\Settings\\TaskStatus::PENDING_ID')}) }}">View all</a></div>
+    </div>
+    <div class="table-card">
+        <div class="table-header"><h2>Tasks pending review</h2></div>
+        {% include '_work/task_rows.html.twig' with {tasks: work.review, empty: 'Nothing waiting for review.'} %}
+        <div class="table-foot"><span class="grow"></span><a class="btn sm" href="{{ path('app_task_index', {assigneeId: me, taskStatusId: constant('App\\Entity\\Settings\\TaskStatus::REVIEWING_INTERNAL_ID')}) }}">View all</a></div>
+    </div>
+    <div class="table-card">
+        <div class="table-header"><h2>Next payment</h2><span class="grow"></span><span class="muted small">Approved but not paid</span></div>
+        {% include '_work/task_rows.html.twig' with {tasks: work.approved, empty: 'No approved tasks waiting for payment.'} %}
+        <div class="table-foot"><span class="grow"></span><a class="btn sm" href="{{ path('app_task_index', {assigneeId: me, taskStatusId: constant('App\\Entity\\Settings\\TaskStatus::APPROVED_ID')}) }}">View all</a></div>
+    </div>
+</div>
+{% endblock %}

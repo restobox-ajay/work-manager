@@ -1,0 +1,76 @@
+{% extends 'base.html.twig' %}
+{% import '_work/macros.html.twig' as ui %}
+
+{% block title %}{{ client.name }}{% endblock %}
+
+{% block body %}
+<div class="page-head">
+    <div class="ph-main">
+        <div class="eyebrow">Client{{ client.clientCode ? ' · ' ~ client.clientCode }}</div>
+        <div class="ph-title"><h1>{{ client.name }}</h1> {{ ui.activeBadge(client.active) }}{% if client.deleted %} <span class="badge warn">Removed from the list</span>{% endif %}</div>
+    </div>
+    <div class="ph-actions">
+        <a class="btn outline" href="{{ path('app_task_index', {clientId: client.id}) }}">Tasks</a>
+        {% if is_granted('PROJECT_CREATE', client) %}<a class="btn success" href="{{ path('app_project_create', {clientId: client.id}) }}">+ New project</a>{% endif %}
+        {% if is_granted('CLIENT_EDIT', client) %}<a class="btn" href="{{ path('app_client_edit', {id: client.id}) }}">Edit</a>{% endif %}
+    </div>
+</div>
+
+{{ ui.flashes() }}
+
+<div class="detail">
+    <div>
+        <div class="table-card">
+            <div class="table-header"><h2>Projects</h2><span class="grow"></span><span class="badge num">{{ projects|length }}</span></div>
+            <div class="tscroll">
+                <table class="t">
+                    <thead><tr><th>Project</th><th>Status</th><th>Created</th><th></th></tr></thead>
+                    <tbody>
+                        {% for project in projects %}
+                            <tr>
+                                <td><a class="bold" href="{{ path('app_project_view', {id: project.id}) }}">{{ project.name }}</a></td>
+                                <td>{{ ui.activeBadge(project.active) }}</td>
+                                <td class="nowrap">{{ ui.ts(project.createdAt) }}</td>
+                                <td class="actions"><a class="btn xs outline" href="{{ path('app_task_index', {projectId: project.id}) }}">Tasks</a></td>
+                            </tr>
+                        {% else %}
+                            <tr><td colspan="4" class="empty"><b>No projects yet.</b></td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div>
+        <div class="card">
+            <h2>Details</h2>
+            <dl class="kv">
+                <dt>Email</dt><dd>{{ client.email ? client.email : '—' }}</dd>
+                <dt>Phone</dt><dd>{{ client.phone ?? '—' }}</dd>
+                <dt>Website</dt><dd>{% if client.website and (client.website starts with 'http://' or client.website starts with 'https://') %}<a href="{{ client.website }}" rel="noopener noreferrer" target="_blank">{{ client.website }}</a>{% else %}{{ client.website ?? '—' }}{% endif %}</dd>
+                <dt>Address</dt>
+                <dd>
+                    {% set address = [client.streetAddress1, client.streetAddress2, client.city, client.province, client.state, client.zipCode, client.country]|filter(v => v) %}
+                    {{ address is empty ? '—' : address|join(', ') }}
+                </dd>
+                <dt>Created</dt><dd>{{ ui.ts(client.createdAt) }}</dd>
+            </dl>
+        </div>
+        <div class="card">
+            <h2>Client Managers</h2>
+            {% for manager in managers %}
+                <div class="note-item">{{ manager.name ?: manager.email }} <span class="muted small">{{ manager.email }}</span></div>
+            {% else %}
+                <p class="muted small">No one manages this client yet{{ is_granted('CLIENT_ADMINISTER') ? ' — choose managers on the Edit page' }}.</p>
+            {% endfor %}
+        </div>
+        {% if is_granted('CLIENT_ADMINISTER') and not client.deleted %}
+            <form class="mx-form" method="post" action="{{ path('app_client_remove', {id: client.id}) }}"
+                  onsubmit="return confirm('Archive this client and remove it from the list? This cannot be undone here.');">
+                <input type="hidden" name="_token" value="{{ csrf_token('client_remove_' ~ client.id) }}">
+                <button class="btn danger block" type="submit">Archive and remove from the list</button>
+            </form>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

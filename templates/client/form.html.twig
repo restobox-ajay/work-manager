@@ -1,0 +1,104 @@
+{% extends 'base.html.twig' %}
+{% import '_work/macros.html.twig' as ui %}
+
+{% block title %}{{ client ? 'Edit ' ~ client.name : 'New client' }}{% endblock %}
+
+{% macro text(name, label, values, attrs = '') %}
+    <div class="field">
+        <label for="f-{{ name }}">{{ label }}</label>
+        <input type="text" id="f-{{ name }}" name="{{ name }}" value="{{ values[name] ?? '' }}" {{ attrs|raw }}>
+    </div>
+{% endmacro %}
+
+{% block body %}
+{% import _self as f %}
+<div class="page-head">
+    <div class="ph-main">
+        <div class="eyebrow">Clients</div>
+        <div class="ph-title"><h1>{{ client ? 'Edit client' : 'Add a new client' }}</h1></div>
+        {% if client %}<p class="lead">{{ client.name }}</p>{% endif %}
+    </div>
+    <div class="ph-actions">
+        <a class="btn outline back" href="{{ client ? path('app_client_view', {id: client.id}) : path('app_client_index') }}">Back</a>
+    </div>
+</div>
+
+{{ ui.errors(errors) }}
+
+<form class="card mx-form" method="post" id="client-form" style="max-width:900px">
+    <input type="hidden" name="_token" value="{{ csrf_token('client_form') }}">
+    <div class="form-grid">
+        <div class="section-label">Client</div>
+        <div class="field">
+            <label for="f-name">Name <span class="req">*</span></label>
+            <input type="text" id="f-name" name="name" value="{{ values.name ?? '' }}" required maxlength="100" autofocus>
+        </div>
+        <div class="field">
+            <label for="f-clientCode">Client Code</label>
+            <input type="text" id="f-clientCode" name="clientCode" value="{{ values.clientCode ?? '' }}" maxlength="10" pattern="[^0-9]*" title="Letters only — no digits."
+                   {% if not client %}data-suggest-url="{{ path('app_client_code') }}"{% endif %}>
+            <small>Three letters identify the client on tasks.{% if not client %} Leave blank and type the name to get a suggestion.{% endif %}</small>
+        </div>
+        {{ f.text('email', 'Email', values, 'maxlength="100" inputmode="email"') }}
+        {{ f.text('phone', 'Phone', values, 'maxlength="20" inputmode="tel"') }}
+        {{ f.text('website', 'Website', values, 'maxlength="255" placeholder="example.com"') }}
+        <div class="field">
+            <label for="f-isActive">Status</label>
+            <select id="f-isActive" name="isActive">
+                <option value="1" {{ (values.isActive ?? 1) == 1 ? 'selected' }}>Active</option>
+                <option value="0" {{ (values.isActive ?? 1) == 0 ? 'selected' }}>Archive</option>
+            </select>
+        </div>
+
+        <div class="section-label">Address</div>
+        {{ f.text('streetAddress1', 'Street Address 1', values, 'maxlength="255"') }}
+        {{ f.text('streetAddress2', 'Street Address 2', values, 'maxlength="255"') }}
+        {{ f.text('city', 'City', values, 'maxlength="100"') }}
+        {{ f.text('province', 'Province', values, 'maxlength="100"') }}
+        {{ f.text('state', 'State', values, 'maxlength="100"') }}
+        {{ f.text('zipCode', 'Zip Code', values, 'maxlength="10"') }}
+        {{ f.text('country', 'Country', values, 'maxlength="50"') }}
+
+        {% if canSetManagers %}
+            <div class="section-label">Client Managers</div>
+            <div class="field span-all">
+                <label for="f-managers">People who manage this client's projects and tasks</label>
+                <select id="f-managers" name="managers[]" multiple size="{{ min(8, max(3, people|length)) }}">
+                    {% for person in people %}
+                        <option value="{{ person.id }}" {{ person.id in managerIds ? 'selected' }}>{{ person.name ?: person.email }} — {{ person.email }}</option>
+                    {% endfor %}
+                </select>
+                <small>Hold Ctrl (Cmd on a Mac) to pick more than one.</small>
+            </div>
+        {% endif %}
+    </div>
+    <div class="form-actions" style="margin-top:16px">
+        <a class="btn outline" href="{{ client ? path('app_client_view', {id: client.id}) : path('app_client_index') }}">Cancel</a>
+        <button class="btn" type="submit">{{ client ? 'Save' : 'Create client' }}</button>
+    </div>
+</form>
+
+{% if not client %}
+<script>
+    // Enhancement only: suggest a client code from the name while the code field is still empty.
+    (function () {
+        var code = document.getElementById('f-clientCode');
+        var name = document.getElementById('f-name');
+        if (!code || !name || !code.dataset.suggestUrl) { return; }
+        var touched = false, timer;
+        code.addEventListener('input', function () { touched = code.value !== ''; });
+        name.addEventListener('input', function () {
+            if (touched) { return; }
+            clearTimeout(timer);
+            timer = setTimeout(function () {
+                if (name.value.trim() === '') { code.value = ''; return; }
+                fetch(code.dataset.suggestUrl + '?name=' + encodeURIComponent(name.value), { headers: { Accept: 'application/json' } })
+                    .then(function (r) { return r.ok ? r.json() : null; })
+                    .then(function (data) { if (data && !touched) { code.value = data.code || ''; } })
+                    .catch(function () {});
+            }, 300);
+        });
+    })();
+</script>
+{% endif %}
+{% endblock %}
