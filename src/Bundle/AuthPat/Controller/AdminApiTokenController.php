@@ -6,8 +6,8 @@ namespace App\Bundle\AuthPat\Controller;
 
 use App\Routing\RouteRequirement;
 use App\Bundle\AuthPat\Repository\PersonalAccessTokenRepository;
-use App\Repository\UserRepository;
 use App\Service\AuditLogger;
+use App\Service\ManagedAccountFinder;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -35,11 +35,11 @@ final class AdminApiTokenController extends AbstractController
     public function revokeTokens(
         int $id,
         Request $request,
-        UserRepository $userRepository,
+        ManagedAccountFinder $accounts,
         PersonalAccessTokenRepository $tokenRepository,
         AuditLogger $auditLogger,
     ): Response {
-        $user = $userRepository->find($id);
+        $user = $accounts->find($id, $this->getUser());
         if ($user === null) {
             return new JsonResponse(['error' => 'User not found.'], Response::HTTP_NOT_FOUND);
         }

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
-use App\Entity\Admin;
+use App\Entity\User;
 use App\Entity\DbConsoleSession;
 use App\Repository\DbConsoleSessionRepository;
 use App\Security\ConsoleCookie;
@@ -66,7 +66,7 @@ class AdminDatabaseConsoleController extends AbstractController
             return $this->redirectToRoute('app_admin_db_console');
         }
 
-        /** @var Admin $admin */
+        /** @var User $admin */
         $admin = $this->getUser();
         $disarm = $request->request->get('_disarm') !== null;
 
@@ -113,18 +113,18 @@ class AdminDatabaseConsoleController extends AbstractController
             return $this->redirectToRoute('app_admin_db_console');
         }
 
-        /** @var Admin $admin */
+        /** @var User $admin */
         $admin = $this->getUser();
         $token = ConsoleCookie::generateToken();
         $window = $this->windowSeconds();
 
         // One console per admin at a time: minting a new token retires any earlier one, so an
         // abandoned session on another machine cannot outlive this one.
-        $this->sessions->deleteAllByAdminId((int) $admin->getId());
+        $this->sessions->deleteAllByUserId((int) $admin->getId());
 
         $session = (new DbConsoleSession())
             ->setTokenHash(ConsoleCookie::hashToken($token))
-            ->setAdminId((int) $admin->getId())
+            ->setUserId((int) $admin->getId())
             ->setIpAddress($request->getClientIp() ?? '0.0.0.0')
             // In PHP's default timezone, like every other stored datetime here: the gateway reads and rewrites
             // this column with strtotime()/date(). A '@ts' object is UTC and Doctrine stores it as UTC
@@ -161,7 +161,7 @@ class AdminDatabaseConsoleController extends AbstractController
 
     private function audit(Request $request, string $action): void
     {
-        /** @var Admin $admin */
+        /** @var User $admin */
         $admin = $this->getUser();
 
         $this->auditLogger->log(

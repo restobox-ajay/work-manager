@@ -21,11 +21,6 @@ use Symfony\Component\DependencyInjection\Loader\PhpFileLoader;
  *
  * Unlike auth-magic-link-bundle there is NO doctrine ORM mapping and NO migrations path to prepend:
  * impersonation owns no table (it is session-key based, ADR-014).
- *
- * The impersonation authenticator stays on the `user` firewall in the app's security.yaml (Symfony
- * requires all firewalls in one file). It references the stable alias `app.impersonation_authenticator`,
- * which core defaults to {@see \App\Security\NullImpersonationAuthenticator} and the bundle's compiler
- * pass re-aliases to the real {@see \App\Bundle\AuthImpersonation\Security\ImpersonationAuthenticator}.
  */
 final class AuthImpersonationExtension extends Extension implements PrependExtensionInterface
 {

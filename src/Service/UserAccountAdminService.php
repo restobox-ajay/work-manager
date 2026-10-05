@@ -5,8 +5,12 @@ declare(strict_types=1);
 namespace App\Service;
 
 use App\Entity\User;
+use App\Enum\AccountStatus;
+use App\Enum\Role;
+use App\Repository\DbConsoleSessionRepository;
 use App\Repository\UserRepository;
 use App\Repository\UserSessionRepository;
+use App\Security\AccountManagementPolicy;
 use App\Security\IpWhitelistManagerInterface;
 use App\Security\PasswordPolicyManagerInterface;
 use App\Security\RecoveryTokenInvalidator;
@@ -25,11 +29,12 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
  * folded-in review fixes (C22 role/status reject-not-coerce, C27/ADR-030 unique-violation catch,
  * C10 atomic audit) single-site and structurally hard to reintroduce as drift.
  *
- * This is a within-realm (web↔API) collapse only. There is deliberately NO shared body across the
- * user/admin realms (ADR-003, FEATURE-103 AC6): the admin realm keeps its own controllers.
+ * Since ADR-068 there is one account type: admins are users holding an admin role. Which roles an actor may
+ * grant, and which accounts they may touch, is AccountManagementPolicy's call; the anti-lockout rules (never
+ * remove the last active super admin, never deactivate or delete yourself) are enforced here for every surface.
  *
- * The caller supplies the audit actor identity as plain strings so the service depends on neither
- * the security token nor the Request and stays unit-testable.
+ * The caller passes the acting User and its IP, so the service depends on neither the security token nor the
+ * Request and stays unit-testable.
  */
 final class UserAccountAdminService
 {
@@ -52,6 +57,8 @@ final class UserAccountAdminService
         // The PAT feature is an optional bundle (FEATURE-138): depend on the core port, not the
         // bundle repository. With auth-pat-bundle absent this is the null-object (revoke is a no-op).
         private readonly UserTokenRevokerInterface $tokenRevoker,
+        private readonly AccountManagementPolicy $policy,
+        private readonly DbConsoleSessionRepository $consoleSessions,
     ) {}
 
     /**
@@ -60,12 +67,13 @@ final class UserAccountAdminService
      *
      * @param array<string, mixed> $input keys: email, name, password, role, status
      */
-    public function create(array $input, string $actorEmail, string $actorIp): UserWriteResult
+    public function create(array $input, User $actor, string $actorIp): UserWriteResult
     {
+        $actorEmail = $actor->getUserIdentifier();
         $email    = trim((string) ($input['email'] ?? ''));
         $name     = trim((string) ($input['name'] ?? ''));
         $password = (string) ($input['password'] ?? '');
-        $role     = (string) ($input['role'] ?? 'ROLE_USER');
+        $role     = (string) ($input['role'] ?? Role::User->value);
         $status   = (string) ($input['status'] ?? 'active');
 
         $errors = $this->validateEmail($email, null);
@@ -84,19 +92,18 @@ final class UserAccountAdminService
         }
 
         // Reject an unknown role/status instead of silently coercing it (review C22).
-        $errors += $this->validateRoleStatus($role, $status);
+        $errors += $this->validateRoleStatus($role, $status, $actor);
 
         if ($errors !== []) {
             return UserWriteResult::withErrors($errors);
         }
 
-        // User roles are fixed to ROLE_USER (User::ALLOWED_ROLES, ADR-024); a validated ROLE_USER
-        // is a no-op, so we never mutate roles here.
         $user = new User();
         $user->setEmail($email);
         $user->setName($name);
         $user->setPassword($this->passwordHasher->hashPassword($user, $password));
         $user->setStatus($status);
+        $user->setRoles([$role]);
 
         // The findByEmail pre-check above is racy; the DB user.email UNIQUE index is the real
         // guard. Catch a concurrent-duplicate violation and surface the same clean validation
@@ -128,8 +135,9 @@ final class UserAccountAdminService
      *
      * @param array<string, mixed> $changes keys: email, name, role, status, allowed_ips
      */
-    public function update(User $user, array $changes, string $actorEmail, string $actorIp): UserWriteResult
+    public function update(User $user, array $changes, User $actor, string $actorIp): UserWriteResult
     {
+        $actorEmail = $actor->getUserIdentifier();
         $errors = [];
         // Validate first and only mutate the entity once every field is clean, so a validation
         // failure never leaves a stray (unflushed) change on the managed entity.
@@ -155,12 +163,14 @@ final class UserAccountAdminService
             }
         }
 
-        // Roles are fixed to ROLE_USER (ADR-024): an unknown role is rejected, a valid ROLE_USER
-        // never mutates anything.
+        // A role change must be one the actor may grant (ADR-068); an unknown or out-of-reach role is rejected.
         if (\array_key_exists('role', $changes)) {
-            $roleError = $this->fieldValidator->validateRole((string) $changes['role']);
+            $role      = (string) $changes['role'];
+            $roleError = $this->validateRole($role, $actor);
             if ($roleError !== null) {
                 $errors['role'] = $roleError;
+            } else {
+                $apply['role'] = $role;
             }
         }
 
@@ -180,6 +190,8 @@ final class UserAccountAdminService
             $apply['allowed_ips'] = $allowedIps === '' ? null : $allowedIps;
         }
 
+        $errors += $this->guardAgainstLockout($user, $actor, $apply['role'] ?? null, $apply['status'] ?? null);
+
         if ($errors !== []) {
             return UserWriteResult::withErrors($errors);
         }
@@ -194,6 +206,9 @@ final class UserAccountAdminService
         }
         if (\array_key_exists('name', $apply)) {
             $user->setName($apply['name']);
+        }
+        if (\array_key_exists('role', $apply)) {
+            $user->setRoles([$apply['role']]);
         }
         // Moving an active account to inactive is a deactivation, whatever the route (edit form, API PATCH):
         // it must cut live access exactly like deactivate() does — sessions, PATs, remember-me — or a later
@@ -251,8 +266,17 @@ final class UserAccountAdminService
      * user would strand its history. Setting status='inactive' disables authentication while
      * keeping the row and all its history intact.
      */
-    public function delete(User $user, string $actorEmail, string $actorIp): void
+    /**
+     * @return string|null why the delete was refused (user-facing), or null when the account was deleted
+     */
+    public function delete(User $user, User $actor, string $actorIp): ?string
     {
+        $refusal = $this->guardAgainstLockout($user, $actor, null, AccountStatus::Inactive->value);
+        if ($refusal !== []) {
+            return reset($refusal);
+        }
+
+        $actorEmail   = $actor->getUserIdentifier();
         $deletedEmail = $user->getEmail();
 
         $user->setStatus('inactive');
@@ -268,14 +292,25 @@ final class UserAccountAdminService
 
         // Soft-delete disables the account; kill its outstanding recovery tokens too (FEATURE-102).
         $this->recoveryTokenInvalidator->invalidateForUser($deletedEmail);
+
+        return null;
     }
 
     /**
      * Deactivate a user AND tear down live access now (not just at next login): drop the user's
      * sessions, revoke their PATs, and invalidate their remember-me cookies + recovery tokens.
      */
-    public function deactivate(User $user, string $actorEmail, string $actorIp): void
+    /**
+     * @return string|null why the deactivation was refused (user-facing), or null when it happened
+     */
+    public function deactivate(User $user, User $actor, string $actorIp): ?string
     {
+        $refusal = $this->guardAgainstLockout($user, $actor, null, AccountStatus::Inactive->value);
+        if ($refusal !== []) {
+            return reset($refusal);
+        }
+
+        $actorEmail = $actor->getUserIdentifier();
         $user->setStatus('inactive');
         $this->tearDownLiveAccess($user);
         $this->em->flush();
@@ -284,6 +319,8 @@ final class UserAccountAdminService
         $this->recoveryTokenInvalidator->invalidateForUser($user->getEmail());
 
         $this->auditLogger->log($actorEmail, 'admin', $actorIp, 'admin.user_deactivate', 'success', $user->getEmail());
+
+        return null;
     }
 
     /**
@@ -302,6 +339,9 @@ final class UserAccountAdminService
         }
         if (\array_key_exists('name', $apply) && $apply['name'] !== $user->getName()) {
             $changes[] = 'name changed';
+        }
+        if (\array_key_exists('role', $apply) && $apply['role'] !== $user->getPrimaryRole()->value) {
+            $changes[] = sprintf('role: %s → %s', $user->getPrimaryRole()->value, $apply['role']);
         }
         if (\array_key_exists('status', $apply) && $apply['status'] !== $user->getStatus()) {
             $changes[] = sprintf('status: %s → %s', $user->getStatus(), $apply['status']);
@@ -322,7 +362,44 @@ final class UserAccountAdminService
     {
         $this->sessionRepository->deleteAllByUserId((int) $user->getId());
         $this->tokenRevoker->revokeAllByUserId((int) $user->getId());
+        $this->consoleSessions->deleteAllByUserId((int) $user->getId());   // and any open DB console (issue #48)
         $user->setSessionsInvalidatedAt(new \DateTimeImmutable());
+    }
+
+    /**
+     * The anti-lockout rules every surface shares: the last active super admin keeps that role and stays
+     * active, and nobody deactivates or deletes their own account.
+     *
+     * @return array<string, string> field-keyed errors (empty when the change is allowed)
+     */
+    private function guardAgainstLockout(User $user, User $actor, ?string $newRole, ?string $newStatus): array
+    {
+        $deactivating = $newStatus === AccountStatus::Inactive->value;
+        if ($deactivating && $user->getId() === $actor->getId()) {
+            return ['status' => 'You cannot deactivate or delete your own account.'];
+        }
+
+        $losesSuperAdmin = ($newRole !== null && $newRole !== Role::SuperAdmin->value) || $deactivating;
+        if ($user->isActive()
+            && $user->hasRole(Role::SuperAdmin)
+            && $losesSuperAdmin
+            && $this->userRepository->countActiveWithRole(Role::SuperAdmin) <= 1
+        ) {
+            return ['role' => 'This is the last active super admin — its role cannot be removed and it cannot be deactivated or deleted.'];
+        }
+
+        return [];
+    }
+
+    private function validateRole(string $role, User $actor): ?string
+    {
+        $roleError = $this->fieldValidator->validateRole($role);
+        if ($roleError !== null) {
+            return $roleError;
+        }
+
+        // Out-of-reach roles read exactly like unknown ones, so a hidden role (tech support) is not revealed.
+        return $this->policy->canAssign($actor, $role) ? null : 'Invalid role.';
     }
 
     /**
@@ -356,10 +433,10 @@ final class UserAccountAdminService
     /**
      * @return array<string, string>
      */
-    private function validateRoleStatus(string $role, string $status): array
+    private function validateRoleStatus(string $role, string $status, User $actor): array
     {
         $errors = [];
-        if (($roleError = $this->fieldValidator->validateRole($role)) !== null) {
+        if (($roleError = $this->validateRole($role, $actor)) !== null) {
             $errors['role'] = $roleError;
         }
         if (($statusError = $this->fieldValidator->validateStatus($status)) !== null) {

@@ -4173,3 +4173,9 @@ FEATURE-190 / ADR-067 (2026-10-04): wholesale-b2b theme on every page. theme.css
 (old Compliance Log CSS removed); base.html.twig = wholesale admin shell for signed-in pages, sign-in card for
 signed-out pages; data-driven sidebar via layout/_nav_tree.html.twig; theme-bridge.css maps plain page markup;
 vanilla theme.js. SidebarTest extended. Theme specs from the owner still to come.
+
+ADR-068 (2026-10-05): admin realm removed — one `user` table, roles USER<ADMIN<SUPER_ADMIN<TECH_SUPPORT, one login at /login,
+AccountManagementPolicy + ManagedAccountFinder for who-manages-whom, /admin-api on PAT tokens, impersonation as a token
+swap, migration Version20261005120000 folds admins into `user` and drops the admin tables. Smoke-tested in a browser
+(login, management pages, create user with role, impersonate/exit, tech-support 2FA, PAT on /admin-api). Tests NOT
+ported yet (owner request) — the suite is red until they are.

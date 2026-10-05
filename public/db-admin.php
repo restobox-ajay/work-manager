@@ -24,7 +24,7 @@
  * refused outright even with an otherwise-valid token. A successful load clears the IP's counter.
  *
  * Fail closed: any problem at all — bad/absent/expired token, wrong IP, revoked account, missing
- * database, or any thrown error — redirects to /admin/login and never reaches the console. The whole
+ * database, or any thrown error — redirects to /login and never reaches the console. The whole
  * decision lives inline in this one file because it must run without the container; the tests drive
  * this file over real HTTP rather than a stand-in for it.
  */
@@ -60,7 +60,7 @@ $envValue = static function (string $key): string {
 
 $denyToLogin = static function (): never {
     if (!headers_sent()) {
-        header('Location: /admin/login');
+        header('Location: /login');
     }
     exit;
 };
@@ -158,7 +158,7 @@ try {
     }
 
     $stmt = $pdo->prepare(
-        'SELECT id, admin_id, expires_at, ip_address FROM db_console_session WHERE token_hash = :h LIMIT 1'
+        'SELECT id, user_id, expires_at, ip_address FROM db_console_session WHERE token_hash = :h LIMIT 1'
     );
     $stmt->execute(['h' => ConsoleCookie::hashToken($token)]);
     $session = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -179,9 +179,9 @@ try {
     }
 
     // 7. The account must still exist, be active, and still hold ROLE_TECH_SUPPORT. The gateway runs
-    //    outside the kernel, so this is the only place a since-revoked admin is caught.
-    $acct = $pdo->prepare('SELECT status, roles FROM admin WHERE id = :id LIMIT 1');
-    $acct->execute(['id' => $session['admin_id']]);
+    //    outside the kernel, so this is the only place a since-revoked account is caught.
+    $acct = $pdo->prepare('SELECT status, roles FROM `user` WHERE id = :id LIMIT 1');
+    $acct->execute(['id' => $session['user_id']]);
     $account = $acct->fetch(PDO::FETCH_ASSOC);
     $roles = $account !== false ? json_decode((string) $account['roles'], true) : null;
     if (

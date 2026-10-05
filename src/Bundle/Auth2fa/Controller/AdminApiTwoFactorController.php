@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace App\Bundle\Auth2fa\Controller;
 
 use App\Routing\RouteRequirement;
-use App\Repository\UserRepository;
 use App\Security\UserTwoFactorManagerInterface;
 use App\Service\AuditLogger;
+use App\Service\ManagedAccountFinder;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -34,11 +34,11 @@ final class AdminApiTwoFactorController extends AbstractController
     public function resetTwoFactor(
         int $id,
         Request $request,
-        UserRepository $userRepository,
+        ManagedAccountFinder $accounts,
         UserTwoFactorManagerInterface $twoFactor,
         AuditLogger $auditLogger,
     ): Response {
-        $user = $userRepository->find($id);
+        $user = $accounts->find($id, $this->getUser());
         if ($user === null) {
             return new JsonResponse(['error' => 'User not found.'], Response::HTTP_NOT_FOUND);
         }

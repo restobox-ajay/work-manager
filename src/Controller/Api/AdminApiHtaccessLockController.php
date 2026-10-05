@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controller\Api;
 
-use App\Entity\Admin;
+use App\Entity\User;
 use App\Htaccess\HtaccessLockActor;
 use App\Htaccess\HtaccessLockForbiddenException;
 use App\Htaccess\HtaccessLockGate;
@@ -266,7 +266,7 @@ final class AdminApiHtaccessLockController extends AbstractController
 
     private function actor(Request $request): HtaccessLockActor
     {
-        /** @var Admin $admin */
+        /** @var User $admin */
         $admin = $this->getUser();
 
         return HtaccessLockActor::admin($admin->getEmail(), $request->getClientIp() ?? '', $this->isGranted('ROLE_TECH_SUPPORT'));

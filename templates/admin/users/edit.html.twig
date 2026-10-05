@@ -39,7 +39,10 @@
     <div>
         <label for="role">Role</label>
         <select id="role" name="role">
-            <option value="ROLE_USER" selected>User</option>
+            {# Only the roles the signed-in account may grant (App\Security\AccountManagementPolicy). #}
+            {% for role in assignable_roles %}
+                <option value="{{ role.value }}"{{ role.value == user.primaryRole.value ? ' selected' }}>{{ role.label }}</option>
+            {% endfor %}
         </select>
     </div>
 

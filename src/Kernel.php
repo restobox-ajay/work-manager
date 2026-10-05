@@ -59,12 +59,10 @@ class Kernel extends BaseKernel
     /**
      * FEATURE-131 (review C17) — fail-fast host configuration guard.
      *
-     * `framework.trusted_hosts` is built from DEFAULT_URI, ADMIN_DOMAIN and APP_DOMAIN
-     * (config/packages/framework.yaml). An empty entry there compiles to a regex that matches
-     * EVERY host, silently disabling host-header protection. This guard refuses to boot — in
-     * web and CLI alike — unless DEFAULT_URI is a valid absolute URL and both domain vars are
-     * non-empty, so no empty pattern can ever reach the trusted-hosts list. Single-domain
-     * deployments set ADMIN_DOMAIN = APP_DOMAIN = the single host. Amends ADR-019 (ADR-029).
+     * `framework.trusted_hosts` is built from DEFAULT_URI and APP_DOMAIN (config/packages/framework.yaml).
+     * An empty entry there compiles to a regex that matches EVERY host, silently disabling host-header
+     * protection. This guard refuses to boot — in web and CLI alike — unless DEFAULT_URI is a valid absolute
+     * URL and APP_DOMAIN is non-empty, so no empty pattern can ever reach the trusted-hosts list (ADR-029).
      */
     public function boot(): void
     {
@@ -85,13 +83,10 @@ class Kernel extends BaseKernel
             ));
         }
 
-        $adminDomain = self::readEnv('ADMIN_DOMAIN');
-        $appDomain = self::readEnv('APP_DOMAIN');
-        if ($adminDomain === '' || $appDomain === '') {
+        if (self::readEnv('APP_DOMAIN') === '') {
             throw new \RuntimeException(
-                'Invalid host configuration: ADMIN_DOMAIN and APP_DOMAIN must both be set so trusted_hosts '
-                . 'cannot be silently disabled by an empty pattern. Single-domain deployments set both to the '
-                . 'same host. See ADR-029 (amends ADR-019).'
+                'Invalid host configuration: APP_DOMAIN must be set so trusted_hosts cannot be silently disabled '
+                . 'by an empty pattern. See ADR-029 (amends ADR-019).'
             );
         }
     }

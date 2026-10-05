@@ -2193,3 +2193,37 @@ parameter (Twig global `app_name`).
 settle which components this app uses.
 **Tripwire:** verifiable. Verified by `tests/Functional/Navigation/SidebarTest.php`.
 **Status: decided + implemented (2026-10-04).**
+
+## ADR-068: One account type — admins are users with roles; the admin realm is removed (owner request, 2026-10-05) — SUPERSEDES ADR-003 (separate realms), ADR-047 (admin-only API tokens), ADR-064 (admin token management) and the admin-realm parts of ADR-021/041/050/051
+
+**Context:** the owner: "it is an internal project with no admin separation; all users have roles and access" —
+remove /admin/login and keep one `user` table.
+**Decision:** every account is a `User`. Roles: `ROLE_USER < ROLE_ADMIN < ROLE_SUPER_ADMIN < ROLE_TECH_SUPPORT`
+(`App\Enum\Role`, mirrored by `role_hierarchy`). One interactive firewall (`user`) with one login (`/login`), one
+password reset, one 2FA (the 2FA bundle; tech support still must enrol, via `TwoFactorEnforcementResolver`), one
+session list and login history. `ADMIN_DOMAIN` is gone.
+- **Management pages** stay under `/admin/*` (`ROLE_ADMIN`). Who may see/manage which account and grant which role is
+  `App\Security\AccountManagementPolicy` (replaces `TechSupportVisibility`): an admin manages plain users; a super
+  admin also manages admins and super admins; tech support manages everyone and stays invisible to the others (a
+  hidden account is a 404, never a 403). `ManagedAccountFinder` applies it to every web and API lookup and list.
+  "Manage Admins" is folded into Users. The anti-lockout rules (last active super admin, no self-deactivate/delete)
+  live in `UserAccountAdminService` for every surface.
+- **API:** `/admin-api` and `/api` share the stateless `api` firewall and the PAT bundle's tokens; `/admin-api`
+  needs `ROLE_ADMIN`. Admin API tokens, their pages and their three CLI commands are removed (users manage tokens
+  at `/account/tokens`; admins revoke a user's tokens from Users).
+- **Impersonation** (bundle) is a token swap on the one firewall (`ImpersonationManager`): allowed only for an
+  account the impersonator may manage, refused for one that cannot sign in, impersonator restored by identifier on
+  exit (fail closed). The superadmin-impersonates-admin flow is the same flow now.
+- **IP whitelist:** accounts holding an admin role are checked against `ip_whitelist.admin_ips`, everyone else
+  against `ip_whitelist.user_ips` (a per-account override still wins). **Lockout:** accounts holding an admin role
+  are still never hard-locked (ADR-021). Admin-only config keys (admin login notifications, admin remember-me
+  session lifetime) are removed; staying signed in is the remember-me cookie's job.
+- **Data:** `Version20261005120000` copies each admin into `user` (password hash, roles — an empty set becomes
+  `ROLE_ADMIN` — status, created_at, 2FA enrolment into `two_factor_settings`), refuses to run if an admin email is
+  already a user's, renames `db_console_session.admin_id` to `user_id`, and drops the six admin tables. Irreversible.
+- **Commands:** `app:create-superadmin` / `app:create-tech-support` create users (`AccountProvisioner`).
+**Tests:** deliberately NOT updated in this change (owner: "do not write tests yet"); the suite still targets the
+removed admin realm and is red until it is ported.
+**Tripwire:** rationale (tests to be ported in a follow-up, by owner decision).
+**Status: decided + implemented (2026-10-05); test port pending.**
+

@@ -15,14 +15,14 @@ use Doctrine\ORM\Mapping as ORM;
  * self-contained signed cookie) is what makes the credential revocable and expirable — deleting the
  * row ends the session on its next request.
  *
- * `adminId` is a plain scalar, not a relation, matching how every other satellite table in this
+ * `userId` is a plain scalar, not a relation, matching how every other satellite table in this
  * project keys its owner (ADR-006/ADR-034): the gateway reads this table with raw PDO outside the
  * kernel, so a Doctrine association would buy nothing it can use.
  */
 #[ORM\Entity(repositoryClass: DbConsoleSessionRepository::class)]
 #[ORM\Table(name: 'db_console_session')]
 #[ORM\UniqueConstraint(name: 'uniq_db_console_session_token', fields: ['tokenHash'])]
-#[ORM\Index(name: 'idx_db_console_session_admin', fields: ['adminId'])]
+#[ORM\Index(name: 'idx_db_console_session_user', fields: ['userId'])]
 class DbConsoleSession
 {
     #[ORM\Id]
@@ -35,7 +35,7 @@ class DbConsoleSession
     private string $tokenHash;
 
     #[ORM\Column]
-    private int $adminId;
+    private int $userId;
 
     #[ORM\Column]
     private \DateTimeImmutable $expiresAt;
@@ -69,14 +69,14 @@ class DbConsoleSession
         return $this;
     }
 
-    public function getAdminId(): int
+    public function getUserId(): int
     {
-        return $this->adminId;
+        return $this->userId;
     }
 
-    public function setAdminId(int $adminId): static
+    public function setUserId(int $userId): static
     {
-        $this->adminId = $adminId;
+        $this->userId = $userId;
 
         return $this;
     }

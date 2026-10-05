@@ -70,13 +70,6 @@ services:
     # (RegisterAuthMagicLinkServicesPass) overrides this alias with the real repository. See ADR-040/048.
     App\Service\MagicLinkTokenMaintainerInterface: '@App\Service\NullMagicLinkTokenMaintainer'
 
-    # The `user` firewall (config/packages/security.yaml) references this stable alias for the
-    # impersonation authenticator. It defaults to the null authenticator (supports()=false →
-    # /impersonate/* 404s with the bundle absent, the routes being bundle-owned). The
-    # auth-impersonate-bundle compiler pass re-aliases it to the real ImpersonationAuthenticator when
-    # registered. See ADR-041 / FEATURE-142.
-    app.impersonation_authenticator: '@App\Security\NullImpersonationAuthenticator'
-
     # ADR-051: the session IS the "stay signed in" credential (no remember-me bearer cookie), so its
     # lifetime is DB-configurable per request via a ttl closure. Subclass because a closure cannot be
     # expressed in YAML args. Aliased below so the framework handler_id and any PdoSessionHandler

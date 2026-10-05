@@ -30,13 +30,12 @@
         <script src="https://cdn.jsdelivr.net/npm/frankenphp-hot-reload/+esm" type="module"></script>
         {% endif %}
     </head>
-    {# Nav follows the authenticated ENTITY (the security boundary), not a role string. #}
-    {% set navType = app.user is instanceof('App\\Entity\\Admin') ? 'admin'
-        : (app.user is instanceof('App\\Entity\\User') ? 'user' : null) %}
-    {% set areaLabel = navType == 'user' ? 'My Account' : 'Admin Console' %}
+    {# One account type (ADR-068): every signed-in page gets the app shell; what the sidebar offers depends on roles. #}
+    {% set signedIn = app.user is not null %}
+    {% set areaLabel = is_granted('ROLE_ADMIN') ? 'Admin Console' : 'My Account' %}
     {# Rendered once, placed in whichever shell applies below (a block can only be declared once). #}
     {% set pageBody %}{% block body %}{% endblock %}{% endset %}
-    <body class="site {{ navType ? 'site-admin' : 'site-admin-login' }}">
+    <body class="site {{ signedIn ? 'site-admin' : 'site-admin-login' }}">
         {% if app.session is defined and app.session.get('_impersonating_as') is not null %}
         <div class="impersonation-banner">
             Impersonating: {{ app.session.get('_impersonating_as') }}
@@ -47,22 +46,11 @@
             </form>
         </div>
         {% endif %}
-        {% if app.session is defined and app.session.get('_impersonating_admin_as') is not null %}
-        <div class="admin-impersonation-banner">
-            Impersonating Admin: {{ app.session.get('_impersonating_admin_as') }}
-            (as {{ app.session.get('_impersonating_admin_by') }})
-            <form method="post" action="{{ path('app_admin_impersonate_admin_exit') }}">
-                <input type="hidden" name="_token" value="{{ csrf_token('admin_impersonate_exit') }}">
-                <button type="submit" class="exit-admin-impersonation-btn">Exit Admin Impersonation</button>
-            </form>
-        </div>
-        {% endif %}
-
-        {% if navType %}
+        {% if signedIn %}
         <a class="skip-link" href="#main-content">Skip to main content</a>
         <div class="app-shell">
             <aside class="topbar sidebar">
-                <a class="brand" href="{{ navType == 'admin' ? path('app_admin_dashboard') : path('app_dashboard') }}" aria-label="{{ app_name }} home">
+                <a class="brand" href="{{ path('app_dashboard') }}" aria-label="{{ app_name }} home">
                     <span class="brand-copy">
                         {{ app_name }}
                         <small>{{ areaLabel }}</small>
@@ -73,7 +61,7 @@
                     <span class="nav-toggle-label">Menu</span>
                 </button>
                 <nav id="primary-navigation" class="nav" aria-label="Primary navigation">
-                    {% include navType == 'admin' ? 'layout/_admin_nav.html.twig' : 'layout/_user_nav.html.twig' %}
+                    {% include 'layout/_nav.html.twig' %}
                 </nav>
                 <button class="sidebar-footer sidebar-collapse-toggle" type="button" aria-label="Collapse sidebar" aria-expanded="true">
                     <span class="sidebar-collapse-icon" aria-hidden="true">

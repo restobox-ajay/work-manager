@@ -4,24 +4,22 @@ declare(strict_types=1);
 
 namespace App\Command;
 
-use App\Entity\Admin;
-use App\Repository\AdminRepository;
-use Doctrine\ORM\EntityManagerInterface;
+use App\Enum\Role;
+use App\Service\AccountProvisioner;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
-use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 /**
- * Provisions a maintainer (ROLE_TECH_SUPPORT) admin — the console is the bootstrap path,
+ * Provisions a maintainer (ROLE_TECH_SUPPORT) account — the console is the bootstrap path,
  * mirroring app:create-superadmin (ADR-004). Kept as a SEPARATE command rather than a `--role` flag
  * on app:create-superadmin so the two roles' options never drift into a shared, easy-to-misuse
  * surface — NOT to hide this command's existence, which is discoverable via `bin/console list` and
  * pointed to from app:create-superadmin's own --help (ADR-050 amendment, Ken 2026-09-28: obscuring
  * a deployment command bought no real security and only slowed down bootstrapping a new instance).
- * Existing tech-support admins can create more via the admin UI.
+ * Existing tech-support accounts can create more from Users in the UI.
  *
  * This is the command to run FIRST on a brand-new instance: ROLE_TECH_SUPPORT has full control
  * (superadmin powers plus more, via role_hierarchy) and can create every other admin — including
@@ -31,7 +29,7 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
     name: 'app:create-tech-support',
     description: 'Provision the first admin on a new instance (full control; run this before app:create-superadmin)',
     help: <<<'HELP'
-        Creates an admin with ROLE_TECH_SUPPORT — full control of the instance (superadmin powers
+        Creates a user account holding ROLE_TECH_SUPPORT — full control of the instance (superadmin powers
         plus more, via role_hierarchy). This is the command to run FIRST when bootstrapping a
         brand-new instance; use the admin UI (or <info>app:create-superadmin</info>) to create
         client-facing superadmins afterward.
@@ -44,9 +42,7 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 class CreateTechSupportCommand extends Command
 {
     public function __construct(
-        private readonly EntityManagerInterface $em,
-        private readonly AdminRepository $adminRepository,
-        private readonly UserPasswordHasherInterface $passwordHasher,
+        private readonly AccountProvisioner $provisioner,
     ) {
         parent::__construct();
     }
@@ -54,8 +50,8 @@ class CreateTechSupportCommand extends Command
     protected function configure(): void
     {
         $this
-            ->addOption('email', null, InputOption::VALUE_REQUIRED, 'Admin email address')
-            ->addOption('password', null, InputOption::VALUE_OPTIONAL, 'Admin password (auto-generated if omitted)');
+            ->addOption('email', null, InputOption::VALUE_REQUIRED, 'Email address')
+            ->addOption('password', null, InputOption::VALUE_OPTIONAL, 'Password (auto-generated if omitted)');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -66,32 +62,16 @@ class CreateTechSupportCommand extends Command
             return Command::FAILURE;
         }
 
-        if ($this->adminRepository->findByEmail($email) !== null) {
-            $output->writeln('<error>An admin with this email already exists.</error>');
+        if ($this->provisioner->emailIsTaken($email)) {
+            $output->writeln('<error>An account with this email already exists.</error>');
             return Command::FAILURE;
         }
 
-        $plaintextPassword = $input->getOption('password');
-        $generated = false;
-        if (!$plaintextPassword) {
-            $plaintextPassword = bin2hex(random_bytes(16));
-            $generated = true;
-        }
+        $generatedPassword = $this->provisioner->create($email, 'Tech Support', Role::TechSupport, $input->getOption('password'));
 
-        $admin = new Admin();
-        $admin->setEmail($email);
-        $admin->setName('Tech Support');
-        $admin->setRoles(['ROLE_TECH_SUPPORT']);
-        $admin->setPassword($this->passwordHasher->hashPassword($admin, $plaintextPassword));
-
-        $this->em->persist($admin);
-        $this->em->flush();
-
-        if ($generated) {
-            $output->writeln('<info>Tech-support admin created.</info>');
-            $output->writeln("Auto-generated password: {$plaintextPassword}");
-        } else {
-            $output->writeln('<info>Tech-support admin created successfully.</info>');
+        $output->writeln('<info>Tech-support account created successfully.</info>');
+        if ($generatedPassword !== null) {
+            $output->writeln("Auto-generated password: {$generatedPassword}");
         }
 
         return Command::SUCCESS;

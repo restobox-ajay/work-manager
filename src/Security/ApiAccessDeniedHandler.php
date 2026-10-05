@@ -14,7 +14,7 @@ use Symfony\Component\Security\Http\Authorization\AccessDeniedHandlerInterface;
  * An authenticated admin API caller whose role is not enough (e.g. a plain admin calling a tech-support-only
  * endpoint) gets the same JSON error shape as every other admin API failure, not an HTML error page.
  */
-final class AdminApiAccessDeniedHandler implements AccessDeniedHandlerInterface
+final class ApiAccessDeniedHandler implements AccessDeniedHandlerInterface
 {
     public function handle(Request $request, AccessDeniedException $accessDeniedException): Response
     {

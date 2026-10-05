@@ -28,12 +28,12 @@ class IpWhitelistConfigPage implements ConfigPageProviderInterface
     {
         return [
             'ip_whitelist.user_ips' => [
-                'label'   => 'User Login Allowed IPs (comma-separated, CIDR supported; empty = allow all)',
+                'label'   => 'Allowed Login IPs — regular users (comma-separated, CIDR supported; empty = allow all)',
                 'type'    => 'ip_list',
                 'default' => '',
             ],
             'ip_whitelist.admin_ips' => [
-                'label'   => 'Admin Login Allowed IPs (comma-separated, CIDR supported; empty = allow all)',
+                'label'   => 'Allowed Login IPs — admin roles (comma-separated, CIDR supported; empty = allow all)',
                 'type'    => 'ip_list',
                 'default' => '',
                 // Refuse a list that would not admit the admin saving it (issue #17); recovery from the

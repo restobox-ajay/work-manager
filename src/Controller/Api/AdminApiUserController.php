@@ -12,6 +12,7 @@ use App\Repository\UserSessionRepository;
 use App\Service\AuditLogger;
 use App\Service\PasswordResetService;
 use App\Service\UserAccountAdminService;
+use App\Service\ManagedAccountFinder;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -34,7 +35,7 @@ final class AdminApiUserController extends AbstractController
     private const MAX_PAGE_SIZE     = 100;
 
     #[Route('', name: 'app_api_admin_users_list', methods: ['GET'])]
-    public function list(Request $request, UserRepository $userRepository): JsonResponse
+    public function list(Request $request, UserRepository $userRepository, ManagedAccountFinder $accounts): JsonResponse
     {
         $page = max(1, min((int) $request->query->get('page', '1'), self::MAX_PAGE));
 
@@ -55,6 +56,8 @@ final class AdminApiUserController extends AbstractController
             $filters['status'] = $status;
         }
 
+        // Only the accounts the caller may manage (ADR-068).
+        $filters = $accounts->visibleFilters($this->getUser(), $filters);
         $total = $userRepository->countFiltered($filters);
         $users = $userRepository->findFilteredPaginated($filters, $page, $perPage);
         $pages = max(1, (int) ceil($total / $perPage));
@@ -81,7 +84,7 @@ final class AdminApiUserController extends AbstractController
         // password-lifecycle bookkeeping (FEATURE-103 AC1). Same one path the web surface uses.
         $result = $userService->create(
             \is_array($data) ? $data : [],
-            $this->getUser()?->getUserIdentifier() ?? 'unknown',
+            $this->currentUser(),
             $request->getClientIp() ?? '0.0.0.0',
         );
 
@@ -95,7 +98,7 @@ final class AdminApiUserController extends AbstractController
     #[Route('/{id}', name: 'app_api_admin_users_detail', requirements: ['id' => RouteRequirement::ID], methods: ['GET'])]
     public function detail(int $id, UserRepository $userRepository): JsonResponse
     {
-        $user = $userRepository->find($id);
+        $user = $accounts->find($id, $this->getUser());
         if ($user === null) {
             return new JsonResponse(['error' => 'User not found.'], Response::HTTP_NOT_FOUND);
         }
@@ -107,10 +110,10 @@ final class AdminApiUserController extends AbstractController
     public function update(
         int $id,
         Request $request,
-        UserRepository $userRepository,
+        ManagedAccountFinder $accounts,
         UserAccountAdminService $userService,
     ): JsonResponse {
-        $user = $userRepository->find($id);
+        $user = $accounts->find($id, $this->getUser());
         if ($user === null) {
             return new JsonResponse(['error' => 'User not found.'], Response::HTTP_NOT_FOUND);
         }
@@ -133,7 +136,7 @@ final class AdminApiUserController extends AbstractController
         $result = $userService->update(
             $user,
             $changes,
-            $this->getUser()?->getUserIdentifier() ?? 'unknown',
+            $this->currentUser(),
             $request->getClientIp() ?? '0.0.0.0',
         );
 
@@ -148,17 +151,20 @@ final class AdminApiUserController extends AbstractController
     public function delete(
         int $id,
         Request $request,
-        UserRepository $userRepository,
+        ManagedAccountFinder $accounts,
         UserAccountAdminService $userService,
     ): Response {
-        $user = $userRepository->find($id);
+        $user = $accounts->find($id, $this->getUser());
         if ($user === null) {
             return new JsonResponse(['error' => 'User not found.'], Response::HTTP_NOT_FOUND);
         }
 
         // Soft delete (ADR-020 / FEATURE-110): the shared service sets status='inactive', writes
         // the atomic audit row, and kills outstanding recovery tokens.
-        $userService->delete($user, $this->getUser()?->getUserIdentifier() ?? 'unknown', $request->getClientIp() ?? '0.0.0.0');
+        $refusal = $userService->delete($user, $this->currentUser(), $request->getClientIp() ?? '0.0.0.0');
+        if ($refusal !== null) {
+            return new JsonResponse(['error' => $refusal], Response::HTTP_CONFLICT);
+        }
 
         return new Response('', Response::HTTP_NO_CONTENT);
     }
@@ -167,11 +173,11 @@ final class AdminApiUserController extends AbstractController
     public function activate(
         int $id,
         Request $request,
-        UserRepository $userRepository,
+        ManagedAccountFinder $accounts,
         EntityManagerInterface $em,
         AuditLogger $auditLogger,
     ): JsonResponse {
-        $user = $userRepository->find($id);
+        $user = $accounts->find($id, $this->getUser());
         if ($user === null) {
             return new JsonResponse(['error' => 'User not found.'], Response::HTTP_NOT_FOUND);
         }
@@ -188,10 +194,10 @@ final class AdminApiUserController extends AbstractController
     public function deactivate(
         int $id,
         Request $request,
-        UserRepository $userRepository,
+        ManagedAccountFinder $accounts,
         UserAccountAdminService $userService,
     ): JsonResponse {
-        $user = $userRepository->find($id);
+        $user = $accounts->find($id, $this->getUser());
         if ($user === null) {
             return new JsonResponse(['error' => 'User not found.'], Response::HTTP_NOT_FOUND);
         }
@@ -199,7 +205,10 @@ final class AdminApiUserController extends AbstractController
         // Deactivation must actually cut access now, not just at next login. The shared service
         // sets status='inactive', drops sessions, revokes PATs, invalidates remember-me cookies +
         // recovery tokens, and writes the audit row.
-        $userService->deactivate($user, $this->getUser()?->getUserIdentifier() ?? 'unknown', $request->getClientIp() ?? '0.0.0.0');
+        $refusal = $userService->deactivate($user, $this->currentUser(), $request->getClientIp() ?? '0.0.0.0');
+        if ($refusal !== null) {
+            return new JsonResponse(['error' => $refusal], Response::HTTP_CONFLICT);
+        }
 
         return new JsonResponse(['status' => 'ok', 'user' => $this->serializeUser($user)]);
     }
@@ -208,12 +217,12 @@ final class AdminApiUserController extends AbstractController
     public function forceLogout(
         int $id,
         Request $request,
-        UserRepository $userRepository,
+        ManagedAccountFinder $accounts,
         UserSessionRepository $sessionRepository,
         EntityManagerInterface $em,
         AuditLogger $auditLogger,
     ): JsonResponse {
-        $user = $userRepository->find($id);
+        $user = $accounts->find($id, $this->getUser());
         if ($user === null) {
             return new JsonResponse(['error' => 'User not found.'], Response::HTTP_NOT_FOUND);
         }
@@ -235,11 +244,11 @@ final class AdminApiUserController extends AbstractController
     public function passwordReset(
         int $id,
         Request $request,
-        UserRepository $userRepository,
+        ManagedAccountFinder $accounts,
         PasswordResetService $passwordResetService,
         AuditLogger $auditLogger,
     ): JsonResponse {
-        $user = $userRepository->find($id);
+        $user = $accounts->find($id, $this->getUser());
         if ($user === null) {
             return new JsonResponse(['error' => 'User not found.'], Response::HTTP_NOT_FOUND);
         }
@@ -281,5 +290,16 @@ final class AdminApiUserController extends AbstractController
             'roles'      => $user->getRoles(),
             'created_at' => $user->getCreatedAt()->format(\DateTimeInterface::ATOM),
         ];
+    }
+
+    /** The calling account; the class-level ROLE_ADMIN guard guarantees there is one. */
+    private function currentUser(): User
+    {
+        $user = $this->getUser();
+        if (!$user instanceof User) {
+            throw $this->createAccessDeniedException();
+        }
+
+        return $user;
     }
 }

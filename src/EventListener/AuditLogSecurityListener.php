@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\EventListener;
 
-use App\Entity\Admin;
 use App\Service\AuditLogger;
 use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
 use Symfony\Component\Security\Http\Event\LoginFailureEvent;
@@ -30,7 +29,8 @@ class AuditLogSecurityListener
         $request = $event->getRequest();
 
         $actor = $user->getUserIdentifier();
-        $actorType = $user instanceof Admin ? 'admin' : 'user';
+        // One account type since ADR-068: signing in and out is always a user action, whatever the roles.
+        $actorType = 'user';
         $ip = $request->getClientIp() ?? '0.0.0.0';
 
         $this->auditLogger->log($actor, $actorType, $ip, 'login', 'success');
@@ -46,7 +46,7 @@ class AuditLogSecurityListener
         $ip = $request->getClientIp() ?? '0.0.0.0';
 
         $actor = trim((string) $request->request->get('email', 'unknown')) ?: 'unknown';
-        $actorType = str_starts_with($request->getPathInfo(), '/admin') ? 'admin' : 'user';
+        $actorType = 'user';
 
         $this->auditLogger->log($actor, $actorType, $ip, 'login', 'failure');
     }
@@ -67,7 +67,7 @@ class AuditLogSecurityListener
         }
 
         $actor = $user->getUserIdentifier();
-        $actorType = $user instanceof Admin ? 'admin' : 'user';
+        $actorType = 'user';
 
         $this->auditLogger->log($actor, $actorType, $ip, 'logout', 'success');
     }

@@ -1,17 +1,11 @@
-{# The slim bar above every signed-in page: the account menu, as in the wholesale-b2b admin console.
-   Expects `navType` ('admin' | 'user') from base.html.twig. #}
+{# The slim bar above every signed-in page: the account menu, as in the wholesale-b2b admin console. #}
 {% import 'layout/_icons.html.twig' as icons %}
 {% set identifier = app.user.userIdentifier %}
-{% set menuLinks = navType == 'admin'
-    ? [
-        { label: 'Active Sessions', icon: 'monitor', href: path('app_admin_account_sessions') },
-        { label: 'Two-Factor Auth', icon: 'shield', href: path('app_admin_2fa_setup') },
-        { label: 'Logout', icon: 'logout', href: path('app_admin_logout') },
-    ]
-    : [
-        { label: 'Settings', icon: 'user', href: path('app_account_settings') },
-        { label: 'Logout', icon: 'logout', href: path('app_logout') },
-    ] %}
+{% set menuLinks = [
+    { label: 'Settings', icon: 'user', href: path('app_account_settings') },
+    { label: 'Active Sessions', icon: 'monitor', href: path('app_account_sessions') },
+    { label: 'Logout', icon: 'logout', href: path('app_logout') },
+] %}
 <div class="admin-content-header">
     <div class="user-menu">
         <button class="user-menu-toggle" type="button" aria-expanded="false" aria-haspopup="true">

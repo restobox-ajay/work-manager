@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Bundle\AuthSecurity\Security;
 
+use App\Enum\Role;
 use App\Service\ConfigService;
 use App\Service\WebhookDispatcherInterface;
 use Doctrine\DBAL\Connection;
@@ -24,6 +25,8 @@ use Symfony\Component\Security\Http\Event\LoginFailureEvent;
  */
 final class LoginRateLimitListener
 {
+    private const REALM = 'user';
+
     /**
      * Fail-closed default applied when the admin has never configured a value.
      * An explicit configured value of 0 still disables throttling (ConfigService
@@ -65,9 +68,8 @@ final class LoginRateLimitListener
         $windowSeconds = $this->configService->getInt('rate_limit.window_seconds', 300);
         $cutoff = (new \DateTimeImmutable())->modify("-{$windowSeconds} seconds")->format('Y-m-d H:i:s');
 
-        // Scope every count by realm so admin-firewall failures never throttle user logins
-        // (and vice versa) — the two firewalls are isolated (ADR-003 / ADR-021).
-        $realm = $this->realmForRequest($request);
+        // login_attempts keeps its realm column for history; since ADR-068 every login is a user login.
+        $realm = self::REALM;
 
         // Per-IP check
         $ip = $request->getClientIp() ?? '0.0.0.0';
@@ -107,7 +109,7 @@ final class LoginRateLimitListener
 
         $ip = $event->getRequest()->getClientIp() ?? '0.0.0.0';
         $email = $this->accountIdentifier($event);
-        $realm = $this->realmForRequest($event->getRequest());
+        $realm = self::REALM;
         $now = (new \DateTimeImmutable())->format('Y-m-d H:i:s');
 
         $this->connection->executeStatement(
@@ -147,27 +149,9 @@ final class LoginRateLimitListener
         return $identifier !== '' ? mb_substr($identifier, 0, 254) : null;
     }
 
-    /**
-     * Realm ('user' | 'admin') a login failure belongs to, derived from the request path.
-     * `^/admin` is exactly the admin firewall's pattern, so this always agrees with the
-     * firewall that actually handled the request — no drift between INSERT and COUNT.
-     */
-    private function realmForRequest(Request $request): string
-    {
-        return str_starts_with($request->getPathInfo(), '/admin') ? 'admin' : 'user';
-    }
-
     private function maybeApplyLockout(?string $email, string $realm): void
     {
         if ($email === null) {
-            return;
-        }
-
-        // Admins are intentionally NOT hard-lockable (ADR-021): Admin has no lockout row and no
-        // AdminChecker enforcement, and account-keyed lockout is a username-targeted DoS vector. A
-        // failed admin-firewall login must therefore never create a lockout for a USER (ADR-003 firewall
-        // isolation). Admin logins are still rate-limited above; they are simply never hard-locked here.
-        if ($realm !== 'user') {
             return;
         }
 
@@ -198,14 +182,17 @@ final class LoginRateLimitListener
                 [$email, (new \DateTimeImmutable())->format('Y-m-d H:i:s')]
             ) !== false;
 
+            // Accounts holding an admin role are never hard-locked (ADR-021, kept by ADR-068): account-keyed lockout
+            // is a username-targeted DoS, and locking out the people who unlock others would be self-defeating.
+            // They are still rate-limited above.
             // Write the lockout into the satellite, keyed by user_id resolved from the email. The
             // INSERT ... SELECT inserts nothing when no user has that email (so a non-existent account is
             // never "locked"); ON DUPLICATE KEY (the UNIQUE user_id) refreshes an existing lockout. This mirrors how login_attempts
             // is written here (raw DBAL), so no User is hydrated mid-failure-handling.
             $written = $this->connection->executeStatement(
                 'INSERT INTO account_lockouts (user_id, locked_until) '
-                . 'SELECT id, ? FROM "user" WHERE email = ? '
-                . 'ON DUPLICATE KEY UPDATE locked_until = VALUES(locked_until)',
+                . 'SELECT id, ? FROM "user" WHERE email = ? AND ' . self::notAnAdminCondition()
+                . ' ON DUPLICATE KEY UPDATE locked_until = VALUES(locked_until)',
                 [$lockedUntil, $email]
             );
 
@@ -224,5 +211,16 @@ final class LoginRateLimitListener
                 ]);
             }
         }
+    }
+
+    /** SQL condition: the `user` row holds none of the admin roles (roles is a JSON array of strings). */
+    private static function notAnAdminCondition(): string
+    {
+        $adminRoles = array_filter(Role::cases(), static fn (Role $role): bool => $role->rank() >= Role::Admin->rank());
+
+        return 'NOT (' . implode(' OR ', array_map(
+            static fn (Role $role): string => sprintf("roles LIKE '%%\"%s\"%%'", $role->value),
+            $adminRoles,
+        )) . ')';
     }
 }

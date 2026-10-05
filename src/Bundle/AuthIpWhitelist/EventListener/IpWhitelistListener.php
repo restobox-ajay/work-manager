@@ -6,6 +6,7 @@ namespace App\Bundle\AuthIpWhitelist\EventListener;
 
 use App\Bundle\AuthIpWhitelist\Repository\UserIpWhitelistRepository;
 use App\Entity\User;
+use App\Enum\Role;
 use App\Repository\UserRepository;
 use App\Security\IpWhitelistedAuthenticatorInterface;
 use App\Service\ConfigService;
@@ -27,6 +28,9 @@ use Symfony\Component\Security\Http\Event\CheckPassportEvent;
 #[AsEventListener(event: CheckPassportEvent::class, priority: 100)]
 final class IpWhitelistListener
 {
+    private const ADMIN_IPS_KEY = 'ip_whitelist.admin_ips';
+    private const USER_IPS_KEY = 'ip_whitelist.user_ips';
+
     public function __construct(
         private readonly ConfigService $configService,
         private readonly RequestStack $requestStack,
@@ -37,7 +41,7 @@ final class IpWhitelistListener
     public function __invoke(CheckPassportEvent $event): void
     {
         // Enforce the IP whitelist for every INTERACTIVE login authenticator:
-        // form login (user + admin firewalls) and any authenticator that opts in
+        // form login and any authenticator that opts in
         // via App\Security\IpWhitelistedAuthenticatorInterface — the passwordless
         // magic link (owned by auth-magic-link-bundle, FEATURE-140) carries that
         // marker. A magic link must not be a whitelist bypass (review C20 /
@@ -45,12 +49,9 @@ final class IpWhitelistListener
         // optional bundle: with that bundle absent no class implements the marker.
         //
         // Every other authenticator is intentionally exempt:
-        //  - ImpersonationAuthenticator: an admin-initiated switch. The admin
-        //    already passed the admin firewall's own IP checks, and the target
-        //    user is not physically present to satisfy their own restriction.
-        //  - TokenAuthenticator / AdminTokenAuthenticator (API PATs): these are
-        //    non-interactive machine credentials, out of scope for the
-        //    interactive-login whitelist.
+        //  - TokenAuthenticator (API PATs): non-interactive machine credentials,
+        //    out of scope for the interactive-login whitelist.
+        // (Impersonation is a token swap by an already signed-in account manager, not a login.)
         $authenticator = $event->getAuthenticator();
         if (!$authenticator instanceof FormLoginAuthenticator
             && !$authenticator instanceof IpWhitelistedAuthenticatorInterface
@@ -65,30 +66,20 @@ final class IpWhitelistListener
 
         $ip = $request->getClientIp() ?? '0.0.0.0';
 
-        // Determine which firewall by checking the request path
-        $isAdminFirewall = str_starts_with($request->getPathInfo(), '/admin');
-
-        if ($isAdminFirewall) {
-            $globalWhitelist = $this->configService->getString('ip_whitelist.admin_ips', '');
-            $this->checkIp($ip, $globalWhitelist);
-            return;
-        }
-
-        // User firewall: check per-user override first, then global
-        $globalWhitelist = $this->configService->getString('ip_whitelist.user_ips', '');
-
-        $effectiveWhitelist = $globalWhitelist;
-
+        // Per-account override first; otherwise the global list for the account's tier — accounts holding an
+        // admin role (ADR-068) use the admin list, everyone else the user list.
+        $user = null;
         $passport = $event->getPassport();
         if ($passport->hasBadge(UserBadge::class)) {
-            $email = $passport->getBadge(UserBadge::class)->getUserIdentifier();
-            $user = $this->userRepository->findByEmail($email);
-            if ($user instanceof User) {
-                $override = $this->whitelistRepository->getAllowedIps($user);
-                if ($override !== null && $override !== '') {
-                    $effectiveWhitelist = $override;
-                }
-            }
+            $user = $this->userRepository->findByEmail($passport->getBadge(UserBadge::class)->getUserIdentifier());
+        }
+
+        $override = $user instanceof User ? $this->whitelistRepository->getAllowedIps($user) : null;
+        if ($override !== null && $override !== '') {
+            $effectiveWhitelist = $override;
+        } else {
+            $isAdmin = $user instanceof User && $user->getPrimaryRole()->rank() >= Role::Admin->rank();
+            $effectiveWhitelist = $this->configService->getString($isAdmin ? self::ADMIN_IPS_KEY : self::USER_IPS_KEY, '');
         }
 
         $this->checkIp($ip, $effectiveWhitelist);

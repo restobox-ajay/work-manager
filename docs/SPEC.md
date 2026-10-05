@@ -58,18 +58,16 @@ All configurable values are stored in the database and editable via the admin co
 
 ### Data Model
 
-`user` and `admin` are fully separate database tables with no shared base class. Schema beyond that is left to the implementer.
+One `user` table for every account; access is decided by roles (ADR-068). Schema beyond that is left to the implementer.
 
 ### User Model
 
-- **Fully separate** tables, entities, firewalls, and login pages for **admin** and **user** — no shared base class, complete isolation for security
-- Both `User` and `Admin` have independent session tracking
+- **One account type** (`User`) with roles: `ROLE_USER < ROLE_ADMIN < ROLE_SUPER_ADMIN < ROLE_TECH_SUPPORT` — one table, one firewall, one login page (ADR-068; superseded the original separate admin realm)
 - Sessions are stored in the database via Symfony's built-in `PdoSessionHandler` — required for "view active sessions" and "logout everywhere" to work. No file sessions.
-- **Superadmin** role — full access, can manage all admins and users
+- **Admin** manages regular users; **Superadmin** also manages admins; **Tech support** manages everyone and is hidden from the others
 - First superadmin provisioned via `bin/console app:create-superadmin --email=X`. If no `--password` is provided, a secure random password is generated and printed once to the console — it is not stored in plaintext anywhere.
 - User status: **active / inactive**
-- All admin pages under `/admin/` URL prefix — this is intentional: it allows the entire admin surface to be IP-whitelisted at the network or firewall level (Caddy, nginx, Symfony firewall) with a single rule
-- **Optional: separate domains** — admin and user interfaces can be served from separate domains (e.g. `admin.example.com` vs `app.example.com`). Configured via `.env` (`ADMIN_DOMAIN`, `APP_DOMAIN`) — this is infrastructure-level config, not something changed at runtime via the admin UI.
+- All management pages under `/admin/` URL prefix — this is intentional: it allows the entire management surface to be IP-whitelisted at the network or firewall level (Caddy, nginx, Symfony firewall) with a single rule
 
 ### Authentication Flows
 

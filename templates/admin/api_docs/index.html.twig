@@ -16,9 +16,10 @@
     test suite, so this page cannot silently drift from the real endpoints.
 </p>
 <p>
-    Get an admin token from the server shell: <code>php bin/console app:admin:create-api-token --email=you@example.com</code>,
-    then press <em>Authorize</em> and paste it. See and revoke your tokens under
-    <a href="{{ path('app_admin_api_tokens') }}">API Tokens</a>.
+    Both APIs use the same personal access tokens: create one under
+    {% if pat_available is defined and pat_available %}<a href="{{ path('app_account_tokens') }}">API Tokens</a>{% else %}API Tokens (the auth-pat-bundle is not installed){% endif %},
+    then press <em>Authorize</em> and paste it. What a token may do follows its owner's roles — the Admin API needs
+    an account holding an admin role.
 </p>
 <div class="warning">
     <em>Try it out</em> sends <strong>real requests to this instance</strong> — create, update, delete and deactivate

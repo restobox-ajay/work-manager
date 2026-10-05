@@ -30,7 +30,7 @@
             <td>{{ user.name }}</td>
             <td>{{ user.email }}</td>
             <td>{{ user.status }}{% if user.id in locked_user_ids %} <span class="locked-indicator">Locked</span>{% endif %}</td>
-            <td>{{ user.roles | join(', ') }}</td>
+            <td>{{ user.primaryRole.label }}</td>
             <td><span class="active-token-count">{{ activeTokenCount }}</span></td>
             <td>
                 <a href="{{ path('app_admin_users_edit', {id: user.id}) }}">Edit</a>

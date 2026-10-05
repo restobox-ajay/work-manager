@@ -20,20 +20,20 @@ class DbConsoleSessionRepository extends ServiceEntityRepository
     }
 
     /**
-     * Revoke every open console for one admin (issue #48): on panel logout, "logout everywhere", a completed
-     * password reset, deactivation and soft-delete — a console must not outlive its admin's access.
+     * Revoke every open console for one account (issue #48): on logout, "logout everywhere", a completed
+     * password reset, deactivation and soft-delete — a console must not outlive its owner's access.
      */
-    public function deleteAllByAdminId(int $adminId): int
+    public function deleteAllByUserId(int $userId): int
     {
         return (int) $this->createQueryBuilder('s')
             ->delete()
-            ->where('s.adminId = :adminId')
-            ->setParameter('adminId', $adminId)
+            ->where('s.userId = :userId')
+            ->setParameter('userId', $userId)
             ->getQuery()
             ->execute();
     }
 
-    /** Revoke every open console of every admin — the "Disable now" kill-switch (issue #48). */
+    /** Revoke every open console of every account — the "Disable now" kill-switch (issue #48). */
     public function deleteAll(): int
     {
         return (int) $this->createQueryBuilder('s')->delete()->getQuery()->execute();

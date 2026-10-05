@@ -5,36 +5,29 @@ framework:
 
     # FEATURE-131 (review C17): pin the trusted host patterns so the app never trusts an
     # attacker-supplied Host header (host-header injection -> password-reset link poisoning,
-    # off-origin post-2FA redirects). The patterns are derived from the app's three real-host
-    # env vars — the DEFAULT_URI host plus ADMIN_DOMAIN and APP_DOMAIN (single-domain sets both
-    # to the same host). A request whose Host matches none is rejected with 400.
-    # The Kernel boot guard (src/Kernel.php) refuses to start unless all three are set, so no
+    # off-origin post-2FA redirects). The patterns are derived from the app's real-host env vars —
+    # the DEFAULT_URI host and APP_DOMAIN. A request whose Host matches neither is rejected with 400.
+    # The Kernel boot guard (src/Kernel.php) refuses to start unless both are set, so no
     # empty pattern can reach this list (an empty trusted_hosts regex would match every host and
     # silently disable the guard). See ADR-029 (amends ADR-019).
     trusted_hosts:
         - '^%env(key:host:url:DEFAULT_URI)%$'
-        - '^%env(ADMIN_DOMAIN)%$'
         - '^%env(APP_DOMAIN)%$'
 
     # Note that the session will be started ONLY if you read or write from it.
     session:
         handler_id: App\Session\ConfigAwarePdoSessionHandler
-        # ADR-051: session lifetime. PHP's 24-minute gc_maxlifetime default made an admin re-enter
-        # their TOTP after 24 idle minutes (2FA verification is session-scoped), which is far too
-        # aggressive for an admin panel. The AUTHORITATIVE server-side window is resolved per request
-        # from the DB by App\Session\SessionTtlResolver (baseline `session.idle_lifetime_minutes`,
-        # or `session.remember_me_lifetime_days` for a session that ticked "Remember me") and applied
-        # as the handler's ttl, which re-stamps sess_lifetime on every request so the window slides.
+        # ADR-051: session lifetime. PHP's 24-minute gc_maxlifetime default signed people out (and made them
+        # re-enter their TOTP, which is session-scoped) after 24 idle minutes. The AUTHORITATIVE server-side
+        # window is resolved per request from the DB by App\Session\SessionTtlResolver
+        # (`session.idle_lifetime_minutes`) and applied as the handler's ttl, which re-stamps sess_lifetime
+        # on every request so the window slides. Staying signed in longer is the remember-me cookie's job.
         #
         # gc_maxlifetime here is only the FALLBACK used when no ttl closure applies; it is kept in
-        # step with the baseline default (180 min).
+        # step with the default (180 min).
         gc_maxlifetime: 10800
-        # cookie_lifetime is a browser-side hint only — the server TTL above decides validity. It must
-        # be >= the largest server window or the browser would drop the cookie first and cut a
-        # "remember me" session short, so it is set to the 21-day default. A session whose server TTL
-        # is shorter simply presents a cookie the server has already expired (harmless: new session).
-        # Raising `session.remember_me_lifetime_days` beyond 21 days requires raising this too.
-        cookie_lifetime: 1814400
+        # cookie_lifetime 0 = a browser-session cookie; the server TTL above decides validity.
+        cookie_lifetime: 0
         # FEATURE-089 (M4): pin cookie flags explicitly instead of relying on
         # framework defaults.
         # - cookie_secure: 'auto' emits the Secure flag on HTTPS requests only.

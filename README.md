@@ -2,7 +2,7 @@
 
 A minimal, auditable authentication foundation for Symfony 7.4. Small, hardened core; optional bundles you opt into. Less code in core = less attack surface, fewer bugs, easier audits.
 
-It ships production-ready auth out of the box — separate user/admin identities, registration, login, password reset, email verification, session management, an admin panel, a token-authenticated admin REST API, and a full audit log. Everything else — 2FA, rate limiting, password policy, magic links, impersonation, IP whitelisting, personal access tokens, webhooks — is a separate bundle.
+It ships production-ready auth out of the box — one account type with roles (user, admin, super admin, tech support), registration, login, password reset, email verification, session management, an admin panel, a token-authenticated admin REST API, and a full audit log. Everything else — 2FA, rate limiting, password policy, magic links, impersonation, IP whitelisting, personal access tokens, webhooks — is a separate bundle.
 
 ---
 
@@ -184,20 +184,12 @@ The bundle auto-registers its admin config sub-page (via `ConfigPageProviderInte
 
 ## Admin REST API
 
-The admin API lives under **`/admin-api/*`** on a dedicated **stateless firewall that authenticates `Admin` entities only** (the `app_admins` provider via `AdminTokenAuthenticator`). A normal `User` — whatever roles it carries — can never reach it. Issue a token with:
-
-```bash
-php bin/console app:admin:create-api-token --email=admin@example.com   # expires in 365 days (--expires-in-days=N, --no-expiry)
-# → use as:  Authorization: Bearer <token>
-php bin/console app:admin:list-api-tokens [--email=…] [--active]       # id, owner, name, last 6 chars, status
-php bin/console app:admin:revoke-api-token --id=12                     # or: --email=… --all
-```
-
-Every admin sees and revokes their own tokens at **API Tokens** in the panel (`/admin/api-tokens`); tech support can open
-any admin's token page from **Manage Admins → API Tokens**. Only a hash is stored, so tokens are identified by their
-last 6 characters. Deactivating or deleting an admin revokes its tokens for good (ADR-064).
-
-This is distinct from [`auth-pat-bundle`](docs/bundles/auth-pat-bundle.md), which issues **user** tokens for the separate user-side `/api` firewall. Full endpoint list: [Admin REST API](docs/core.md#admin-rest-api). **Interactive docs:** admin panel → *API Docs* (any admin class), backed by the contract-tested OpenAPI spec [`docs/api/openapi.yaml`](docs/api/openapi.yaml) — a test calls every documented endpoint for real and fails if the docs and the code disagree.
+The management API lives under **`/admin-api/*`**. It shares the stateless `api` firewall and the **personal access
+tokens** of [`auth-pat-bundle`](docs/bundles/auth-pat-bundle.md) with the user API (`/api`): create a token at
+**API Tokens** (`/account/tokens`) and send it as `Authorization: Bearer <token>`. What a token may do follows its
+owner's roles (ADR-068) — `/admin-api` needs `ROLE_ADMIN` or above. Deactivating or deleting an account revokes its
+tokens. **Interactive docs:** *Administration → API Docs*, backed by the contract-tested OpenAPI spec
+[`docs/api/openapi.yaml`](docs/api/openapi.yaml).
 
 ## Testing
 
@@ -213,11 +205,10 @@ Tests run against a local MySQL 8 server (database `work_manager_test`, created 
 
 ## Architecture at a glance
 
-- **Two fully separate identities.** `User` and `Admin` are distinct entities, tables, firewalls, providers, and login pages — no shared base class. Admin authorization is **entity/firewall based**, never a role string on a user. See [Two-Entity Model](docs/core.md#two-entity-model).
+- **One account type, access by role (ADR-068).** Every account is a `User`; `ROLE_USER < ROLE_ADMIN < ROLE_SUPER_ADMIN < ROLE_TECH_SUPPORT` decides what it may open. One login at `/login`; the management pages live under `/admin/*` for accounts holding an admin role. Who may manage or grant what is `App\Security\AccountManagementPolicy`.
 - **Four firewalls:** `admin_api` (`^/admin-api`, stateless, Admin tokens) → `admin` (`^/admin`, session) → `api` (`^/api`, user PATs) → `user` (session). Order matters; `admin_api` precedes `admin`.
 - **Role single source of truth.** `User::ALLOWED_ROLES` / `Admin::ALLOWED_ROLES` enforce a default-deny allowlist in `setRoles()`, so no caller can escalate a `User` into admin space.
 - **Config-page hook.** Bundles implement `ConfigPageProviderInterface`; autoconfigure tags them `auth.config_page`; the core injects all of them via `#[AutowireIterator]`. Each bundle's settings appear in the admin config UI automatically.
-- **Optional separate-domain mode.** `ADMIN_DOMAIN` / `APP_DOMAIN` env vars switch the firewalls to host matchers; unset = single-domain (no change).
 
 ## Security posture
 

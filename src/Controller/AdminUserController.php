@@ -7,6 +7,7 @@ namespace App\Controller;
 use App\Entity\User;
 use App\Repository\UserRepository;
 use App\Security\AccountLockManagerInterface;
+use App\Security\AccountManagementPolicy;
 use App\Security\IpWhitelistManagerInterface;
 use App\Security\UserTokenRevokerInterface;
 use App\Security\UserTwoFactorManagerInterface;
@@ -14,6 +15,7 @@ use App\Service\AuditLogger;
 use App\Service\ConfigService;
 use App\Service\PasswordResetService;
 use App\Service\UserAccountAdminService;
+use App\Service\ManagedAccountFinder;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -31,14 +33,18 @@ class AdminUserController extends AbstractController
     public function list(
         Request $request,
         UserRepository $userRepository,
+        ManagedAccountFinder $accounts,
         UserTokenRevokerInterface $tokenRevoker,
         UserTwoFactorManagerInterface $twoFactor,
         AccountLockManagerInterface $lockManager,
         ConfigService $config,
     ): Response {
+        // Only the accounts this viewer may manage (ADR-068): admins see users, super admins also see admins,
+        // tech support sees everyone.
+        $filters = $accounts->visibleFilters($this->getUser());
         $page  = max(1, (int) $request->query->get('page', '1'));
-        $total = $userRepository->countAll();
-        $users = $userRepository->findPaginated($page, self::PAGE_SIZE);
+        $total = $userRepository->countFiltered($filters);
+        $users = $userRepository->findFilteredPaginated($filters, $page, self::PAGE_SIZE);
         $pages = max(1, (int) ceil($total / self::PAGE_SIZE));
 
         $userIds     = array_map(static fn (User $u) => $u->getId(), $users);
@@ -81,11 +87,12 @@ class AdminUserController extends AbstractController
     public function edit(
         int $id,
         Request $request,
-        UserRepository $userRepository,
+        ManagedAccountFinder $accounts,
         UserAccountAdminService $userService,
         IpWhitelistManagerInterface $ipWhitelist,
+        AccountManagementPolicy $policy,
     ): Response {
-        $user = $userRepository->find($id);
+        $user = $accounts->find($id, $this->getUser());
         if ($user === null) {
             throw $this->createNotFoundException('User not found.');
         }
@@ -104,7 +111,7 @@ class AdminUserController extends AbstractController
                     'role'        => $request->request->get('role', 'ROLE_USER'),
                     'status'      => $request->request->get('status', 'active'),
                     'allowed_ips' => $request->request->get('allowed_ips', ''),
-                ], $this->getUser()?->getUserIdentifier() ?? 'unknown', $request->getClientIp() ?? '0.0.0.0');
+                ], $this->currentUser(), $request->getClientIp() ?? '0.0.0.0');
 
                 if ($result->isSuccess()) {
                     $this->addFlash('success', 'User updated successfully.');
@@ -122,6 +129,7 @@ class AdminUserController extends AbstractController
             // The per-user IP-whitelist override lives in the auth-ip-whitelist-bundle satellite, not on
             // `user` (FEATURE-146): read it through the port (empty when the bundle is absent).
             'allowed_ips' => $ipWhitelist->getAllowedIps($user) ?? '',
+            'assignable_roles' => $policy->assignableRoles($this->currentUser()),
         ]);
     }
 
@@ -129,10 +137,10 @@ class AdminUserController extends AbstractController
     public function delete(
         int $id,
         Request $request,
-        UserRepository $userRepository,
+        ManagedAccountFinder $accounts,
         UserAccountAdminService $userService,
     ): Response {
-        $user = $userRepository->find($id);
+        $user = $accounts->find($id, $this->getUser());
         if ($user === null) {
             throw $this->createNotFoundException('User not found.');
         }
@@ -143,7 +151,12 @@ class AdminUserController extends AbstractController
 
         // Soft delete (ADR-020 / FEATURE-110): the shared service sets status='inactive' + writes
         // the atomic audit row + kills outstanding recovery tokens; the row and its history survive.
-        $userService->delete($user, $this->getUser()?->getUserIdentifier() ?? 'unknown', $request->getClientIp() ?? '0.0.0.0');
+        $refusal = $userService->delete($user, $this->currentUser(), $request->getClientIp() ?? '0.0.0.0');
+        if ($refusal !== null) {
+            $this->addFlash('error', $refusal);
+
+            return $this->redirectToRoute('app_admin_users');
+        }
 
         $this->addFlash('success', 'User deleted successfully.');
 
@@ -154,11 +167,11 @@ class AdminUserController extends AbstractController
     public function passwordReset(
         int $id,
         Request $request,
-        UserRepository $userRepository,
+        ManagedAccountFinder $accounts,
         PasswordResetService $passwordResetService,
         AuditLogger $auditLogger,
     ): Response {
-        $user = $userRepository->find($id);
+        $user = $accounts->find($id, $this->getUser());
         if ($user === null) {
             throw $this->createNotFoundException('User not found.');
         }
@@ -187,11 +200,11 @@ class AdminUserController extends AbstractController
     public function resetTwoFactor(
         int $id,
         Request $request,
-        UserRepository $userRepository,
+        ManagedAccountFinder $accounts,
         UserTwoFactorManagerInterface $twoFactor,
         AuditLogger $auditLogger,
     ): Response {
-        $user = $userRepository->find($id);
+        $user = $accounts->find($id, $this->getUser());
         if ($user === null) {
             throw $this->createNotFoundException('User not found.');
         }
@@ -225,11 +238,11 @@ class AdminUserController extends AbstractController
     public function unlock(
         int $id,
         Request $request,
-        UserRepository $userRepository,
+        ManagedAccountFinder $accounts,
         AccountLockManagerInterface $lockManager,
         AuditLogger $auditLogger,
     ): Response {
-        $user = $userRepository->find($id);
+        $user = $accounts->find($id, $this->getUser());
         if ($user === null) {
             throw $this->createNotFoundException('User not found.');
         }
@@ -260,11 +273,11 @@ class AdminUserController extends AbstractController
     public function revokeAllTokens(
         int $id,
         Request $request,
-        UserRepository $userRepository,
+        ManagedAccountFinder $accounts,
         UserTokenRevokerInterface $tokenRevoker,
         AuditLogger $auditLogger,
     ): Response {
-        $user = $userRepository->find($id);
+        $user = $accounts->find($id, $this->getUser());
         if ($user === null) {
             throw $this->createNotFoundException('User not found.');
         }
@@ -289,52 +302,11 @@ class AdminUserController extends AbstractController
         return $this->redirectToRoute('app_admin_users');
     }
 
-    #[Route('/{id}/impersonate-start', name: 'app_admin_users_impersonate_start', methods: ['POST'])]
-    public function impersonateStart(
-        int $id,
-        Request $request,
-        UserRepository $userRepository,
-        AuditLogger $auditLogger,
-        ConfigService $config,
-    ): Response {
-        $user = $userRepository->find($id);
-        if ($user === null) {
-            throw $this->createNotFoundException('User not found.');
-        }
-
-        if (!$this->isCsrfTokenValid('admin_user_impersonate_' . $id, (string) $request->request->get('_token', ''))) {
-            throw $this->createAccessDeniedException('Invalid CSRF token.');
-        }
-
-        // "Allow Impersonation" (issue #9): nothing is queued or audited when it is off.
-        if (!$config->getBool('impersonate.enabled', true)) {
-            $this->addFlash('error', 'Impersonation is disabled (Config → Impersonation).');
-            return $this->redirectToRoute('app_admin_users');
-        }
-
-        $adminEmail = $this->getUser()?->getUserIdentifier() ?? 'unknown';
-
-        $request->getSession()->set('_impersonation_request', [
-            'userId'     => $user->getId(),
-            'adminEmail' => $adminEmail,
-        ]);
-
-        $auditLogger->log(
-            $adminEmail,
-            'admin',
-            $request->getClientIp() ?? '0.0.0.0',
-            'admin.impersonate_start',
-            'success',
-            $user->getEmail()
-        );
-
-        return $this->redirectToRoute('app_impersonate_start');
-    }
-
     #[Route('/new', name: 'app_admin_users_new', methods: ['GET', 'POST'])]
     public function new(
         Request $request,
         UserAccountAdminService $userService,
+        AccountManagementPolicy $policy,
     ): Response {
         $errors = [];
 
@@ -350,7 +322,7 @@ class AdminUserController extends AbstractController
                     'password' => $request->request->get('password', ''),
                     'role'     => $request->request->get('role', 'ROLE_USER'),
                     'status'   => $request->request->get('status', 'active'),
-                ], $this->getUser()?->getUserIdentifier() ?? 'unknown', $request->getClientIp() ?? '0.0.0.0');
+                ], $this->currentUser(), $request->getClientIp() ?? '0.0.0.0');
 
                 if ($result->isSuccess()) {
                     $this->addFlash('success', 'User created successfully.');
@@ -364,6 +336,18 @@ class AdminUserController extends AbstractController
 
         return $this->render('admin/users/new.html.twig', [
             'errors' => $errors,
+            'assignable_roles' => $policy->assignableRoles($this->currentUser()),
         ]);
+    }
+
+    /** The signed-in account; the class-level ROLE_ADMIN guard guarantees there is one. */
+    private function currentUser(): User
+    {
+        $user = $this->getUser();
+        if (!$user instanceof User) {
+            throw $this->createAccessDeniedException();
+        }
+
+        return $user;
     }
 }

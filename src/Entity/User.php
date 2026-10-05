@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Entity;
 
 use App\Enum\AccountStatus;
+use App\Enum\Role;
 use App\Repository\UserRepository;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Security\Core\User\EquatableInterface;
@@ -96,17 +97,11 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, Equatab
     }
 
     /**
-     * The complete set of roles a User account may hold — the single source of truth.
-     *
-     * ROLE_USER is the baseline (always present via getRoles()). Downstream applications
-     * add their own non-admin, user-tier roles here (e.g. 'ROLE_EDITOR', 'ROLE_BILLING').
-     *
-     * Admin roles (ROLE_ADMIN, ROLE_SUPER_ADMIN) MUST NOT be listed: admins are a fully
-     * separate entity and firewall, and a User carrying an admin role would collapse that
-     * security boundary. setRoles() enforces this allowlist, so no caller — controller,
-     * API, console command, or future code — can ever escalate a User into admin space.
+     * Every role an account may hold — mirrors App\Enum\Role (ADR-068: one account type, access by role).
+     * setRoles() drops anything else. WHO may grant which role is decided by
+     * App\Security\AccountManagementPolicy, not here.
      */
-    public const ALLOWED_ROLES = ['ROLE_USER'];
+    public const ALLOWED_ROLES = ['ROLE_USER', 'ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_TECH_SUPPORT'];
 
     public function getRoles(): array
     {
@@ -120,6 +115,22 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, Equatab
         // Allowlist (default-deny): anything not in ALLOWED_ROLES is dropped on write.
         $this->roles = array_values(array_intersect($roles, self::ALLOWED_ROLES));
         return $this;
+    }
+
+    /** The account's highest role — the one the management screens show and edit. */
+    public function getPrimaryRole(): Role
+    {
+        return Role::highestOf($this->getRoles());
+    }
+
+    public function hasRole(Role $role): bool
+    {
+        return \in_array($role->value, $this->getRoles(), true);
+    }
+
+    public function isActive(): bool
+    {
+        return $this->status === AccountStatus::Active->value;
     }
 
     public function getPassword(): string

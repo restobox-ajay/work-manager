@@ -1,7 +1,7 @@
 openapi: 3.1.0
 
 info:
-  title: Symfony Auth Boilerplate API
+  title: Work Manager API
   version: 1.0.0
   description: |
     The two token-authenticated REST surfaces of this application. Everything here is **verified against the
@@ -10,28 +10,26 @@ info:
     `OpenApiSpecTest` fails if a route exists that is not documented (or the reverse). If this file and the code
     disagree, the build is red — fix whichever one is wrong.
 
+    ## Authentication — both APIs
+
+    Both surfaces use the same **personal access tokens** (`auth-pat-bundle`): create one at `/account/tokens` and
+    send it as `Authorization: Bearer <token>`. The plaintext is shown once; only its hash is stored. A revoked,
+    expired or unknown token, or one whose owner is deactivated, is answered `401`. What a token may do follows its
+    owner's roles (ADR-068): the Admin API needs an account holding an admin role (else `403`); some endpoints need
+    tech support. Without `auth-pat-bundle` no token can authenticate, so both APIs refuse every call (`401`).
+
     ## Admin API — `/admin-api/*`
 
-    Stateless, **Admin-entity-only** bearer-token auth (ADR-047). Any admin role can hold a token; a `User` can
-    never reach it. Issue a token from the server shell:
-
-    ```
-    php bin/console app:admin:create-api-token --email=admin@example.com
-    ```
-
-    Send it as `Authorization: Bearer <token>`. The plaintext is shown once; only its SHA-256 hash (and its last 6
-    characters, to tell tokens apart) is stored. Tokens expire after 365 days by default. Revoke one in the admin
-    panel (**API Tokens**), or with `app:admin:revoke-api-token`; deactivating or deleting an admin revokes all of its
-    tokens. A revoked, expired, unknown or deactivated-admin token is answered `401`.
+    Account and instance management, for accounts holding `ROLE_ADMIN` or above. An admin manages regular users;
+    a super admin also manages admins; tech-support accounts are visible only to tech support.
 
     Endpoints marked with a **bundle** exist only when that optional bundle is registered in
     `config/bundles.php`; with the bundle removed the route is absent (404 from the router, not from the app).
 
     ## User API — `/api/*`
 
-    Stateless **personal access token** auth for users (`auth-pat-bundle`). Users create tokens at
-    `/account/tokens`. Only `GET /api/ping` ships; add your own routes under `/api/` and they are protected by
-    the same authenticator automatically.
+    Every signed-in account's own API. Only `GET /api/ping` ships; add your own routes under `/api/` and they are
+    protected by the same authenticator automatically.
 
     ## Conventions
 
@@ -760,7 +758,7 @@ paths:
       operationId: ping
       tags: [User API]
       summary: Check that your token works
-      description: '**Bundle:** `auth-pat-bundle`. Authenticated with a **user** personal access token, not an admin token.'
+      description: '**Bundle:** `auth-pat-bundle`. Any personal access token.'
       x-bundle: auth-pat-bundle
       security:
         - userBearer: []
@@ -777,7 +775,7 @@ components:
     adminBearer:
       type: http
       scheme: bearer
-      description: Admin API token (`app:admin:create-api-token`). Bound to an Admin account; admin roles only.
+      description: A personal access token (created at `/account/tokens`) whose owner holds an admin role.
     userBearer:
       type: http
       scheme: bearer
