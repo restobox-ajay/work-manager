@@ -241,8 +241,8 @@ final class ClientService
         if (($normalized['clientCode'] ?? null) !== null) {
             $normalized['clientCode'] = strtoupper($normalized['clientCode']);
         }
-        if (($normalized['website'] ?? null) !== null && !preg_match('#^[a-z][a-z0-9+.-]*://#i', $normalized['website'])) {
-            $normalized['website'] = 'http://'.$normalized['website'];
+        if (array_key_exists('website', $normalized)) {
+            $normalized['website'] = InputValue::url($normalized['website']);
         }
         if (array_key_exists('isActive', $values)) {
             $normalized['isActive'] = (int) $values['isActive'] === Client::STATUS_ARCHIVE ? Client::STATUS_ARCHIVE : Client::STATUS_ACTIVE;

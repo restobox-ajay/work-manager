@@ -2336,3 +2336,16 @@ own controller actions and templates; nine lists that way would be nine near-ide
 
 **Consequences.** A new reference list is one registry entry plus its entity. The payment tables (`task_payment`,
 `payment_request`) come with the payment system, not here.
+
+## ADR-076: Projects carry a local, dev, prod and doc URL (owner request, 2026-10-05)
+
+**Decision.** Four nullable `VARCHAR(255)` columns on `project` — `local_url`, `dev_url`, `prod_url`, `doc_url` —
+added by migration `Version20261009120000` (these are this app's own; work-platform's table has none, so a data
+copy leaves them NULL). `ProjectService::LINK_FIELDS` lists them once for the form, the project page and the
+messages. Input is read with the new `InputValue::url()` (blank → NULL; no scheme → `http://`, the rule
+`ClientService` already applied to a client's website, now shared), then checked with `Assert\Url`
+(`requireTld: false`, so `http://localhost:8000` is accepted; http/https only) and a 255 limit. The project page
+lists them under "Links" and makes only http(s) values clickable (`rel="noopener noreferrer"`).
+
+**Tripwire:** verifiable — Verified by `tests/Functional/Project/ProjectLinksTest.php` (create with scheme
+completion and blank → NULL, invalid URL refused with 422, edit/clear, only http(s) rendered as a link).

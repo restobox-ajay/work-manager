@@ -42,6 +42,20 @@ final class InputValue
         return $value !== '' ? $value : null;
     }
 
+    /**
+     * A link typed without a scheme ("example.com") gets "http://", as Yii2's url validator with
+     * defaultScheme did, so it is validated -- and later rendered as a link -- the way it was meant.
+     */
+    public static function url(mixed $value): ?string
+    {
+        $value = self::text($value);
+        if ($value !== null && !preg_match('#^[a-z][a-z0-9+.-]*://#i', $value)) {
+            $value = 'http://'.$value;
+        }
+
+        return $value;
+    }
+
     public static function int(mixed $value): ?int
     {
         $value = self::text($value);

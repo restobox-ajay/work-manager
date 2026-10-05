@@ -42,6 +42,18 @@ class Project
     #[ORM\Column(type: Types::TEXT, nullable: true)]
     private ?string $description = null;
 
+    #[ORM\Column(length: 255, nullable: true)]
+    private ?string $localUrl = null;
+
+    #[ORM\Column(length: 255, nullable: true)]
+    private ?string $devUrl = null;
+
+    #[ORM\Column(length: 255, nullable: true)]
+    private ?string $prodUrl = null;
+
+    #[ORM\Column(length: 255, nullable: true)]
+    private ?string $docUrl = null;
+
     #[ORM\Column(type: Types::SMALLINT)]
     private int $status = self::STATUS_ACTIVE;
 
@@ -106,6 +118,54 @@ class Project
     public function setDescription(?string $description): static
     {
         $this->description = $description;
+
+        return $this;
+    }
+
+    public function getLocalUrl(): ?string
+    {
+        return $this->localUrl;
+    }
+
+    public function setLocalUrl(?string $localUrl): static
+    {
+        $this->localUrl = $localUrl;
+
+        return $this;
+    }
+
+    public function getDevUrl(): ?string
+    {
+        return $this->devUrl;
+    }
+
+    public function setDevUrl(?string $devUrl): static
+    {
+        $this->devUrl = $devUrl;
+
+        return $this;
+    }
+
+    public function getProdUrl(): ?string
+    {
+        return $this->prodUrl;
+    }
+
+    public function setProdUrl(?string $prodUrl): static
+    {
+        $this->prodUrl = $prodUrl;
+
+        return $this;
+    }
+
+    public function getDocUrl(): ?string
+    {
+        return $this->docUrl;
+    }
+
+    public function setDocUrl(?string $docUrl): static
+    {
+        $this->docUrl = $docUrl;
 
         return $this;
     }

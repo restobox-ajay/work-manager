@@ -25,6 +25,15 @@ final class ProjectService
 {
     public const PAGE_SIZE = 20;
     private const NAME_MAX_LENGTH = 100;
+    private const URL_MAX_LENGTH = 255;
+
+    /** The project's links, field => label (form, view and validation messages share the wording). */
+    public const LINK_FIELDS = [
+        'localUrl' => 'Local URL',
+        'devUrl'   => 'Dev URL',
+        'prodUrl'  => 'Prod URL',
+        'docUrl'   => 'Doc / Specs URL',
+    ];
 
     public function __construct(
         private readonly ProjectRepository $projects,
@@ -100,7 +109,7 @@ final class ProjectService
         return $reasons;
     }
 
-    /** @return array{clientId: ?int, name: string, description: ?string, status: int} */
+    /** @return array{clientId: ?int, name: string, description: ?string, status: int, localUrl: ?string, devUrl: ?string, prodUrl: ?string, docUrl: ?string} */
     public function valuesFrom(Project $project): array
     {
         return [
@@ -108,6 +117,10 @@ final class ProjectService
             'name'        => $project->getName(),
             'description' => $project->getDescription(),
             'status'      => $project->getStatus(),
+            'localUrl'    => $project->getLocalUrl(),
+            'devUrl'      => $project->getDevUrl(),
+            'prodUrl'     => $project->getProdUrl(),
+            'docUrl'      => $project->getDocUrl(),
         ];
     }
 
@@ -181,14 +194,23 @@ final class ProjectService
             'description' => InputValue::text($values['description'] ?? null),
             'status'      => InputValue::int($values['status'] ?? null) ?? Project::STATUS_ACTIVE,
         ];
-
-        $errors = $this->validator->checkFields($input, [
+        $rules = [
             'name'   => [
                 new Assert\NotBlank(message: 'Name is required.'),
                 new Assert\Length(max: self::NAME_MAX_LENGTH, maxMessage: 'Name cannot be longer than {{ limit }} characters.'),
             ],
             'status' => [new Assert\Choice(choices: [Project::STATUS_ACTIVE, Project::STATUS_ARCHIVE], message: 'Status must be Active or Archive.')],
-        ]);
+        ];
+        foreach (self::LINK_FIELDS as $field => $label) {
+            $input[$field] = InputValue::url($values[$field] ?? null);
+            // requireTld off: a local URL is often http://localhost or a bare dev hostname.
+            $rules[$field] = [
+                new Assert\Url(message: "$label is not a valid URL.", requireTld: false),
+                new Assert\Length(max: self::URL_MAX_LENGTH, maxMessage: "$label cannot be longer than {{ limit }} characters."),
+            ];
+        }
+
+        $errors = $this->validator->checkFields($input, $rules);
 
         $client = $input['clientId'] !== null ? $this->clients->find($input['clientId']) : null;
         if ($client === null || $client->isDeleted()) {
@@ -206,6 +228,10 @@ final class ProjectService
             ->setName($input['name'])
             ->setDescription($input['description'])
             ->setStatus($input['status'])
+            ->setLocalUrl($input['localUrl'])
+            ->setDevUrl($input['devUrl'])
+            ->setProdUrl($input['prodUrl'])
+            ->setDocUrl($input['docUrl'])
             ->setUpdatedAt(time())
             ->setUpdatedBy($actor->getId());
 

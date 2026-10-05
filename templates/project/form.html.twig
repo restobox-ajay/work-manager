@@ -39,6 +39,13 @@
             <label for="f-name">Name <span class="req">*</span></label>
             <input type="text" id="f-name" name="name" value="{{ values.name ?? '' }}" required maxlength="100" {{ project ? '' : 'autofocus' }}>
         </div>
+        {# type="text", not "url": a link typed without "http://" is completed server-side, not refused by the browser. #}
+        {% for field, label in constant('App\\Service\\Project\\ProjectService::LINK_FIELDS') %}
+            <div class="field">
+                <label for="f-{{ field }}">{{ label }}</label>
+                <input type="text" inputmode="url" id="f-{{ field }}" name="{{ field }}" value="{{ values[field] ?? '' }}" maxlength="255" placeholder="example.com">
+            </div>
+        {% endfor %}
         <div class="field span-all">
             <label for="f-description">Description</label>
             <textarea id="f-description" name="description" rows="5">{{ values.description ?? '' }}</textarea>

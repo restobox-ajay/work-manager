@@ -29,6 +29,17 @@
     <div class="card"><h2>Description</h2><div style="white-space:pre-line">{{ project.description }}</div></div>
 {% endif %}
 
+<div class="card">
+    <h2>Links</h2>
+    <dl class="kv">
+        {% for field, label in constant('App\\Service\\Project\\ProjectService::LINK_FIELDS') %}
+            {% set url = attribute(project, field) %}
+            {# Only an http(s) value becomes a link, so a stored "javascript:" can never be clicked. #}
+            <dt>{{ label }}</dt><dd>{% if url and (url starts with 'http://' or url starts with 'https://') %}<a href="{{ url }}" rel="noopener noreferrer" target="_blank">{{ url }}</a>{% else %}{{ url ?? '—' }}{% endif %}</dd>
+        {% endfor %}
+    </dl>
+</div>
+
 <div class="table-card">
     <div class="table-header"><h2>Tasks</h2><span class="grow"></span><span class="muted small">Newest {{ tasks|length }}</span></div>
     <div class="tscroll">

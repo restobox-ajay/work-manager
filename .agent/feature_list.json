@@ -4338,7 +4338,8 @@
       ],
       "passes": true,
       "evidence": [
-        "tests/Functional/Security/TwoFactorAuthTest.php::testFailedImpersonationLeavesNoMarkerThatSkipsTheTargetsChallengeLater: red on the old authenticator at the banner step and, with that assertion removed, at the 2FA step; green after", "bin/verify-fast.sh exits 0: 1004 PHPUnit tests / 7350 assertions, 117 acceptance / 490"
+        "tests/Functional/Security/TwoFactorAuthTest.php::testFailedImpersonationLeavesNoMarkerThatSkipsTheTargetsChallengeLater: red on the old authenticator at the banner step and, with that assertion removed, at the 2FA step; green after",
+        "bin/verify-fast.sh exits 0: 1004 PHPUnit tests / 7350 assertions, 117 acceptance / 490"
       ]
     },
     {
@@ -5026,6 +5027,27 @@
         "tests/Functional/Navigation/SidebarTest.php::testTheCurrentPageIsMarkedAndOnlyItsGroupRendersOpen, ::testSignedInPagesUseTheThemeShell, ::testSignedOutPagesUseTheSignInCard, ::testTheThemeAssetsTheLayoutLinksExist; the existing sidebar link-set tests unchanged and green",
         "tests/Functional/Admin/AdminDatabaseConsoleTest.php: arm-button lookup scoped to .page-body (the layout now has its own buttons)",
         "Rendered and inspected with headless Chromium: admin login, dashboard, users, create user, config, account menu, collapsed sidebar, mobile"
+      ]
+    },
+    {
+      "id": "FEATURE-191",
+      "title": "Project local/dev/prod/doc URLs (ADR-076)",
+      "description": "Projects store a local URL, dev URL, prod URL and doc URL, edited on the project form and shown as links on the project page.",
+      "priority": "must",
+      "depends_on": [],
+      "acceptance_criteria": [
+        "The project create/edit form has Local URL, Dev URL, Prod URL and Doc / Specs URL fields, all optional",
+        "A link typed without a scheme is saved with http://; a blank one is saved as NULL",
+        "An invalid URL is refused with a message naming the field and nothing is saved",
+        "The project page shows the links; only http(s) values are clickable"
+      ],
+      "test_type": [
+        "functional"
+      ],
+      "passes": true,
+      "evidence": [
+        "tests/Functional/Project/ProjectLinksTest.php (4 tests)",
+        "tests/Functional/Schema/SchemaSyncTest.php green with migration Version20261009120000"
       ]
     }
   ]

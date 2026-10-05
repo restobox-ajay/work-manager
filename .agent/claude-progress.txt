@@ -4190,3 +4190,5 @@ Clients, Projects, Tasks. Migration Version20261007120000. Browser-checked as ad
 ADR-075 (2026-10-07): Config now has nine work-platform lists (tags, payers, wallets, payment methods, task types,
 task statuses, email templates, currencies, countries) on one generic CRUD. Migration Version20261008130000.
 Browser-checked add/edit/delete/validation on every list. No tests yet.
+ADR-076 (2026-10-05): projects get local/dev/prod/doc URLs (migration Version20261009120000, InputValue::url()
+shared with the client website). Tests: tests/Functional/Project/ProjectLinksTest.php.
