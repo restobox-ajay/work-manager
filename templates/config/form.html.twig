@@ -1,0 +1,40 @@
+{% extends 'base.html.twig' %}
+{% import '_work/macros.html.twig' as ui %}
+
+{# Add / Edit one Config row (ADR-073), on its own page like the client and project forms. #}
+{% block title %}{{ row ? 'Edit ' ~ label.singular|lower : 'Add ' ~ label.singular|lower }}{% endblock %}
+
+{% block body %}
+{% set back = path(routeBase) %}
+<div class="page-head">
+    <div class="ph-main">
+        <div class="eyebrow">Config · {{ label.plural }}</div>
+        <div class="ph-title"><h1>{{ row ? 'Edit ' : 'Add ' }}{{ label.singular|lower }}</h1></div>
+    </div>
+    <div class="ph-actions"><a class="btn outline back" href="{{ back }}">Back</a></div>
+</div>
+
+{{ ui.errors(errors) }}
+
+<form class="card mx-form" method="post" style="max-width:640px">
+    <input type="hidden" name="_token" value="{{ csrf_token('settings_' ~ kind) }}">
+    <div class="form-grid">
+        {% if kind == 'currencies' %}
+            <div class="field"><label for="s-name">Short name <span class="req">*</span></label><input type="text" id="s-name" name="name" value="{{ values.name ?? '' }}" required maxlength="10" autofocus></div>
+            <div class="field"><label for="s-fx">FX rate <span class="req">*</span></label><input type="text" id="s-fx" name="fxRate" value="{{ values.fxRate ?? '' }}" required inputmode="decimal"><small>For CAD: how many CAD make 1 USD.</small></div>
+        {% else %}
+            <div class="field{{ kind == 'task-types' ? ' span-2' }}"><label for="s-name">Name <span class="req">*</span></label><input type="text" id="s-name" name="name" value="{{ values.name ?? '' }}" required maxlength="{{ kind == 'task-types' ? 60 : 50 }}" autofocus></div>
+            {% if kind == 'task-statuses' %}
+                <div class="field"><label for="s-order">Order</label><input type="number" id="s-order" name="order" value="{{ values.order ?? '' }}" min="0" max="9999"></div>
+            {% else %}
+                <div class="field span-2"><label for="s-desc">Description</label><input type="text" id="s-desc" name="description" value="{{ values.description ?? '' }}" maxlength="255"></div>
+            {% endif %}
+            <label class="mx-check span-2"><span>Active <small>(offered on task forms)</small></span><input type="checkbox" name="isActive" value="1" {{ (values.isActive ?? false) ? 'checked' }}></label>
+        {% endif %}
+    </div>
+    <div class="form-actions" style="margin-top:16px">
+        <a class="btn outline" href="{{ back }}">Cancel</a>
+        <button class="btn" type="submit">{{ row ? 'Save' : 'Add' }}</button>
+    </div>
+</form>
+{% endblock %}

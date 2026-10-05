@@ -11,13 +11,9 @@ use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 /**
- * Config (ADR-070/073): the task reference lists — statuses, types, currencies — laid out like the Maxeme Auto
- * mockup's Settings page: a tab per list, a read-only table, Add/Edit in a popup. Under /config, so "settings" stays
- * free for other things.
- *
- * Each list has its own routes: /config/<list> (the table), /config/<list>/new and /config/<list>/{id}/edit (the
- * table with the popup open; POST saves). The popup is rendered open by the server, so it works without JavaScript.
- * Admins only.
+ * Config (ADR-070/073): the task reference lists — statuses, types, currencies — each a plain CRUD: /config/<list>
+ * (the table), /config/<list>/new and /config/<list>/{id}/edit (a form page; POST saves). Under /config, so
+ * "settings" stays free for other things. Rows are not deleted: tasks point at them by id. Admins only.
  */
 #[IsGranted('ROLE_ADMIN')]
 #[Route('/config')]
@@ -32,7 +28,7 @@ final class ConfigListController extends AbstractWorkController
     #[Route('/currencies', name: 'app_config_currencies', defaults: ['kind' => 'currencies'], methods: ['GET'])]
     public function list(string $kind): Response
     {
-        return $this->renderPage($kind, false, null, [], []);
+        return $this->render('config/list.html.twig', $this->common($kind) + ['rows' => $this->settings->rows($kind)]);
     }
 
     #[Route('/task-statuses/new', name: 'app_config_task_statuses_new', defaults: ['kind' => 'task-statuses'], methods: ['GET', 'POST'])]
@@ -59,33 +55,30 @@ final class ConfigListController extends AbstractWorkController
 
     private function form(string $kind, ?object $row, Request $request): Response
     {
-        if (!$request->isMethod('POST')) {
-            return $this->renderPage($kind, true, $row, $row !== null ? $this->settings->valuesFrom($row) : $this->settings->defaults($kind), []);
+        $values = $row !== null ? $this->settings->valuesFrom($row) : $this->settings->defaults($kind);
+        $errors = [];
+
+        if ($request->isMethod('POST')) {
+            $this->assertCsrf($request, 'settings_'.$kind);
+            $values = $request->request->all();
+            $errors = $this->settings->save($kind, $row, $values, $this->viewer());
+            if ($errors === []) {
+                $this->addFlash('success', sprintf('%s saved.', WorkSettingsService::LABELS[$kind]['singular']));
+
+                return $this->redirectToRoute(self::routeName($kind));
+            }
         }
 
-        $this->assertCsrf($request, 'settings_'.$kind);
-        $values = $request->request->all();
-        $errors = $this->settings->save($kind, $row, $values, $this->viewer());
-        if ($errors !== []) {
-            return $this->renderPage($kind, true, $row, $values, $errors, 422);
-        }
-
-        $this->addFlash('success', sprintf('%s saved.', WorkSettingsService::LABELS[$kind]['singular']));
-
-        return $this->redirectToRoute(self::routeName($kind));
+        return $this->render('config/form.html.twig', $this->common($kind) + [
+            'row'    => $row,
+            'values' => $values,
+            'errors' => $errors,
+        ], new Response(status: $errors === [] ? 200 : 422));
     }
 
-    /**
-     * @param array<string, mixed> $values
-     * @param list<string>         $errors
-     */
-    private function renderPage(string $kind, bool $open, ?object $row, array $values, array $errors, int $status = 200): Response
+    /** @return array{kind: string, label: array{plural: string, singular: string}, routeBase: string} */
+    private function common(string $kind): array
     {
-        return $this->render('config/list.html.twig', [
-            'kind'   => $kind,
-            'labels' => WorkSettingsService::LABELS,
-            'rows'   => $this->settings->rows($kind),
-            'modal'  => ['open' => $open, 'row' => $row, 'values' => $values, 'errors' => $errors],
-        ], new Response(status: $status));
+        return ['kind' => $kind, 'label' => WorkSettingsService::LABELS[$kind], 'routeBase' => self::routeName($kind)];
     }
 }
