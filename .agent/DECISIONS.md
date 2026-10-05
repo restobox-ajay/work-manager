@@ -2282,3 +2282,24 @@ one tabbed page with Add/Edit popups like the mockup's, rendered open server-sid
 
 **Tripwire:** no tests yet (owner: tests later). Payment-related columns on `task` (payment_id, paid_*, payer_id)
 exist but nothing writes them until the payment system is ported.
+
+## ADR-072: The rest of work-platform's Tasks menu; menu ordered Clients, Projects, Tasks (owner request, 2026-10-06)
+
+**Pages:** Add Task, Quick Add, Tasks By Client/Project (the list with a client/project side list), Tasks By
+Contractor, Task By Date (billing report, archived work included), Task Created By Manager, Authorization Queue,
+Task Priority — the eight entries of work-platform's Tasks menu, in its order. Each reuses the task list query
+(`TaskRepository::buildListQuery()` criteria) scoped by `WorkAccess::taskVisibility()`; logic in
+`TaskReportService`, pages in `TaskReportController`.
+
+**Authorization queue, mapped:** a budget request, or any task filed by someone who does not manage the project
+(Contractor staff), is created with `authorized = Task::AUTHORIZED_YES` ("in the queue", Yii2's inverted naming).
+Reviewers are admins, the project's Project Manager and the client's Client Manager (`canReviewTask`). Approve makes
+it normal work; Deny records the decision. Difference from work-platform: there a non-admin saw only the queued
+tasks they had created themselves, so a manager could not review a contractor's request from the queue page; here
+the queue follows the normal task visibility, so reviewers see what they can decide.
+
+**Tables:** `task_priority_order`, `task_read_status` (work-platform columns), migration `Version20261007120000`.
+Priority rows are created when an admin first moves a task (work-platform seeded them on every task save).
+
+**Menu:** Clients (Add Client, List Clients), Projects (Add Project, List Projects), Tasks (the eight above);
+manager-only entries (Quick Add, Task Created By Manager) need `WORK_MANAGE`.

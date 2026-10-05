@@ -4185,3 +4185,5 @@ Browser-checked desktop/collapsed/mobile/login. SidebarTest not updated (owner: 
 ADR-070 (2026-10-05): clients/projects/tasks/settings/dashboard ported from work-platform-symfony. Migration
 Version20261006120000 (verified up/down, schema:validate in sync). Browser-checked as admin, client manager and
 contractor (visibility, edit/fee rights, archived tagging, settings popups). symfony/validator added. No tests yet.
+ADR-072 (2026-10-06): all eight work-platform Tasks menu pages + authorization queue + priority; menu ordered
+Clients, Projects, Tasks. Migration Version20261007120000. Browser-checked as admin, client manager, contractor.

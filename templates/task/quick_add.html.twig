@@ -1,0 +1,62 @@
+{% extends 'base.html.twig' %}
+{% import '_work/macros.html.twig' as ui %}
+
+{# Quick Add (ADR-072): several tasks in one go, one row each; rows without a name are skipped. #}
+{% block title %}Quick add tasks{% endblock %}
+
+{% macro options(map, selected, blank) %}
+    <option value="">{{ blank }}</option>
+    {% for id, label in map %}<option value="{{ id }}" {{ selected == id ? 'selected' }}>{{ label }}</option>{% endfor %}
+{% endmacro %}
+
+{% block body %}
+{% import _self as f %}
+<div class="page-head">
+    <div class="ph-main">
+        <div class="eyebrow">Tasks</div>
+        <div class="ph-title"><h1>Quick add</h1></div>
+        <p class="lead">One task per row. Rows left without a name are ignored; a row that cannot be saved stays here with the reason.</p>
+    </div>
+    <div class="ph-actions"><a class="btn outline back" href="{{ path('app_task_index') }}">Tasks</a></div>
+</div>
+
+{{ ui.flashes() }}
+{{ ui.errors(errors) }}
+
+<form class="table-card mx-form" method="post">
+    <input type="hidden" name="_token" value="{{ csrf_token('task_quick_add') }}">
+    <div class="tscroll">
+        <table class="t">
+            <thead>
+                <tr>
+                    <th style="min-width:220px">Task name</th><th>Project</th><th>Contractor</th><th>Task type</th><th>Due date</th>
+                    {% if showFees %}<th>Payout</th><th>Currency</th><th>Billable (min)</th>{% endif %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in rows %}
+                    {% set i = loop.index0 %}
+                    <tr>
+                        <td><input type="text" name="rows[{{ i }}][name]" value="{{ row.name ?? '' }}" maxlength="5000" aria-label="Task name, row {{ loop.index }}"></td>
+                        <td>
+                            <select name="rows[{{ i }}][projectId]" aria-label="Project, row {{ loop.index }}" style="min-width:180px">
+                                <option value="">Choose a project</option>
+                                {% for project in projects %}<option value="{{ project.id }}" {{ (row.projectId ?? '') == project.id ? 'selected' }}>{{ project.client.name }} › {{ project.name }}</option>{% endfor %}
+                            </select>
+                        </td>
+                        <td><select name="rows[{{ i }}][assigneeId]" aria-label="Contractor, row {{ loop.index }}">{{ f.options(people, row.assigneeId ?? null, 'Unassigned') }}</select></td>
+                        <td><select name="rows[{{ i }}][taskTypeId]" aria-label="Task type, row {{ loop.index }}">{{ f.options(types, row.taskTypeId ?? null, '—') }}</select></td>
+                        <td><input type="date" name="rows[{{ i }}][dueDate]" value="{{ row.dueDate ?? '' }}" aria-label="Due date, row {{ loop.index }}"></td>
+                        {% if showFees %}
+                            <td><input type="text" name="rows[{{ i }}][totalAmount]" value="{{ row.totalAmount ?? '' }}" inputmode="decimal" placeholder="0.00" style="width:90px" aria-label="Payout, row {{ loop.index }}"></td>
+                            <td><select name="rows[{{ i }}][currencyId]" aria-label="Currency, row {{ loop.index }}">{% for id, name in currencies %}<option value="{{ id }}" {{ (row.currencyId ?? 1) == id ? 'selected' }}>{{ name }}</option>{% endfor %}</select></td>
+                            <td><input type="number" name="rows[{{ i }}][timeBudget]" value="{{ row.timeBudget ?? '' }}" step="1" style="width:80px" aria-label="Billable minutes, row {{ loop.index }}"></td>
+                        {% endif %}
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <div class="table-foot"><span class="grow">Payout is saved only for projects where you may set fees.</span><button class="btn success" type="submit">Create tasks</button></div>
+</form>
+{% endblock %}

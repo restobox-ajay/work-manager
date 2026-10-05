@@ -32,7 +32,7 @@ final class DashboardService
 
     public function showsManagerView(User $viewer, bool $mineRequested): bool
     {
-        return !$mineRequested && $this->access->canCreateTask($viewer);
+        return !$mineRequested && $this->access->managesAnyWork($viewer);
     }
 
     /**

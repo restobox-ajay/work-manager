@@ -48,6 +48,13 @@ final class TaskInput
 
     public ?\DateTimeInterface $creationDate = null;
 
+    /** Create form only: "Add Task" or "Add Budget" (TaskService::REQUEST_TYPE_*). */
+    #[Assert\Choice(choices: [TaskService::REQUEST_TYPE_TASK, TaskService::REQUEST_TYPE_BUDGET], message: 'Choose Add Task or Add Budget.')]
+    public string $requestType = TaskService::REQUEST_TYPE_TASK;
+
+    /** Why the task or budget is asked for — shown to the reviewer in the authorization queue. */
+    public ?string $authorizedDescription = null;
+
     public static function fromTask(Task $task): self
     {
         $input = new self();
@@ -91,6 +98,8 @@ final class TaskInput
                 'dueDate'        => $this->dueDate = InputValue::timestamp($value),
                 'billableDate'   => $this->billableDate = InputValue::date($value),
                 'creationDate'   => $this->creationDate = InputValue::date($value),
+                'requestType'    => $this->requestType = InputValue::text($value) ?? TaskService::REQUEST_TYPE_TASK,
+                'authorizedDescription' => $this->authorizedDescription = InputValue::text($value),
                 default          => null,
             };
         }

@@ -25,25 +25,36 @@
 {% if two_factor_available is defined and two_factor_available %}
     {% set securityLinks = securityLinks|merge([{ label: 'Two-Factor Auth', href: path('app_2fa_setup'), current: cur starts with 'app_2fa' }]) %}
 {% endif %}
-{# Work: one group per module, as wholesale-b2b's sidebar. A row's `add` is its "+" (hover to reveal; always shown on
-   touch screens), offered only to someone allowed to add one. #}
+{# Work, in work-platform's order — Clients, Projects, Tasks — one group per module as wholesale-b2b's sidebar.
+   A row's `add` is its "+" (hover to reveal; always shown on touch screens). Every entry shows only to someone
+   allowed to use it. #}
 {% set me = app.user.id %}
-{% set mineFilter = app.request.query.get('assigneeId') == me %}
+{% set q = app.request.query %}
+{% set pending = constant('App\\Entity\\Settings\\TaskStatus::PENDING_ID') %}
+{% set taskLinks = [
+    is_granted('TASK_CREATE') ? { label: 'Add Task', href: path('app_task_create'), current: cur == 'app_task_create' } : null,
+    is_granted('WORK_MANAGE') ? { label: 'Quick Add', href: path('app_task_quick_add'), current: cur == 'app_task_quick_add' } : null,
+    { label: 'Tasks By Client/Project', href: path('app_task_index', {taskStatusId: pending}), current: cur == 'app_task_index' or cur == 'app_task_view' or cur == 'app_task_edit',
+      add: is_granted('TASK_CREATE') ? { label: 'New task', href: path('app_task_create') } : null },
+    { label: 'Tasks By Contractor', href: path('app_task_contractor', {taskStatusId: pending}), current: cur == 'app_task_contractor' },
+    { label: 'Task By Date', href: path('app_task_by_date'), current: cur == 'app_task_by_date' },
+    is_granted('WORK_MANAGE') ? { label: 'Task Created By Manager', href: path('app_task_manager'), current: cur == 'app_task_manager' } : null,
+    { label: 'Authorization Queue', href: path('app_task_queue'), current: cur == 'app_task_queue' },
+    { label: 'Task Priority', href: path('app_task_priority'), current: cur == 'app_task_priority' },
+]|filter(link => link) %}
 {% set items = [
     { label: 'Dashboard', icon: 'dashboard', href: path('app_dashboard'), current: cur == 'app_dashboard' },
-    { label: 'Tasks', icon: 'check-square', children: [
-        { label: 'All Tasks', href: path('app_task_index'), current: cur starts with 'app_task_' and not (cur == 'app_task_index' and mineFilter),
-          add: is_granted('TASK_CREATE') ? { label: 'New task', href: path('app_task_create') } : null },
-        { label: 'Assigned to Me', href: path('app_task_index', {assigneeId: me}), current: cur == 'app_task_index' and mineFilter },
-    ] },
-    { label: 'Projects', icon: 'folder', children: [
-        { label: 'All Projects', href: path('app_project_index'), current: cur starts with 'app_project_',
-          add: is_granted('PROJECT_CREATE') ? { label: 'New project', href: path('app_project_create') } : null },
-    ] },
     { label: 'Clients', icon: 'briefcase', children: [
-        { label: 'All Clients', href: path('app_client_index'), current: cur starts with 'app_client_',
+        is_granted('CLIENT_CREATE') ? { label: 'Add Client', href: path('app_client_create'), current: cur == 'app_client_create' } : null,
+        { label: 'List Clients', href: path('app_client_index'), current: cur starts with 'app_client_' and cur != 'app_client_create',
           add: is_granted('CLIENT_CREATE') ? { label: 'New client', href: path('app_client_create') } : null },
-    ] },
+    ]|filter(link => link) },
+    { label: 'Projects', icon: 'folder', children: [
+        is_granted('PROJECT_CREATE') ? { label: 'Add Project', href: path('app_project_create'), current: cur == 'app_project_create' } : null,
+        { label: 'List Projects', href: path('app_project_index'), current: cur starts with 'app_project_' and cur != 'app_project_create',
+          add: is_granted('PROJECT_CREATE') ? { label: 'New project', href: path('app_project_create') } : null },
+    ]|filter(link => link) },
+    { label: 'Tasks', icon: 'check-square', children: taskLinks },
     { label: 'My Account', icon: 'user', children: accountLinks },
     { label: 'Security', icon: 'shield', children: securityLinks },
 ] %}

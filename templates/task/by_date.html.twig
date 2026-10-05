@@ -1,0 +1,60 @@
+{% extends 'base.html.twig' %}
+{% import '_work/macros.html.twig' as ui %}
+
+{#
+    Task By Date (ADR-072): a billing report. Tasks whose billable (or creation) date falls in the range, a group
+    per day with that day's totals. Archived work is included — archiving a project does not cancel what is owed.
+#}
+{% block title %}Tasks by date{% endblock %}
+
+{% block body %}
+<div class="page-head">
+    <div class="ph-main">
+        <div class="eyebrow">Tasks</div>
+        <div class="ph-title"><h1>Tasks by date</h1></div>
+        <p class="lead">Totals count only the tasks whose payout you may see.</p>
+    </div>
+</div>
+
+{{ ui.flashes() }}
+
+<form class="mx-period mx-form" method="get" action="{{ path('app_task_by_date') }}">
+    <label>Reporting by
+        <select name="reportingBy">
+            <option value="billableDate" {{ field == 'billableDate' ? 'selected' }}>Billable date</option>
+            <option value="creationDate" {{ field == 'creationDate' ? 'selected' }}>Creation date</option>
+        </select>
+    </label>
+    <label>From <input type="date" name="startDate" value="{{ startDate }}" required></label>
+    <label>To <input type="date" name="endDate" value="{{ endDate }}" required></label>
+    <button class="btn sm" type="submit">Show</button>
+</form>
+
+{% for group in groups %}
+    <div class="table-card">
+        <div class="table-header"><h2>{{ group.date ? group.date|date('l, Y-m-d') : 'No date' }}</h2><span class="grow"></span><span class="badge num">{{ group.tasks|length }}</span></div>
+        <div class="tscroll">
+            <table class="t">
+                <thead><tr><th>Client</th><th>Project</th><th>Task</th><th>Contractor</th><th>Type</th><th>Status</th><th class="right">Billable (min)</th><th class="right">Payout</th></tr></thead>
+                <tbody>
+                    {% for task in group.tasks %}
+                        <tr>
+                            <td>{{ task.project ? task.project.client.name : '—' }}</td>
+                            <td>{{ task.project ? task.project.name : '—' }}</td>
+                            <td><a class="bold" href="{{ path('app_task_view', {id: task.id}) }}">{{ ui.short(task.name, 80) }}</a></td>
+                            <td>{{ task.assignee ? (task.assignee.name ?: task.assignee.email) : '—' }}</td>
+                            <td>{{ types[task.taskTypeId] ?? '—' }}</td>
+                            <td>{{ ui.statusBadge(task.taskStatusId, statuses) }}</td>
+                            <td class="right">{{ fee[task.id] ? (task.timeBudget ?? '—') : '—' }}</td>
+                            <td class="right nowrap">{{ fee[task.id] ? (task.totalAmount ?? '0.00') ~ ' ' ~ (currencies[task.currencyId] ?? '') : '—' }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot><tr><td colspan="6" class="right">Total</td><td class="right">{{ group.minutes }}</td><td class="right">{{ group.amount }}</td></tr></tfoot>
+            </table>
+        </div>
+    </div>
+{% else %}
+    <div class="card"><p class="muted" style="margin:0">No tasks with a {{ field == 'billableDate' ? 'billable' : 'creation' }} date between {{ startDate }} and {{ endDate }}.</p></div>
+{% endfor %}
+{% endblock %}

@@ -26,6 +26,10 @@ final class TaskService
     /** A blank currency falls back to this, matching the column's default. */
     private const DEFAULT_CURRENCY_ID = 1;
 
+    /** The create form's two request types (work-platform's TaskForm::REQUEST_TYPE_*). */
+    public const REQUEST_TYPE_TASK = 'Add Task';
+    public const REQUEST_TYPE_BUDGET = 'Add Budget';
+
     /** Statuses the payment flow sets; a task form may not set them by hand. */
     public const PAYMENT_MANAGED_STATUS_IDS = [TaskStatus::PAID_ID];
 
@@ -54,9 +58,15 @@ final class TaskService
         $now = time();
         $task->setCreatedAt($now)->setCreatedBy($actor->getId())->setUpdatedAt($now)->setUpdatedBy($actor->getId());
         $task->setCreationDate($task->getCreationDate() ?? new \DateTimeImmutable('today'));
-        // Everyone who can create a task here is managing it, so it skips work-platform's authorization queue
-        // (that queue only ever held tasks a Contractor filed).
-        $task->setAuthorized(Task::AUTHORIZED_NO);
+        // work-platform's authorization queue: a budget request, or a task filed by someone who does not manage the
+        // project (a Contractor), waits for a reviewer. Task::AUTHORIZED_YES is "in the queue" (Yii2's naming).
+        if ($input->requestType === self::REQUEST_TYPE_BUDGET || !$this->access->filesDirectly($actor, $project)) {
+            $task->setAuthorized(Task::AUTHORIZED_YES)
+                ->setAuthorizedStatus(Task::AUTHORIZED_STATUS_PENDING)
+                ->setAuthorizedDescription($input->authorizedDescription);
+        } else {
+            $task->setAuthorized(Task::AUTHORIZED_NO);
+        }
 
         $this->em->persist($task);
         $this->em->flush();
@@ -101,6 +111,21 @@ final class TaskService
         $this->em->flush();
 
         $this->audit->record($actor, 'task.status_detail', $this->describe($task));
+    }
+
+    /**
+     * A reviewer's decision on a queued task (work-platform's TaskAuthorizationService::updateStatus): Approve takes it
+     * out of the queue into normal work; Deny records the decision and leaves it out of normal work.
+     */
+    public function decideAuthorization(Task $task, string $decision, User $actor): void
+    {
+        $task->setAuthorizedStatus($decision)
+            ->setAuthorized($decision === Task::AUTHORIZED_STATUS_APPROVE ? Task::AUTHORIZED_NO : Task::AUTHORIZED_YES)
+            ->setUpdatedAt(time())
+            ->setUpdatedBy($actor->getId());
+        $this->em->flush();
+
+        $this->audit->record($actor, 'task.authorization_'.strtolower($decision), $this->describe($task));
     }
 
     /** Soft delete, as work-platform: the row stays for payment history and is hidden everywhere. */

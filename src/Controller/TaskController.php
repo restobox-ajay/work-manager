@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Controller;
 
 use App\Entity\Task;
+use App\Entity\User;
 use App\Repository\TaskRepository;
 use App\Security\Voter\WorkVoter;
 use App\Security\Work\WorkAccess;
@@ -14,6 +15,7 @@ use App\Service\Project\ProjectService;
 use App\Service\Task\TaskInput;
 use App\Service\Task\TaskListService;
 use App\Service\Task\TaskLookups;
+use App\Service\Task\TaskReportService;
 use App\Service\Task\TaskService;
 use App\Service\Validation\InputValue;
 use Symfony\Bridge\Doctrine\Attribute\MapEntity;
@@ -41,26 +43,44 @@ final class TaskController extends AbstractWorkController
     ) {
     }
 
+    /** Tasks By Client/Project (work-platform's /task/client): the list, with clients and projects to pick from. */
     #[Route('', name: 'app_task_index', methods: ['GET'])]
     public function index(Request $request, TaskListService $list): Response
+    {
+        return $this->renderList($request, $list, 'clients');
+    }
+
+    /** Tasks By Contractor (work-platform's /task/contractor): the same list, picked by contractor instead. */
+    #[Route('/contractor', name: 'app_task_contractor', methods: ['GET'])]
+    public function byContractor(Request $request, TaskListService $list, TaskReportService $reports): Response
+    {
+        return $this->renderList($request, $list, 'contractors', $reports->contractors($this->viewer()));
+    }
+
+    /** @param User[] $contractors */
+    private function renderList(Request $request, TaskListService $list, string $sideList, array $contractors = []): Response
     {
         $viewer = $this->viewer();
         $filters = $list->filtersFrom($request->query->all());
         $sort = $request->query->getString('sort');
         $page = $list->search($viewer, $filters, Paginated::pageFrom($request->query->get('page')), $sort);
+        $clientId = $filters['clientId'] > 0 ? $filters['clientId'] : null;
 
         return $this->render('task/index.html.twig', [
-            'page'      => $page,
-            'rows'      => $list->rowDetails($viewer, $page->items),
-            'filters'   => $filters,
-            'sort'      => $sort,
-            'clients'   => $this->clients->selectable($viewer),
-            'projects'  => $this->projects->selectable($viewer, $filters['clientId'] > 0 ? $filters['clientId'] : null),
-            'statuses'  => $this->lookups->statuses(),
-            'types'     => $this->lookups->types(),
-            'currencies' => $this->lookups->currencies(),
-            'people'    => $this->lookups->people(),
-            'noneId'    => TaskRepository::NO_PROJECT_ID,
+            'page'        => $page,
+            'rows'        => $list->rowDetails($viewer, $page->items),
+            'filters'     => $filters,
+            'sort'        => $sort,
+            'sideList'    => $sideList,
+            'listRoute'   => $sideList === 'contractors' ? 'app_task_contractor' : 'app_task_index',
+            'contractors' => $contractors,
+            'clients'     => $this->clients->selectable($viewer),
+            'projects'    => $this->projects->selectable($viewer, $clientId),
+            'statuses'    => $this->lookups->statuses(),
+            'types'       => $this->lookups->types(),
+            'currencies'  => $this->lookups->currencies(),
+            'people'      => $this->lookups->people(),
+            'noneId'      => TaskRepository::NO_PROJECT_ID,
         ]);
     }
 
@@ -73,10 +93,12 @@ final class TaskController extends AbstractWorkController
 
         if ($request->isMethod('POST')) {
             $this->assertCsrf($request, 'task_form');
-            $input->overlay($this->posted($request));
+            $input->overlay($this->posted($request) + array_intersect_key($request->request->all(), ['requestType' => 1, 'authorizedDescription' => 1]));
             $result = $this->tasks->create($input, $this->viewer());
             if ($result->isSaved()) {
-                $this->addFlash('success', 'Task created.');
+                $this->addFlash('success', $result->record->getAuthorized() === Task::AUTHORIZED_YES
+                    ? 'Request sent: it waits in the authorization queue until a reviewer approves it.'
+                    : 'Task created.');
 
                 return $this->redirectToRoute('app_task_view', ['id' => $result->record->getId()]);
             }

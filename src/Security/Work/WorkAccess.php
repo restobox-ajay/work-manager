@@ -145,7 +145,11 @@ final class WorkAccess implements ResetInterface
 
     // ── Tasks ────────────────────────────────────────────────────────────────
 
-    /** Whether this user may create tasks at all (some project or client they manage). */
+    /**
+     * Whether this user may file tasks at all: an admin, a Client Manager or managing staff files them directly; a
+     * Contractor on some project may file one too, and it waits in the authorization queue (work-platform's rule
+     * for a Contractor-created task).
+     */
     public function canCreateTask(User $user): bool
     {
         if ($this->isAdmin($user)) {
@@ -153,10 +157,10 @@ final class WorkAccess implements ResetInterface
         }
         $relations = $this->relationsOf($user);
 
-        return $relations->managedClientIds !== [] || $relations->managingStaffProjectIds() !== [];
+        return $relations->managedClientIds !== [] || $relations->staffProjectIds() !== [];
     }
 
-    /** Whether a task may be filed under this project (null = no project) by this user. */
+    /** Whether a task may be filed under this project (null = no project) by this user — directly or into the queue. */
     public function canAddTaskTo(User $user, ?Project $project): bool
     {
         if ($this->isAdmin($user)) {
@@ -167,7 +171,46 @@ final class WorkAccess implements ResetInterface
         }
         $relations = $this->relationsOf($user);
 
-        return $relations->managesClient($project->getClient()?->getId()) || $relations->isManagingStaff($project->getId());
+        return $relations->managesClient($project->getClient()?->getId()) || $relations->isStaff($project->getId());
+    }
+
+    /**
+     * Whether a task this user files under this project skips the authorization queue: yes for an admin, a
+     * Client Manager or managing staff; no for a Contractor. A budget request always queues (decided by the caller).
+     */
+    public function filesDirectly(User $user, ?Project $project): bool
+    {
+        if ($this->isAdmin($user)) {
+            return true;
+        }
+        $relations = $this->relationsOf($user);
+
+        return $project !== null
+            && ($relations->managesClient($project->getClient()?->getId()) || $relations->isManagingStaff($project->getId()));
+    }
+
+    /** Approve or deny a queued task (work-platform's canReview): admin, its Project Manager, or its Client Manager. */
+    public function canReviewTask(User $user, Task $task): bool
+    {
+        if ($this->isAdmin($user)) {
+            return true;
+        }
+        $relations = $this->relationsOf($user);
+
+        return $relations->isProjectManager($task->getProject()?->getId())
+            || $relations->managesClient($task->getProject()?->getClient()?->getId())
+            || $relations->managesClient($task->getClientId());
+    }
+
+    /** Sees the queue / manager pages at all: someone who manages work. */
+    public function managesAnyWork(User $user): bool
+    {
+        if ($this->isAdmin($user)) {
+            return true;
+        }
+        $relations = $this->relationsOf($user);
+
+        return $relations->managedClientIds !== [] || $relations->managingStaffProjectIds() !== [];
     }
 
     public function canViewTask(User $user, Task $task): bool

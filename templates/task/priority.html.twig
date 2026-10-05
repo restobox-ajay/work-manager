@@ -1,0 +1,69 @@
+{% extends 'base.html.twig' %}
+{% import '_work/macros.html.twig' as ui %}
+
+{#
+    Task Priority (ADR-072): one person's pending work and reviews, in their priority order. Admins move a task to
+    the top or bottom; the order is per person, so it never changes anyone else's list.
+#}
+{% block title %}Task priority{% endblock %}
+
+{% block body %}
+{% set targetName = people[targetId] ?? 'You' %}
+<div class="page-head">
+    <div class="ph-main">
+        <div class="eyebrow">Tasks</div>
+        <div class="ph-title"><h1>Task priority</h1></div>
+        <p class="lead">{{ targetId == app.user.id ? 'Your' : targetName ~ '’s' }} pending tasks and reviews, most important first.</p>
+    </div>
+    {% if peopleList is not empty %}
+        <form class="ph-actions mx-form" method="get" action="{{ path('app_task_priority') }}">
+            <select name="userId" aria-label="Person" onchange="this.form.submit()" style="width:auto">
+                <option value="{{ app.user.id }}">Me</option>
+                {% for person in peopleList %}{% if person.id != app.user.id %}<option value="{{ person.id }}" {{ targetId == person.id ? 'selected' }}>{{ person.name ?: person.email }}</option>{% endif %}{% endfor %}
+            </select>
+            <noscript><button class="btn sm" type="submit">Show</button></noscript>
+        </form>
+    {% endif %}
+</div>
+
+{{ ui.flashes() }}
+
+{% for key, tab in tabs %}
+    <div class="table-card">
+        <div class="table-header"><h2>{{ tab.label }}</h2><span class="grow"></span><span class="badge num">{{ tab.tasks|length }}</span></div>
+        {% if canReorder and tab.tasks is not empty %}
+            {# One form per tab carries the tab's current order; each Top/Bottom button names its task. #}
+            <form id="sort-{{ key }}" class="mx-form" method="post" action="{{ path('app_task_priority_sort', {userId: targetId}) }}">
+                <input type="hidden" name="_token" value="{{ csrf_token('task_priority_' ~ targetId) }}">
+                {% for task in tab.tasks %}<input type="hidden" name="taskIds[]" value="{{ task.id }}">{% endfor %}
+            </form>
+        {% endif %}
+        <div class="tscroll">
+            <table class="t">
+                <thead><tr><th style="width:40px">#</th><th>Client</th><th>Project</th><th>Task</th><th>Due</th><th>Status</th><th class="right">Payout</th>{% if canReorder %}<th></th>{% endif %}</tr></thead>
+                <tbody>
+                    {% for task in tab.tasks %}
+                        <tr>
+                            <td class="muted">{{ loop.index }}</td>
+                            <td>{{ task.project ? task.project.client.name : '—' }}</td>
+                            <td>{{ task.project ? task.project.name : '—' }}</td>
+                            <td><a class="bold" href="{{ path('app_task_view', {id: task.id}) }}">{{ ui.short(task.name, 80) }}</a></td>
+                            <td class="nowrap">{{ ui.ts(task.dueDate) }}</td>
+                            <td>{{ ui.statusBadge(task.taskStatusId, statuses) }}</td>
+                            <td class="right nowrap">{{ fee[task.id] ? (task.totalAmount ?? '0.00') ~ ' ' ~ (currencies[task.currencyId] ?? '') : '—' }}</td>
+                            {% if canReorder %}
+                                <td class="actions">
+                                    <button class="btn xs outline" form="sort-{{ key }}" type="submit" name="taskId" value="{{ task.id }}" formaction="{{ path('app_task_priority_sort', {userId: targetId}) }}?move=top" {{ loop.first ? 'disabled' }}>To top</button>
+                                    <button class="btn xs outline" form="sort-{{ key }}" type="submit" name="taskId" value="{{ task.id }}" formaction="{{ path('app_task_priority_sort', {userId: targetId}) }}?move=bottom" {{ loop.last ? 'disabled' }}>To bottom</button>
+                                </td>
+                            {% endif %}
+                        </tr>
+                    {% else %}
+                        <tr><td colspan="8" class="empty">Nothing here.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% endfor %}
+{% endblock %}

@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Repository;
 
+use App\Entity\Settings\TaskStatus;
 use App\Entity\Task;
+use App\Entity\TaskPriorityOrder;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\ManagerRegistry;
@@ -32,6 +34,17 @@ class TaskRepository extends ServiceEntityRepository
         'timeBudget'   => 't.timeBudget',
         'billableDate' => 't.billableDate',
         'totalAmount'  => 't.totalAmount',
+    ];
+
+    private const PENDING_PAYMENT_SORTABLE_COLUMNS = [
+        'client'       => 'c.name',
+        'project'      => 'p.name',
+        'name'         => 't.name',
+        'createdAt'    => 't.createdAt',
+        'timeBudget'   => 't.timeBudget',
+        'billableDate' => 't.billableDate',
+        'totalAmount'  => 't.totalAmount',
+        'approvedDate' => 't.approvedDate',
     ];
 
     public function __construct(ManagerRegistry $registry)
@@ -83,6 +96,142 @@ class TaskRepository extends ServiceEntityRepository
             ->getResult();
     }
 
+    // ── Payments (ADR-071) ───────────────────────────────────────────────────
+
+    /**
+     * Approved tasks no payment batch has taken yet. Archived work is included: archiving a project does not
+     * cancel what is owed for it (owner-settled rule).
+     *
+     * @param ?int $assigneeId null = every contractor
+     *
+     * @return Task[]
+     */
+    public function findPendingPayments(?int $assigneeId, ?string $term, ?string $sort): array
+    {
+        [$column, $direction] = SortParam::resolve($sort, self::PENDING_PAYMENT_SORTABLE_COLUMNS, '-createdAt');
+
+        $qb = $this->createQueryBuilder('t')
+            ->addSelect('p', 'c', 'a')
+            ->leftJoin('t.project', 'p')
+            ->leftJoin('p.client', 'c')
+            ->leftJoin('t.assignee', 'a')
+            ->andWhere('t.taskStatusId = :approved')
+            ->andWhere('t.isActive = 1 AND t.isDeleted = 0')
+            ->andWhere("t.paymentId IS NULL OR t.paymentId = ''")
+            ->setParameter('approved', TaskStatus::APPROVED_ID)
+            ->orderBy($column, $direction)
+            ->addOrderBy('t.id', 'DESC');
+
+        if ($assigneeId !== null) {
+            $qb->andWhere('t.assignee = :assignee')->setParameter('assignee', $assigneeId);
+        }
+        if ($term !== null) {
+            $qb->andWhere('t.name LIKE :term')->setParameter('term', '%'.addcslashes($term, '%_').'%');
+        }
+
+        return $qb->getQuery()->getResult();
+    }
+
+    /**
+     * One page of payment batch ids that have tasks, newest payment first.
+     *
+     * @return array{ids: list<string>, total: int}
+     */
+    public function findPastPaymentBatchIds(?int $assigneeId, ?string $term, int $page, int $pageSize): array
+    {
+        $qb = $this->createQueryBuilder('t')
+            ->select('t.paymentId')
+            ->andWhere("t.paymentId IS NOT NULL AND t.paymentId <> ''")
+            ->andWhere('t.isDeleted = 0')
+            ->groupBy('t.paymentId')
+            ->orderBy('MAX(t.paidDate)', 'DESC');
+
+        if ($assigneeId !== null) {
+            $qb->andWhere('t.assignee = :assignee')->setParameter('assignee', $assigneeId);
+        }
+        if ($term !== null) {
+            $qb->andWhere('t.name LIKE :term')->setParameter('term', '%'.addcslashes($term, '%_').'%');
+        }
+
+        $all = array_map('strval', array_column($qb->getQuery()->getScalarResult(), 'paymentId'));
+
+        return ['ids' => array_slice($all, max(0, $page - 1) * $pageSize, $pageSize), 'total' => count($all)];
+    }
+
+    /**
+     * What is in each payment batch. A soft-deleted task still counts — it was paid for.
+     *
+     * @param list<string> $paymentIds
+     *
+     * @return array<string, Task[]>
+     */
+    public function findByPaymentIds(array $paymentIds): array
+    {
+        $result = array_fill_keys($paymentIds, []);
+        if ($paymentIds === []) {
+            return $result;
+        }
+
+        foreach ($this->createQueryBuilder('t')
+            ->addSelect('p', 'c', 'a')
+            ->leftJoin('t.project', 'p')
+            ->leftJoin('p.client', 'c')
+            ->leftJoin('t.assignee', 'a')
+            ->andWhere('t.paymentId IN (:ids)')
+            ->setParameter('ids', $paymentIds)
+            ->orderBy('t.createdAt', 'ASC')
+            ->getQuery()
+            ->getResult() as $task) {
+            $result[(string) $task->getPaymentId()][] = $task;
+        }
+
+        return $result;
+    }
+
+    public function batchHasLiveTaskAssignedTo(string $paymentId, int $userId): bool
+    {
+        return (int) $this->createQueryBuilder('t')
+            ->select('COUNT(t.id)')
+            ->andWhere('t.paymentId = :paymentId AND t.assignee = :userId AND t.isDeleted = 0')
+            ->setParameter('paymentId', $paymentId)
+            ->setParameter('userId', $userId)
+            ->getQuery()
+            ->getSingleScalarResult() > 0;
+    }
+
+    /**
+     * Live tasks of the given contractors, grouped by contractor then project (contractor summary page).
+     *
+     * @param int[] $assigneeIds
+     *
+     * @return array<int, array<int, Task[]>> assignee id => project id => tasks
+     */
+    public function findGroupedByAssigneeAndProject(array $assigneeIds): array
+    {
+        if ($assigneeIds === []) {
+            return [];
+        }
+
+        $grouped = [];
+        foreach ($this->createQueryBuilder('t')
+            ->addSelect('p', 'c', 'a')
+            ->join('t.project', 'p')
+            ->join('p.client', 'c')
+            ->join('t.assignee', 'a')
+            ->andWhere('a.id IN (:ids)')
+            ->andWhere('t.isActive = 1 AND t.isDeleted = 0')
+            ->setParameter('ids', $assigneeIds)
+            ->orderBy('c.name', 'ASC')
+            ->addOrderBy('p.name', 'ASC')
+            ->addOrderBy('t.createdAt', 'DESC')
+            ->getQuery()
+            ->getResult() as $task) {
+            $grouped[(int) $task->getAssignee()->getId()][(int) $task->getProject()->getId()][] = $task;
+        }
+
+        return $grouped;
+    }
+
     /**
      * A user's own tasks in one status, for the dashboard widgets.
      *
@@ -130,7 +279,9 @@ class TaskRepository extends ServiceEntityRepository
      * Criteria (all optional):
      *  - visibility: null for "every task", else {userId, taskIds, projectIds, clientIds} — a task is visible when
      *    the user is its assignee, reviewer or creator, or its id/project/client is in the matching set
-     *  - term, clientId, projectId, assigneeId, reviewerUserId, taskStatusId, taskTypeId
+     *  - term, clientId, projectId, assigneeId, reviewerUserId, createdBy, notCreatedBy, taskStatusId, taskTypeId
+     *  - taskIds (only these; [] = none), queue (see applyQueueCriteria()), includeArchived
+     *  - dateField ('billableDate'|'creationDate') with dateFrom/dateTo (inclusive days)
      *
      * @param array<string, mixed> $criteria
      */
@@ -148,7 +299,8 @@ class TaskRepository extends ServiceEntityRepository
         $named = ($projectId !== null && $projectId !== self::NO_PROJECT_ID)
             || ($clientId !== null && $clientId !== self::NO_CLIENT_ID);
 
-        if (!$named) {
+        // includeArchived: the by-date report is a billing report — archiving a project does not cancel what is owed.
+        if (!$named && !($criteria['includeArchived'] ?? false)) {
             $qb->andWhere('(p.id IS NULL) OR (c.isDeleted = 0 AND c.isActive = 1 AND p.isDeleted = 0 AND p.status = 1)');
         }
 
@@ -171,7 +323,28 @@ class TaskRepository extends ServiceEntityRepository
             $qb->andWhere('t.project = :projectId')->setParameter('projectId', $projectId);
         }
 
+        $this->applyQueueCriteria($qb, $criteria);
+
+        if (($criteria['dateField'] ?? null) !== null) {
+            $field = match ($criteria['dateField']) {
+                'billableDate' => 't.billableDate',
+                'creationDate' => 't.creationDate',
+            };
+            $qb->andWhere("$field BETWEEN :dateFrom AND :dateTo")
+                ->setParameter('dateFrom', $criteria['dateFrom'], 'date_immutable')
+                ->setParameter('dateTo', $criteria['dateTo'], 'date_immutable');
+        }
+        if (($criteria['notCreatedBy'] ?? null) !== null) {
+            $qb->andWhere('t.createdBy IS NULL OR t.createdBy <> :notCreatedBy')->setParameter('notCreatedBy', $criteria['notCreatedBy']);
+        }
+        if (array_key_exists('taskIds', $criteria) && $criteria['taskIds'] !== null) {
+            $criteria['taskIds'] === []
+                ? $qb->andWhere('1 = 0')
+                : $qb->andWhere('t.id IN (:onlyTaskIds)')->setParameter('onlyTaskIds', $criteria['taskIds']);
+        }
+
         foreach ([
+            'createdBy'      => 't.createdBy',
             'assigneeId'     => 't.assignee',
             'reviewerUserId' => 't.reviewerUserId',
             'taskStatusId'   => 't.taskStatusId',
@@ -183,6 +356,102 @@ class TaskRepository extends ServiceEntityRepository
         }
 
         return $qb;
+    }
+
+    /**
+     * The authorization queue (work-platform's TaskRepository::buildAuthorizationQueueQuery()). Task::AUTHORIZED_YES
+     * (0) means "in the queue" — Yii2's inverted naming, kept because the column holds exactly those values.
+     *  - queue = 'pending': queued, not yet decided (no status, Pending or Modify), not paid
+     *  - queue = 'decided': every task that has a decision recorded, queued or not
+     *  - queue = 'none' : normal work only (what the task lists show)
+     */
+    private function applyQueueCriteria(QueryBuilder $qb, array $criteria): void
+    {
+        match ($criteria['queue'] ?? null) {
+            'pending' => $qb->andWhere('t.authorized = :queued AND t.taskStatusId <> :paidStatus')
+                ->andWhere("t.authorizedStatus IS NULL OR t.authorizedStatus = '' OR t.authorizedStatus IN (:open)")
+                ->setParameter('queued', Task::AUTHORIZED_YES)
+                ->setParameter('paidStatus', TaskStatus::PAID_ID)
+                ->setParameter('open', [Task::AUTHORIZED_STATUS_PENDING, Task::AUTHORIZED_STATUS_MODIFY]),
+            'decided' => $qb->andWhere('t.authorizedStatus IN (:decided)')
+                ->setParameter('decided', [Task::AUTHORIZED_STATUS_APPROVE, Task::AUTHORIZED_STATUS_DENY, Task::AUTHORIZED_STATUS_MODIFY]),
+            'none'    => $qb->andWhere('t.authorized = :notQueued')->setParameter('notQueued', Task::AUTHORIZED_NO),
+            default   => null,
+        };
+    }
+
+    /**
+     * One tab of the Task Priority page: the target user's tasks, in their own priority order, then newest.
+     *
+     * @param 'assignee'|'reviewerReviewing'|'reviewerPending' $tab
+     *
+     * @return Task[]
+     */
+    public function findForPriorityTab(string $tab, int $userId): array
+    {
+        $qb = $this->createQueryBuilder('t')
+            ->addSelect('p', 'c', 'a')
+            ->leftJoin('t.project', 'p')
+            ->leftJoin('p.client', 'c')
+            ->leftJoin('t.assignee', 'a')
+            ->leftJoin(TaskPriorityOrder::class, 'o', 'WITH', 'o.taskId = t.id AND o.userId = :userId')
+            ->andWhere('t.isDeleted = 0 AND t.isActive = 1')
+            ->andWhere('t.authorized = :notQueued')
+            ->setParameter('notQueued', Task::AUTHORIZED_NO)
+            ->setParameter('userId', $userId)
+            // Unordered tasks (no row yet) after the ordered ones.
+            ->addSelect('CASE WHEN o.sortOrder IS NULL THEN 1 ELSE 0 END AS HIDDEN unordered')
+            ->orderBy('unordered', 'ASC')
+            ->addOrderBy('o.sortOrder', 'ASC')
+            ->addOrderBy('t.createdAt', 'DESC');
+
+        [$statusId, $field] = match ($tab) {
+            'assignee'          => [TaskStatus::PENDING_ID, 't.assignee'],
+            'reviewerReviewing' => [TaskStatus::REVIEWING_INTERNAL_ID, 't.reviewerUserId'],
+            'reviewerPending'   => [TaskStatus::PENDING_ID, 't.reviewerUserId'],
+        };
+
+        return $qb->andWhere('t.taskStatusId = :statusId')->andWhere("$field = :userId")
+            ->setParameter('statusId', $statusId)
+            ->getQuery()
+            ->getResult();
+    }
+
+    /**
+     * Everyone assigned a task the viewer can see — the Tasks By Contractor side list.
+     *
+     * @param array{userId: int, taskIds: int[], projectIds: int[], clientIds: int[]}|null $visibility
+     *
+     * @return int[]
+     */
+    public function findDistinctAssigneeIds(?array $visibility): array
+    {
+        $qb = $this->buildListQuery(['visibility' => $visibility, 'queue' => 'none'])
+            ->select('DISTINCT IDENTITY(t.assignee) AS assigneeId')
+            ->andWhere('t.assignee IS NOT NULL');
+
+        return array_map('intval', array_column($qb->getQuery()->getScalarResult(), 'assigneeId'));
+    }
+
+    /**
+     * Every task matching the criteria, unpaged (by-date report, manager-created page).
+     *
+     * @param array<string, mixed> $criteria see buildListQuery()
+     *
+     * @return Task[]
+     */
+    public function findAllMatching(array $criteria, string $orderBy = 't.createdAt', string $direction = 'DESC', ?int $limit = null): array
+    {
+        $qb = $this->buildListQuery($criteria)
+            ->addSelect('a')
+            ->leftJoin('t.assignee', 'a')
+            ->orderBy($orderBy, $direction)
+            ->addOrderBy('t.id', 'DESC');
+        if ($limit !== null) {
+            $qb->setMaxResults($limit);
+        }
+
+        return $qb->getQuery()->getResult();
     }
 
     /**

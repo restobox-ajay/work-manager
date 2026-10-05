@@ -1,0 +1,56 @@
+{% extends 'base.html.twig' %}
+{% import '_work/macros.html.twig' as ui %}
+
+{# Task Created By Manager (ADR-072): tasks other people filed that wait in the authorization queue, unread first. #}
+{% block title %}Tasks created by others{% endblock %}
+
+{% block body %}
+<div class="page-head">
+    <div class="ph-main">
+        <div class="eyebrow">Tasks</div>
+        <div class="ph-title"><h1>Task created by manager</h1></div>
+        <p class="lead">Tasks someone else filed that still wait for authorization. Mark them read once you have looked.</p>
+    </div>
+    <div class="ph-actions"><a class="btn outline" href="{{ path('app_task_queue') }}">Authorization queue</a></div>
+</div>
+
+{{ ui.flashes() }}
+
+<div class="pills" style="margin-bottom:12px">
+    {% for key, label in {no: 'Unread', yes: 'Read', all: 'All'} %}
+        <a class="pill{{ readParam == key ? ' active' }}" href="{{ path('app_task_manager', {read: key, createdBy: createdBy}) }}">{{ label }}</a>
+    {% endfor %}
+</div>
+
+<div class="table-card">
+    <div class="tscroll">
+        <table class="t">
+            <thead><tr><th>Client</th><th>Project</th><th>Task</th><th>Requested by</th><th>Created</th><th>Status</th><th>Read</th></tr></thead>
+            <tbody>
+                {% for task in tasks %}
+                    {% set isRead = read[task.id] ?? false %}
+                    <tr>
+                        <td>{{ task.project ? task.project.client.name : '—' }}</td>
+                        <td>{{ task.project ? task.project.name : '—' }}</td>
+                        <td><a class="bold" href="{{ path('app_task_view', {id: task.id}) }}">{{ ui.short(task.name, 80) }}</a></td>
+                        <td>{% if task.createdBy %}<a href="{{ path('app_task_manager', {read: readParam, createdBy: task.createdBy}) }}">{{ people[task.createdBy] ?? '#' ~ task.createdBy }}</a>{% else %}—{% endif %}</td>
+                        <td class="nowrap">{{ ui.ts(task.createdAt) }}</td>
+                        <td>{{ ui.statusBadge(task.taskStatusId, statuses) }}</td>
+                        <td>
+                            <form class="mx-form" method="post" action="{{ path('app_task_read', {id: task.id}) }}">
+                                <input type="hidden" name="_token" value="{{ csrf_token('task_read_' ~ task.id) }}">
+                                <input type="hidden" name="read" value="{{ isRead ? 0 : 1 }}">
+                                <input type="hidden" name="back" value="{{ readParam }}">
+                                <button class="btn xs {{ isRead ? 'outline' : '' }}" type="submit">{{ isRead ? 'Mark unread' : 'Mark read' }}</button>
+                            </form>
+                        </td>
+                    </tr>
+                {% else %}
+                    <tr><td colspan="7" class="empty"><b>Nothing here.</b></td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% if createdBy %}<div class="table-foot">Filtered to one requester. <a href="{{ path('app_task_manager', {read: readParam}) }}">Show everyone</a></div>{% endif %}
+</div>
+{% endblock %}

@@ -8,8 +8,8 @@
 {% set named = (filters.clientId and filters.clientId != noneId) or (filters.projectId and filters.projectId != noneId) %}
 <div class="page-head">
     <div class="ph-main">
-        <div class="eyebrow">Work</div>
-        <div class="ph-title"><h1>Tasks</h1></div>
+        <div class="eyebrow">Tasks</div>
+        <div class="ph-title"><h1>{{ sideList == 'contractors' ? 'Tasks by contractor' : 'Tasks by client / project' }}</h1></div>
         <p class="lead">
             {% if named %}Everything under the chosen client or project, archived work included (tagged).
             {% else %}Tasks under archived projects or clients are hidden; choose a client or project to see them.{% endif %}
@@ -22,8 +22,42 @@
 
 {{ ui.flashes() }}
 
-<div class="table-card">
-    <form class="table-header mx-form" method="get" action="{{ path('app_task_index') }}" style="flex-wrap:wrap">
+{# The side list picks the client/project (or contractor) the way work-platform's list pages did; the filters
+   above the table narrow further. Links keep the status filter. #}
+{% set keep = {taskStatusId: filters.taskStatusId, sort: sort ?: null} %}
+<div class="split dash-split">
+    <nav class="card" aria-label="{{ sideList == 'contractors' ? 'Contractors' : 'Clients' }}" style="padding:12px 0">
+        {% if sideList == 'contractors' %}
+            <div class="section-label" style="padding:0 14px 4px;margin:0 0 4px">Select contractor</div>
+            <ul class="dash-clients">
+                <li class="{{ filters.assigneeId is null ? 'active' }}"><a href="{{ path(listRoute, keep) }}">All contractors</a></li>
+                {% for person in contractors %}
+                    <li class="{{ filters.assigneeId == person.id ? 'active' }}"><a href="{{ path(listRoute, keep|merge({assigneeId: person.id})) }}" title="{{ person.email }}">{{ person.name ?: person.email }}</a></li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <div class="section-label" style="padding:0 14px 4px;margin:0 0 4px">Select client</div>
+            <ul class="dash-clients">
+                <li class="{{ filters.clientId is null and filters.projectId is null ? 'active' }}"><a href="{{ path(listRoute, keep) }}">All clients</a></li>
+                {% for client in clients %}
+                    <li class="{{ filters.clientId == client.id and filters.projectId is null ? 'active' }}">
+                        <a href="{{ path(listRoute, keep|merge({clientId: client.id})) }}" title="{{ client.name }}">{{ client.name }}</a>
+                        {% if filters.clientId == client.id %}
+                            <ul>
+                                {% for project in projects %}
+                                    <li class="{{ filters.projectId == project.id ? 'active' }}"><a href="{{ path(listRoute, keep|merge({clientId: client.id, projectId: project.id})) }}" title="{{ project.name }}">{{ project.name }}</a></li>
+                                {% endfor %}
+                                <li class="{{ filters.projectId == noneId ? 'active' }}"><a href="{{ path(listRoute, keep|merge({clientId: client.id, projectId: noneId})) }}">(no project)</a></li>
+                            </ul>
+                        {% endif %}
+                    </li>
+                {% endfor %}
+                <li class="{{ filters.clientId == noneId ? 'active' }}"><a href="{{ path(listRoute, keep|merge({clientId: noneId})) }}">(no client)</a></li>
+            </ul>
+        {% endif %}
+    </nav>
+<div class="table-card" style="min-width:0">
+    <form class="table-header mx-form" method="get" action="{{ path(listRoute) }}" style="flex-wrap:wrap">
         <input type="search" name="q" value="{{ filters.q }}" placeholder="Task, project or client" aria-label="Search tasks">
         <select name="clientId" aria-label="Client" style="width:auto;max-width:180px">
             <option value="">All clients</option>
@@ -49,26 +83,26 @@
             {% for id, name in types %}<option value="{{ id }}" {{ filters.taskTypeId == id ? 'selected' }}>{{ name }}</option>{% endfor %}
         </select>
         <button class="btn sm" type="submit">Filter</button>
-        {% if params|length > 1 %}<a class="btn sm outline" href="{{ path('app_task_index') }}">Reset</a>{% endif %}
+        {% if params|length > 1 %}<a class="btn sm outline" href="{{ path(listRoute) }}">Reset</a>{% endif %}
     </form>
     <div class="tscroll">
         <table class="t">
             <thead>
                 <tr>
-                    {{ ui.sortHeader('client', 'Client', sort, 'app_task_index', params) }}
-                    {{ ui.sortHeader('project', 'Project', sort, 'app_task_index', params) }}
-                    {{ ui.sortHeader('name', 'Task Name', sort, 'app_task_index', params) }}
+                    {{ ui.sortHeader('client', 'Client', sort, listRoute, params) }}
+                    {{ ui.sortHeader('project', 'Project', sort, listRoute, params) }}
+                    {{ ui.sortHeader('name', 'Task Name', sort, listRoute, params) }}
                     <th>Status Detail</th>
                     <th>Task Type</th>
-                    {{ ui.sortHeader('dueDate', 'Due Date', sort, 'app_task_index', params) }}
-                    {{ ui.sortHeader('createdAt', 'Created', sort, 'app_task_index', params) }}
+                    {{ ui.sortHeader('dueDate', 'Due Date', sort, listRoute, params) }}
+                    {{ ui.sortHeader('createdAt', 'Created', sort, listRoute, params) }}
                     <th>Contractor</th>
                     <th>Reviewer</th>
                     <th>Status</th>
-                    {{ ui.sortHeader('timeBudget', 'Billable (min)', sort, 'app_task_index', params) }}
-                    {{ ui.sortHeader('billableDate', 'Billable Date', sort, 'app_task_index', params) }}
+                    {{ ui.sortHeader('timeBudget', 'Billable (min)', sort, listRoute, params) }}
+                    {{ ui.sortHeader('billableDate', 'Billable Date', sort, listRoute, params) }}
                     <th>Currency</th>
-                    {{ ui.sortHeader('totalAmount', 'Payout', sort, 'app_task_index', params) }}
+                    {{ ui.sortHeader('totalAmount', 'Payout', sort, listRoute, params) }}
                     <th></th>
                 </tr>
             </thead>
@@ -104,6 +138,7 @@
             </tbody>
         </table>
     </div>
-    {{ ui.pager(page, 'app_task_index', params) }}
+    {{ ui.pager(page, listRoute, params) }}
+</div>
 </div>
 {% endblock %}

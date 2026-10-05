@@ -389,8 +389,8 @@ html:not(.js) .user-menu:focus-within .dropdown {
 
 /* ── Page body: forms ──────────────────────────────────────────────────────── */
 /* A bare form on a signed-in page is a .card with label-above fields, as in the mockup's forms. */
-.site-app .page-body > form:not([style*="inline"]),
-.site-app .page-body > section > form:not([style*="inline"]) {
+.site-app .page-body > form:not([style*="inline"]):not(.mx-form),
+.site-app .page-body > section > form:not([style*="inline"]):not(.mx-form) {
     display: grid;
     gap: 12px;
     max-width: 640px;

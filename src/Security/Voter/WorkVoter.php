@@ -36,6 +36,8 @@ final class WorkVoter extends Voter
     public const TASK_STATUS_DETAIL = 'TASK_STATUS_DETAIL';
     public const TASK_DELETE = 'TASK_DELETE';
     public const TASK_FEE = 'TASK_FEE';
+    /** Manages some work (admin, Client Manager or managing staff): the manager-only task pages. */
+    public const WORK_MANAGE = 'WORK_MANAGE';
 
     private const SUBJECT_CLASS = [
         self::CLIENT_CREATE      => null,
@@ -51,6 +53,7 @@ final class WorkVoter extends Voter
         self::TASK_STATUS_DETAIL => Task::class,
         self::TASK_DELETE        => Task::class,
         self::TASK_FEE           => Task::class,
+        self::WORK_MANAGE        => null,
     ];
 
     public function __construct(private readonly WorkAccess $access)
@@ -91,6 +94,7 @@ final class WorkVoter extends Voter
             self::TASK_STATUS_DETAIL => $this->access->canUpdateStatusDetail($user, $subject),
             self::TASK_DELETE        => $this->access->canDeleteTask($user, $subject),
             self::TASK_FEE           => $this->access->canAccessFee($user, $subject),
+            self::WORK_MANAGE        => $this->access->managesAnyWork($user),
         };
     }
 }
