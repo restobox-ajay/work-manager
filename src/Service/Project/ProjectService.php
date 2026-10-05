@@ -32,7 +32,7 @@ final class ProjectService
         'localUrl' => 'Local URL',
         'devUrl'   => 'Dev URL',
         'prodUrl'  => 'Prod URL',
-        'docUrl'   => 'Doc / Specs URL',
+        'docUrl'   => 'Doc / Specs link',
     ];
 
     public function __construct(

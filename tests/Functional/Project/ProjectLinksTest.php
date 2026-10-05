@@ -75,7 +75,7 @@ final class ProjectLinksTest extends WebTestCase
         ]);
 
         self::assertResponseStatusCodeSame(422);
-        self::assertSelectorTextContains('body', 'Doc / Specs URL is not a valid URL.');
+        self::assertSelectorTextContains('body', 'Doc / Specs link is not a valid URL.');
         self::assertNull($this->em->getRepository(Project::class)->findOneBy(['name' => 'Bad links project']));
     }
 

@@ -5036,7 +5036,7 @@
       "priority": "must",
       "depends_on": [],
       "acceptance_criteria": [
-        "The project create/edit form has Local URL, Dev URL, Prod URL and Doc / Specs URL fields, all optional",
+        "The project create/edit form has Local URL, Dev URL, Prod URL and Doc / Specs link fields, all optional",
         "A link typed without a scheme is saved with http://; a blank one is saved as NULL",
         "An invalid URL is refused with a message naming the field and nothing is saved",
         "The project page shows the links; only http(s) values are clickable"
