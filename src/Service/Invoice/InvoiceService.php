@@ -234,6 +234,28 @@ final class InvoiceService
         return WriteResult::saved($invoice);
     }
 
+    /**
+     * Deletes an invoice that was never sent (ADR-097): its lines go with it (so its tasks can be invoiced again) and
+     * its number is not handed out again. A sent invoice is refused — it is checked under a row lock, so an email
+     * going out at the same moment cannot slip between the check and the delete.
+     *
+     * @return bool false when the invoice has been sent and was kept
+     */
+    public function delete(Invoice $invoice, User $actor): bool
+    {
+        return $this->em->wrapInTransaction(function () use ($invoice, $actor): bool {
+            $this->em->refresh($invoice, LockMode::PESSIMISTIC_WRITE);
+            if ($invoice->isSent()) {
+                return false;
+            }
+            $this->history->forget($invoice, $actor);
+            $this->em->remove($invoice);
+            $this->em->flush();
+
+            return true;
+        });
+    }
+
     /** Cancelling keeps the invoice and its number but releases its tasks for another invoice. */
     public function cancel(Invoice $invoice, ?string $reason, User $actor): void
     {

@@ -36,6 +36,10 @@ class Expense
     #[ORM\Column(type: 'text', nullable: true)]
     private ?string $note = null;
 
+    /** Optional reference for how it was paid: UPI id / transaction no., cheque no. and bank… (ADR-097). */
+    #[ORM\Column(length: 255, nullable: true)]
+    private ?string $paymentDetails = null;
+
     #[ORM\Column(nullable: true)]
     private ?int $createdBy = null;
 
@@ -114,6 +118,18 @@ class Expense
     public function setNote(?string $note): static
     {
         $this->note = $note;
+
+        return $this;
+    }
+
+    public function getPaymentDetails(): ?string
+    {
+        return $this->paymentDetails;
+    }
+
+    public function setPaymentDetails(?string $paymentDetails): static
+    {
+        $this->paymentDetails = $paymentDetails;
 
         return $this;
     }

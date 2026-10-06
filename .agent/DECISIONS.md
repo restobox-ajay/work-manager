@@ -2634,3 +2634,20 @@ page and no account without an invitation, unknown mode treated as invitation-on
 **Tripwire:** verifiable — Verified by `tests/Unit/EventListener/SecurityHeadersSubscriberTest.php`,
 `tests/Unit/Service/Log/ErrorLogWriterRedactionTest.php` and `tests/Functional/Security/RememberMeTest.php`
 (SameSite=Lax).
+
+## ADR-097: Delete unsent invoices; optional payment details on expenses (owner request, 2026-10-06)
+
+**Decision.**
+- **Invoice delete.** The invoice list has a Delete button (with a confirm) on invoices that were never emailed
+  (`Invoice::isSent()` = `emailed_at` set). A sent invoice is a record the client holds: it gets no button, and
+  `POST /invoice/{id}/delete` refuses it — re-checked under a row lock (`InvoiceService::delete`), so an email
+  sent from another tab after the list was opened is still caught. Deleting removes the lines (its tasks can be
+  invoiced again) and its `invoice_log` history; the audit log keeps one `invoice.deleted` entry (number, client,
+  total). Numbers are not reused (ADR-077). Sent invoices are cancelled instead.
+- **Expense payment details.** `expense.payment_details` (VARCHAR 255, optional; migration
+  `Version20261011160000`). The form field's label follows "Paid by" (`ExpenseService::PAYMENT_DETAIL_LABELS`:
+  UPI ID / transaction no., Bank / transaction reference, Cheque no. and details, Payment details) and is hidden
+  for cash, whose details are not stored. Shown under "Paid by" in the month list.
+
+**Tripwire:** verifiable — Verified by `tests/Functional/Invoice/InvoiceDeleteTest.php` and
+`tests/Functional/Expense/ExpensePaymentDetailsTest.php`.

@@ -22,6 +22,13 @@
                                 <a class="btn info xs" href="{{ path('app_invoice_email', {id: invoice.id}) }}" title="Email the invoice with its PDF">Email</a>
                                 <a class="btn warning xs" href="{{ path('app_invoice_edit', {id: invoice.id}) }}">Edit</a>
                             {% endif %}
+                            {# ADR-097: a sent invoice is never deleted (cancel it instead), so it gets no Delete button. #}
+                            {% if not invoice.sent %}
+                                <form class="mx-form" method="post" action="{{ path('app_invoice_delete', {id: invoice.id}) }}" style="display:inline" onsubmit="return confirm('Delete invoice {{ invoice.number|e('js') }}? This cannot be undone.');">
+                                    <input type="hidden" name="_token" value="{{ csrf_token('invoice_delete_' ~ invoice.id) }}">
+                                    <button class="btn danger xs" type="submit">Delete</button>
+                                </form>
+                            {% endif %}
                         </td>
                     </tr>
 {% endmacro %}

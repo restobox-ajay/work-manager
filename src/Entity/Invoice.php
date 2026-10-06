@@ -482,6 +482,12 @@ class Invoice
         return $this->status === InvoiceStatus::Cancelled;
     }
 
+    /** Emailed to the client at least once (ADR-097): a sent invoice is a record the client holds and is never deleted. */
+    public function isSent(): bool
+    {
+        return $this->emailedAt !== null;
+    }
+
     /** @return int[] the tasks this invoice bills */
     public function taskIds(): array
     {

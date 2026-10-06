@@ -106,6 +106,7 @@ final class ExpenseController extends AbstractWorkController
             'categories' => $this->categories->findSelectable($expense?->getCategory()?->getId()),
             'properties' => $this->properties->findAllOrdered(),
             'methods'    => ExpenseService::METHODS,
+            'paymentDetailLabels' => ExpenseService::PAYMENT_DETAIL_LABELS,
         ], new Response(status: $errors === [] ? 200 : 422));
     }
 

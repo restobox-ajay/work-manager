@@ -197,6 +197,23 @@ final class InvoiceController extends AbstractWorkController
         return $this->redirectToRoute('app_invoice_view', ['id' => $invoice->getId()]);
     }
 
+    /** Only an invoice that was never emailed can be deleted (ADR-097); the list hides the button for sent ones. */
+    #[Route('/{id}/delete', name: 'app_invoice_delete', requirements: ['id' => '\d+'], methods: ['POST'])]
+    public function delete(Invoice $invoice, Request $request): Response
+    {
+        $this->assertCsrf($request, 'invoice_delete_'.$invoice->getId());
+        $number = $invoice->getNumber();
+        $listRoute = $invoice->getKind() === InvoiceKind::Tasks ? 'app_invoice_tasks' : 'app_invoice_independent';
+        if (!$this->invoices->delete($invoice, $this->viewer())) {
+            $this->addFlash('error', sprintf('Invoice %s has been sent to the client, so it cannot be deleted. Cancel it instead.', $number));
+
+            return $this->redirectToRoute('app_invoice_view', ['id' => $invoice->getId()]);
+        }
+        $this->addFlash('success', sprintf('Invoice %s deleted.', $number));
+
+        return $this->redirectToRoute($listRoute);
+    }
+
     /** @return string[] the GST rates an invoice's lines were saved with (still offered when editing it) */
     private static function savedGstRates(Invoice $invoice): array
     {

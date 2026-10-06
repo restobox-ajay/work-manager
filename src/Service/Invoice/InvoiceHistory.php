@@ -22,6 +22,7 @@ final class InvoiceHistory
     public const EMAILED = 'emailed';
     public const EMAIL_FAILED = 'email_failed';
     public const CANCELLED = 'cancelled';
+    public const DELETED = 'deleted';
 
     public const LABELS = [
         self::CREATED      => 'Created',
@@ -44,5 +45,18 @@ final class InvoiceHistory
         $this->em->flush();
 
         $this->audit->record($actor, 'invoice.'.$action, trim(sprintf('#%d %s %s', (int) $invoice->getId(), $invoice->getNumber(), (string) $detail)));
+    }
+
+    /**
+     * A deleted invoice (ADR-097) takes its own history with it — there is no invoice left to show it on — so what
+     * remains is one "invoice.deleted" audit-log entry with its number, client and total. Flushed by the caller.
+     */
+    public function forget(Invoice $invoice, User $actor): void
+    {
+        $this->em->createQueryBuilder()->delete(InvoiceLog::class, 'l')->where('l.invoiceId = :id')
+            ->setParameter('id', (int) $invoice->getId())->getQuery()->execute();
+
+        $this->audit->record($actor, 'invoice.'.self::DELETED, sprintf('#%d %s to %s, %s %s', (int) $invoice->getId(),
+            $invoice->getNumber(), $invoice->getToName(), $invoice->getCurrency(), $invoice->getTotal()));
     }
 }

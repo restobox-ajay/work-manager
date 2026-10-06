@@ -28,7 +28,13 @@
         <div class="field"><label for="f-amount">Amount (₹) <span class="req">*</span></label><input type="text" inputmode="decimal" id="f-amount" name="amount" value="{{ values.amount ?? '' }}" required {{ expense ? '' : 'autofocus' }}></div>
         <div class="field">
             <label for="f-method">Paid by <span class="req">*</span></label>
-            <select id="f-method" name="method" required>{% for k, label in methods %}<option value="{{ k }}" {{ (values.method ?? '') == k ? 'selected' }}>{{ label }}</option>{% endfor %}</select>
+            <select id="f-method" name="method" required data-payment-labels="{{ paymentDetailLabels|json_encode }}">{% for k, label in methods %}<option value="{{ k }}" {{ (values.method ?? '') == k ? 'selected' }}>{{ label }}</option>{% endfor %}</select>
+        </div>
+        {# ADR-097: optional; its label follows "Paid by" (public/js/expense-form.js), hidden for cash. #}
+        {% set detailLabel = paymentDetailLabels[values.method ?? ''] ?? null %}
+        <div class="field" id="f-payment-details-field" {{ detailLabel is null ? 'hidden' }}>
+            <label for="f-payment-details">{{ detailLabel ?? 'Payment details' }}</label>
+            <input type="text" id="f-payment-details" name="paymentDetails" value="{{ values.paymentDetails ?? '' }}" maxlength="255" placeholder="Optional">
         </div>
         <div class="field span-all"><label for="f-description">Description <span class="req">*</span></label><input type="text" id="f-description" name="description" value="{{ values.description ?? '' }}" maxlength="255" required placeholder="e.g. Plumber for kitchen leak"></div>
         <div class="field">
@@ -46,4 +52,5 @@
         <button class="btn primary" type="submit">Save expense</button>
     </div>
 </form>
+<script src="{{ versioned('/js/expense-form.js') }}" defer></script>
 {% endblock %}

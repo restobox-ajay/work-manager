@@ -47,7 +47,7 @@
                         <td>{{ e.category ? e.category.name : '—' }}</td>
                         <td>{{ e.description }}{% if e.note %}<div class="muted small">{{ ui.short(e.note) }}</div>{% endif %}</td>
                         <td>{{ e.property ? e.property.name : '—' }}</td>
-                        <td>{{ methods[e.method] ?? e.method }}</td>
+                        <td>{{ methods[e.method] ?? e.method }}{% if e.paymentDetails %}<div class="muted small">{{ e.paymentDetails }}</div>{% endif %}</td>
                         <td class="num bold">{{ e.amount|invoice_money('INR') }}</td>
                         <td class="actions">
                             <a class="btn warning xs" href="{{ path('app_expense_edit', {id: e.id}) }}">Edit</a>

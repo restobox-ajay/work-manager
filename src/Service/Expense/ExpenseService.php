@@ -24,6 +24,18 @@ final class ExpenseService
 {
     public const METHODS = RentMoney::METHODS;
 
+    /**
+     * What the optional payment-details field asks for, per "Paid by" method (ADR-097). A method that is not listed
+     * (cash) has no details: the field is hidden and anything posted for it is dropped.
+     */
+    public const PAYMENT_DETAIL_LABELS = [
+        'upi'    => 'UPI ID / transaction no.',
+        'bank'   => 'Bank / transaction reference',
+        'cheque' => 'Cheque no. and details (bank, date)',
+        'other'  => 'Payment details',
+    ];
+    private const MAX_PAYMENT_DETAILS = 255;
+
     /** The bucket for expenses saved without a category in the month and year totals. */
     public const UNCATEGORISED = 'Uncategorised';
 
@@ -47,6 +59,7 @@ final class ExpenseService
             'description' => $expense->getDescription(),
             'propertyId'  => $expense->getProperty()?->getId(),
             'note'        => $expense->getNote(),
+            'paymentDetails' => $expense->getPaymentDetails(),
         ];
     }
 
@@ -73,6 +86,10 @@ final class ExpenseService
         if (!isset(self::METHODS[$method])) {
             $errors[] = 'Choose how it was paid.';
         }
+        $paymentDetails = isset(self::PAYMENT_DETAIL_LABELS[$method]) ? InputValue::text($posted['paymentDetails'] ?? null) : null;
+        if ($paymentDetails !== null && mb_strlen($paymentDetails) > self::MAX_PAYMENT_DETAILS) {
+            $errors[] = sprintf('Payment details can be at most %d characters.', self::MAX_PAYMENT_DETAILS);
+        }
         $description = InputValue::text($posted['description'] ?? null) ?? '';
         if ($description === '' || mb_strlen($description) > 255) {
             $errors[] = 'Enter what it was for (at most 255 characters).';
@@ -89,7 +106,8 @@ final class ExpenseService
         $expense ??= (new Expense())->setCreatedAt(time())->setCreatedBy($actor->getId());
         $note = is_scalar($posted['note'] ?? null) ? trim(str_replace("\r\n", "\n", (string) $posted['note'])) : '';
         $expense->setSpentOn($date)->setCategory($category)->setAmount(RentMoney::d((int) $amount))->setMethod($method)
-            ->setDescription($description)->setProperty($property)->setNote($note !== '' ? $note : null)->setUpdatedAt(time());
+            ->setPaymentDetails($paymentDetails)->setDescription($description)->setProperty($property)
+            ->setNote($note !== '' ? $note : null)->setUpdatedAt(time());
         if ($isNew) {
             $this->em->persist($expense);
         }
