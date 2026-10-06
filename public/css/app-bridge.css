@@ -720,9 +720,13 @@ table.t .group-total.grand td { background: #ecebf3; font-size: .95rem; }
 .impersonation-banner button.btn { height: 26px; font-size: .75rem; }
 /* A link button next to one-button POST forms in a cell lines up with them (e.g. Edit on the users list). */
 .page-body td > a.btn { margin: 2px 5px 2px 0; vertical-align: middle; }
-/* A page-level link button ("+ New User", "+ New Invitation") sits 5px above what follows it. */
+/* A page-level link button ("+ New User", "+ New Invitation") keeps 5px clear above and below. */
 .site-app .page-body > a.btn,
-.site-app .page-body > p > a.btn:only-child { margin: 0 6px 5px 0; }
+.site-app .page-body > p > a.btn:only-child { margin: 5px 6px 5px 0; }
+/* Every button in the page keeps 5px clear above and below, so it never touches the card, table, form or section
+   next to it. Buttons in table cells keep their compact spacing (the cell rules below win), so rows do not grow. */
+.page-body .btn { margin-top: 5px; margin-bottom: 5px; }
+.page-body td .btn { margin-top: 0; margin-bottom: 0; }
 /* Buttons side by side are 5px apart everywhere: page-head actions, button rows, table footers and action cells.
    An action cell drops the whitespace between its inline buttons (font-size 0; buttons size their text in rem),
    so only the 5px margin separates them. */
