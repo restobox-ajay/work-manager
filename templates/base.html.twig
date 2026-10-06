@@ -6,13 +6,11 @@
         <meta name="theme-color" content="#206eb8">
         <title>{% block title %}{{ app_name }}{% endblock %}</title>
         <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 128 128%22><text y=%221.2em%22 font-size=%2296%22>⚫️</text><text y=%221.3em%22 x=%220.2em%22 font-size=%2276%22 fill=%22%23fff%22>sf</text></svg>">
-        {# Runs before the first paint, so a sidebar the user collapsed is drawn collapsed straight away instead of
-           drawn open and then snapped shut (a visible flicker on every page load). `js` lets the CSS show controls
-           that only work with app.js. Storage can throw (private mode, blocked site data): fall back to open. #}
-        <script>
-            document.documentElement.classList.add('js');
-            try { if (localStorage.getItem('sidebarCollapsed') === '1') { document.documentElement.classList.add('sidebar-collapsed'); } } catch (e) {}
-        </script>
+        {# Before the first paint (no defer): draws a collapsed sidebar collapsed straight away. A file, not inline, so
+           strict-CSP pages can run it. #}
+        <script src="{{ versioned('/js/early.js') }}"></script>
+        {# Signed-in pages report JavaScript errors to the Error Log (ADR-093; public/js/app.js). #}
+        {% if app.user %}<meta name="client-error-endpoint" content="{{ path('app_logs_client_error') }}">{% endif %}
         {% block stylesheets %}
         {# app.css is the Maxeme Auto mockup's stylesheet, copied as-is so both share one palette and shell;
            app-bridge.css maps this app's plain page markup (bare h1/form/table) onto it. #}

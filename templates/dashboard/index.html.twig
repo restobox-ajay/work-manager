@@ -23,6 +23,19 @@
 
 {{ ui.flashes() }}
 
+{% if renewing is defined and renewing is not empty %}
+    {% import 'subscription/_macros.html.twig' as sm %}
+    <div class="card renew-alert" role="status">
+        <div class="ra-head"><b>{{ renewing|length }} subscription{{ renewing|length == 1 ? '' : 's' }} renewing in the next 30 days</b>
+            <a class="btn info xs" href="{{ path('app_subscription_renewals') }}">View all</a></div>
+        <ul>
+            {% for s in renewing|slice(0, 5) %}
+                <li><a href="{{ path('app_subscription_show', {id: s.id}) }}">{{ s.name }}</a> · {{ s.amount|invoice_money(s.currency) }} · {{ sm.renewal(s, renewingStates[s.id]) }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+{% endif %}
+
 <div class="split dash-split">
     <nav class="card" aria-label="Clients" style="padding:12px 0">
         <div class="section-label" style="padding:0 14px 4px;margin:0 0 4px">Select client</div>

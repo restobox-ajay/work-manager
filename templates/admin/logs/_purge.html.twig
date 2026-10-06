@@ -1,0 +1,6 @@
+{# Clear old entries of one log (ADR-093). #}
+<form class="mx-form btn-row" method="post" action="{{ path('app_admin_logs_purge', {kind: kind}) }}">
+    <input type="hidden" name="_token" value="{{ csrf_token('logs_purge_' ~ kind) }}">
+    <select name="days" aria-label="Older than" style="width:auto">{% for d in purgeDays %}<option value="{{ d }}">Older than {{ d }} days</option>{% endfor %}</select>
+    <button class="btn danger sm" type="submit" onclick="return confirm('Delete these log entries? This cannot be undone.');">Clear old entries</button>
+</form>

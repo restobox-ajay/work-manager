@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Repository;
 
 use App\Entity\AuditLog;
+use App\Service\Log\ActivityAreas;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\ManagerRegistry;
@@ -40,6 +41,21 @@ class AuditLogRepository extends ServiceEntityRepository
             ->getResult();
     }
 
+    /** @return list<string> every action recorded so far, for the Activity Log's filter */
+    public function findDistinctActions(): array
+    {
+        return array_column($this->createQueryBuilder('a')->select('DISTINCT a.action')->orderBy('a.action', 'ASC')->getQuery()->getArrayResult(), 'action');
+    }
+
+    /** @return iterable<AuditLog> matching entries, newest first, at most $limit — for the CSV export */
+    public function iterateFiltered(array $filters, int $limit): iterable
+    {
+        $qb = $this->createQueryBuilder('a')->orderBy('a.createdAt', 'DESC')->addOrderBy('a.id', 'DESC')->setMaxResults($limit);
+        $this->applyFilters($qb, $filters);
+
+        return $qb->getQuery()->toIterable();
+    }
+
     public function deleteOlderThan(\DateTimeImmutable $cutoff): int
     {
         return (int) $this->getEntityManager()
@@ -69,6 +85,19 @@ class AuditLogRepository extends ServiceEntityRepository
         if (!empty($filters['action'])) {
             $qb->andWhere('a.action = :action')
                ->setParameter('action', $filters['action']);
+        }
+
+        if (!empty($filters['area'])) {
+            // Sign-in & security actions have no "area." prefix; the others start with theirs (ADR-093).
+            if ($filters['area'] === ActivityAreas::SECURITY) {
+                $qb->andWhere('a.action NOT LIKE :dotted')->setParameter('dotted', '%.%');
+            } else {
+                $qb->andWhere('a.action LIKE :area')->setParameter('area', $filters['area'].'.%');
+            }
+        }
+
+        if (!empty($filters['outcome'])) {
+            $qb->andWhere('a.outcome = :outcome')->setParameter('outcome', $filters['outcome']);
         }
 
         // date_from/date_to are already validated \DateTimeImmutable objects

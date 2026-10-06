@@ -57,7 +57,7 @@
 {# On an invoice's own pages, the menu entry of its kind is the current one. #}
 {% set invoiceKind = app.request.attributes.get('_invoice_kind') %}
 {% set configLinks = [] %}
-{% for l in [['tags','Tags','New tag'],['payers','Payer Entities','New payer entity'],['wallet-entities','Wallet Entities','New wallet entity'],['payment-methods','Payment Methods','New payment method'],['task-types','Task Types','New task type'],['task-statuses','Task Status','New task status'],['email-templates','Email Templates','New email template'],['currencies','Currency','New currency'],['countries','Country','New country'],['billing-profiles','Billing Profiles','New billing profile'],['expense-categories','Expense Categories','New expense category']] %}
+{% for l in [['tags','Tags','New tag'],['payers','Payer Entities','New payer entity'],['wallet-entities','Wallet Entities','New wallet entity'],['payment-methods','Payment Methods','New payment method'],['task-types','Task Types','New task type'],['task-statuses','Task Status','New task status'],['email-templates','Email Templates','New email template'],['currencies','Currency','New currency'],['countries','Country','New country'],['billing-profiles','Billing Profiles','New billing profile'],['expense-categories','Expense Categories','New expense category'],['subscription-categories','Subscription Categories','New subscription category']] %}
     {% set configLinks = configLinks|merge([{ label: l[1], href: path('app_config_list', {kind: l[0]}), current: cur starts with 'app_config_' and kind == l[0],
       add: { label: l[2], href: path('app_config_new', {kind: l[0]}) } }]) %}
 {% endfor %}
@@ -86,6 +86,15 @@
             { label: 'Monthly Expenses', href: path('app_expense_index'), current: cur starts with 'app_expense_' and cur != 'app_expense_year',
               add: { label: 'New expense', href: path('app_expense_new') } },
         ] },
+        { label: 'Subscription Manager', icon: 'refresh', children: [
+            { label: 'All Subscriptions', href: path('app_subscription_index'), current: cur starts with 'app_subscription_' and cur not in ['app_subscription_renewals', 'app_subscription_summary'],
+              add: { label: 'New subscription', href: path('app_subscription_new') } },
+            { label: 'Upcoming Renewals', href: path('app_subscription_renewals'), current: cur == 'app_subscription_renewals' },
+            { label: 'Cost Summary', href: path('app_subscription_summary'), current: cur == 'app_subscription_summary' },
+        ] },
+        { label: 'Password Manager', icon: 'lock', children: [
+            { label: 'My Vault', href: path('app_vault_index'), current: cur starts with 'app_vault_' },
+        ] },
         { label: 'Users', icon: 'users', children: [
             { label: 'All Users', href: path('app_admin_users'), current: cur starts with 'app_admin_users' and cur != 'app_admin_users_invite' and cur != 'app_admin_users_invitations',
               add: { label: 'New user', href: path('app_admin_users_new') } },
@@ -96,9 +105,13 @@
         { label: 'Settings', icon: 'toggle', children: [
             { label: 'Tax Rates', href: path('app_settings_tax_rates'), current: cur == 'app_settings_tax_rates' },
         ] },
+        { label: 'Logs', icon: 'log', children: [
+            { label: 'Activity Log', href: path('app_admin_audit_log'), current: cur starts with 'app_admin_audit_log' },
+            { label: 'Email Log', href: path('app_admin_email_log'), current: cur starts with 'app_admin_email_log' },
+            { label: 'Error Log', href: path('app_admin_error_log'), current: cur starts with 'app_admin_error_log' },
+        ] },
         { label: 'Administration', icon: 'settings', children: [
             { label: 'Overview', href: path('app_admin_dashboard'), current: cur == 'app_admin_dashboard' },
-            { label: 'Audit Log', href: path('app_admin_audit_log'), current: cur == 'app_admin_audit_log' },
             { label: 'General Config', href: path('app_admin_config'), current: cur == 'app_admin_config' },
             { label: 'API Docs', href: path('app_admin_api_docs'), current: cur starts with 'app_admin_api_docs' },
         ] },

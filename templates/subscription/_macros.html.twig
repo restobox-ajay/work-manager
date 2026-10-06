@@ -1,0 +1,16 @@
+{# Subscriptions helpers (ADR-091). #}
+{# hundredths + currency → "$20.00" #}
+{% macro money(h, currency) %}{{ (h / 100)|number_format(2, '.', '')|invoice_money(currency) }}{% endmacro %}
+{# A renewal date with how close it is: overdue / soon / ok #}
+{% macro renewal(s, state) %}
+    {%- if s.nextRenewal -%}
+        {% set days = ((s.nextRenewal|date('U') - 'today'|date('U')) / 86400)|round %}
+        <span class="nowrap">{{ s.nextRenewal|date('M j, Y') }}</span>
+        {% if state == 'overdue' %}<span class="badge danger">Overdue {{ -days }}d</span>
+        {% elseif state == 'soon' %}<span class="badge warn">{{ days == 0 ? 'Today' : 'In ' ~ days ~ 'd' }}</span>{% endif %}
+    {%- else -%}<span class="muted">{{ s.cycle.recurring ? '—' : s.cycle.label }}</span>{%- endif -%}
+{% endmacro %}
+{% macro status(status) %}
+    {%- set map = {active: 'success', paused: 'warn', cancelled: 'plain'} -%}
+    <span class="badge {{ map[status] ?? 'plain' }}">{{ status|capitalize }}</span>
+{%- endmacro %}

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Service;
 
+use App\Enum\AuditOutcome;
+use App\Service\Log\ActivityAreas;
 use Symfony\Component\HttpFoundation\Request;
 
 /**
@@ -34,6 +36,17 @@ final class AuditLogFilterParser
         $action = trim((string) $request->query->get('action', ''));
         if ($action !== '') {
             $filters['action'] = $action;
+        }
+
+        // Activity Log only (ADR-093): unknown values are ignored rather than reported.
+        $area = trim((string) $request->query->get('area', ''));
+        if (isset(ActivityAreas::AREAS[$area])) {
+            $filters['area'] = $area;
+        }
+
+        $outcome = trim((string) $request->query->get('outcome', ''));
+        if (in_array($outcome, AuditOutcome::values(), true)) {
+            $filters['outcome'] = $outcome;
         }
 
         $dateFrom = trim((string) $request->query->get('date_from', ''));

@@ -105,3 +105,31 @@
         initUserMenus();
     });
 })();
+
+// Error Log (ADR-093): a signed-in page reports its JavaScript errors, at most 5 distinct ones per page view.
+// sendBeacon survives navigation and needs no response; the server checks origin, size and rate.
+(function () {
+    'use strict';
+    var meta = document.querySelector('meta[name="client-error-endpoint"]');
+    if (!meta || !navigator.sendBeacon) { return; }
+    var endpoint = meta.content, sent = {}, count = 0;
+    function report(message, source, line, stack) {
+        message = String(message || '').slice(0, 1000);
+        if (!message || sent[message] || count >= 5) { return; }
+        sent[message] = true;
+        count++;
+        var body = JSON.stringify({ message: message, source: source ? String(source).slice(0, 500) : null,
+            line: typeof line === 'number' ? line : null, stack: stack ? String(stack).slice(0, 4000) : null,
+            url: location.origin + location.pathname });
+        try { navigator.sendBeacon(endpoint, new Blob([body], { type: 'text/plain' })); } catch (e) { /* nothing more to do */ }
+    }
+    window.addEventListener('error', function (event) {
+        // Resource load failures (blocked fonts, images) are not script errors.
+        if (!event.message) { return; }
+        report(event.message, event.filename, event.lineno, event.error && event.error.stack);
+    });
+    window.addEventListener('unhandledrejection', function (event) {
+        var reason = event.reason;
+        report('Unhandled promise rejection: ' + (reason && reason.message ? reason.message : String(reason)), null, null, reason && reason.stack);
+    });
+})();

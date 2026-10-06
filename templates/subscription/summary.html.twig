@@ -1,0 +1,49 @@
+{% extends 'base.html.twig' %}
+{% import '_work/macros.html.twig' as ui %}
+{% import 'subscription/_macros.html.twig' as sm %}
+
+{% block title %}Subscription costs{% endblock %}
+
+{% block body %}
+<div class="page-head">
+    <div class="ph-main">
+        <div class="eyebrow">Subscriptions</div>
+        <div class="ph-title"><h1>Cost summary</h1></div>
+        <p class="lead">What active recurring subscriptions cost per month and per year, by category. Each currency is totalled separately (no conversion).
+            {{ counts.active ?? 0 }} active · {{ counts.paused ?? 0 }} paused · {{ counts.cancelled ?? 0 }} cancelled.</p>
+    </div>
+    <div class="ph-actions"><a class="btn primary" href="{{ path('app_subscription_new') }}">+ New subscription</a></div>
+</div>
+{{ ui.flashes() }}
+{% for currency, c in costs %}
+    <div class="table-card" style="margin-bottom:16px">
+        <div class="table-header"><b>{{ currency }}</b><span class="grow"></span><span class="muted">{{ c.count }} recurring</span></div>
+        <div class="tscroll">
+            <table class="t">
+                <thead><tr><th>Category</th><th class="num">Subscriptions</th><th class="num">Per month</th><th class="num">Per year</th><th class="num">Share</th></tr></thead>
+                <tbody>
+                    {% for name, b in c.byCategory %}
+                        <tr><td>{{ name }}</td><td class="num">{{ b.count }}</td><td class="num">{{ sm.money(b.monthly, currency) }}</td><td class="num">{{ sm.money(b.yearly, currency) }}</td><td class="num">{{ c.yearly ? (b.yearly * 100 / c.yearly)|round : 0 }}%</td></tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot><tr class="group-total"><td class="bold">Total</td><td class="num bold">{{ c.count }}</td><td class="num bold">{{ sm.money(c.monthly, currency) }}</td><td class="num bold">{{ sm.money(c.yearly, currency) }}</td><td class="num bold">100%</td></tr></tfoot>
+            </table>
+        </div>
+    </div>
+{% else %}
+    <div class="card"><b>No active recurring subscriptions yet.</b> <a href="{{ path('app_subscription_new') }}">Add one</a>.</div>
+{% endfor %}
+{% if oneTime is not empty %}
+    <div class="table-card">
+        <div class="table-header"><b>One-time and lifetime purchases</b><span class="grow"></span><span class="muted">not in the monthly / yearly totals</span></div>
+        <div class="tscroll">
+            <table class="t">
+                <thead><tr><th>Name</th><th>Category</th><th>Billing</th><th class="num">Cost</th></tr></thead>
+                <tbody>
+                    {% for s in oneTime %}<tr><td><a href="{{ path('app_subscription_show', {id: s.id}) }}">{{ s.name }}</a></td><td>{{ s.category ? s.category.name : '—' }}</td><td>{{ s.cycle.label }}</td><td class="num">{{ s.amount|invoice_money(s.currency) }}</td></tr>{% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,69 @@
+{% extends 'base.html.twig' %}
+{% import '_work/macros.html.twig' as ui %}
+
+{% block title %}{{ s ? 'Edit ' ~ s.name : 'New subscription' }}{% endblock %}
+
+{% block body %}
+{% set back = s ? path('app_subscription_show', {id: s.id}) : path('app_subscription_index') %}
+{% set v = values %}
+<div class="page-head">
+    <div class="ph-main">
+        <div class="eyebrow">Subscriptions</div>
+        <div class="ph-title"><h1>{{ s ? 'Edit ' ~ s.name : 'New subscription' }}</h1></div>
+        <p class="lead">Passwords and licence keys are not stored here — keep them in the Password Manager.</p>
+    </div>
+    <div class="ph-actions"><a class="btn secondary back" href="{{ back }}">Back</a></div>
+</div>
+{{ ui.errors(errors) }}
+<form class="card mx-form" method="post" style="max-width:900px">
+    <input type="hidden" name="_token" value="{{ csrf_token('subscription_form') }}">
+    <div class="section-label">App or service</div>
+    <div class="form-grid">
+        <div class="field"><label for="f-name">Name <span class="req">*</span></label><input type="text" id="f-name" name="name" value="{{ v.name ?? '' }}" maxlength="120" required placeholder="e.g. Claude Pro, PhpStorm, Microsoft 365" {{ s ? '' : 'autofocus' }}></div>
+        <div class="field"><label for="f-vendor">Vendor</label><input type="text" id="f-vendor" name="vendor" value="{{ v.vendor ?? '' }}" maxlength="120" placeholder="e.g. Anthropic, JetBrains, Microsoft"></div>
+        <div class="field">
+            <label for="f-category">Category</label>
+            <select id="f-category" name="categoryId">
+                <option value="">None</option>
+                {% for c in categories %}<option value="{{ c.id }}" {{ (v.categoryId ?? '') == c.id ? 'selected' }}>{{ c.name }}</option>{% endfor %}
+            </select>
+        </div>
+        <div class="field"><label for="f-plan">Plan</label><input type="text" id="f-plan" name="plan" value="{{ v.plan ?? '' }}" maxlength="120" placeholder="e.g. Pro, All Products Pack, Family"></div>
+        <div class="field">
+            <label for="f-status">Status <span class="req">*</span></label>
+            <select id="f-status" name="status" required>{% for k, label in statuses %}<option value="{{ k }}" {{ (v.status ?? '') == k ? 'selected' }}>{{ label }}</option>{% endfor %}</select>
+        </div>
+    </div>
+
+    <div class="section-label" style="margin-top:18px">Billing</div>
+    <div class="form-grid">
+        <div class="field"><label for="f-amount">Cost <span class="req">*</span></label><input type="text" inputmode="decimal" id="f-amount" name="amount" value="{{ v.amount ?? '' }}" required></div>
+        <div class="field">
+            <label for="f-currency">Currency <span class="req">*</span></label>
+            <select id="f-currency" name="currency" required>{% for c in currencies %}<option value="{{ c }}" {{ (v.currency ?? '') == c ? 'selected' }}>{{ c }}</option>{% endfor %}</select>
+        </div>
+        <div class="field">
+            <label for="f-cycle">Billed <span class="req">*</span></label>
+            <select id="f-cycle" name="billingCycle" required>{% for k, label in cycles %}<option value="{{ k }}" {{ (v.billingCycle ?? '') == k ? 'selected' }}>{{ label }}</option>{% endfor %}</select>
+        </div>
+        <div class="field"><label for="f-start">Start date</label><input type="date" id="f-start" name="startDate" value="{{ v.startDate ?? '' }}"></div>
+        <div class="field"><label for="f-next">Next renewal</label><input type="date" id="f-next" name="nextRenewal" value="{{ v.nextRenewal ?? '' }}"><small class="muted">Blank: worked out from the start date. Ignored for one-time / lifetime.</small></div>
+        <div class="field"><label class="check"><input type="checkbox" name="autoRenew" value="1" {{ (v.autoRenew ?? false) ? 'checked' }}> Renews automatically</label></div>
+        <div class="field"><label for="f-paid-with">Paid with</label><input type="text" id="f-paid-with" name="paymentMethod" value="{{ v.paymentMethod ?? '' }}" maxlength="120" placeholder="e.g. HDFC credit card, PayPal"></div>
+        <div class="field"><label for="f-billing-url">Billing portal</label><input type="text" id="f-billing-url" name="billingUrl" value="{{ v.billingUrl ?? '' }}" maxlength="255" placeholder="https://"></div>
+    </div>
+
+    <div class="section-label" style="margin-top:18px">Account</div>
+    <div class="form-grid">
+        <div class="field"><label for="f-email">Account email</label><input type="email" id="f-email" name="accountEmail" value="{{ v.accountEmail ?? '' }}" maxlength="180"></div>
+        <div class="field"><label for="f-seats">Seats / devices</label><input type="number" id="f-seats" name="seats" value="{{ v.seats ?? '' }}" min="1" step="1"></div>
+        <div class="field"><label for="f-assigned">Assigned to</label><input type="text" id="f-assigned" name="assignedTo" value="{{ v.assignedTo ?? '' }}" maxlength="120" placeholder="Who uses it"></div>
+        <div class="field"><label for="f-website">Website</label><input type="text" id="f-website" name="websiteUrl" value="{{ v.websiteUrl ?? '' }}" maxlength="255" placeholder="https://"></div>
+        <div class="field span-all"><label for="f-notes">Notes</label><textarea id="f-notes" name="notes" rows="3">{{ v.notes ?? '' }}</textarea></div>
+    </div>
+    <div class="form-actions" style="margin-top:16px">
+        <a class="btn secondary" href="{{ back }}">Cancel</a>
+        <button class="btn primary" type="submit">Save subscription</button>
+    </div>
+</form>
+{% endblock %}

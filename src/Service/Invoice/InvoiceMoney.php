@@ -14,6 +14,12 @@ final class InvoiceMoney
     /** Symbols printed before an amount; any other currency prints its code. */
     private const SYMBOLS = ['USD' => '$', 'CAD' => '$', 'AUD' => '$', 'INR' => '₹', 'EUR' => '€', 'GBP' => '£'];
 
+    /** @return list<string> the currency codes this class has a symbol for, e.g. for a currency select */
+    public static function knownCurrencies(): array
+    {
+        return array_keys(self::SYMBOLS);
+    }
+
     /** "1,250.5" → 125050; null when it is not a number with at most two decimals. Thousands commas are allowed. */
     public static function toHundredths(?string $value): ?int
     {

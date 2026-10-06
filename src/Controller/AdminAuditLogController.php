@@ -6,6 +6,7 @@ namespace App\Controller;
 
 use App\Repository\AuditLogRepository;
 use App\Service\AuditLogFilterParser;
+use App\Service\Log\ActivityAreas;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -37,6 +38,10 @@ class AdminAuditLogController extends AbstractController
             'currentPage' => $page,
             'totalPages'  => $pages,
             'total'       => $total,
+            'pageSize'    => self::PAGE_SIZE,
+            'areas'       => ActivityAreas::AREAS,
+            'actions'     => $repository->findDistinctActions(),
+            'entryAreas'  => array_combine(array_map(static fn ($e) => $e->getId(), $entries), array_map(static fn ($e) => ActivityAreas::label($e->getAction()), $entries)),
         ]);
     }
 }

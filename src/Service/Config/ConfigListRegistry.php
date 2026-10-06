@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Service\Config;
 
 use App\Entity\Expense\ExpenseCategory;
+use App\Entity\Subscription\SubscriptionCategory;
 use App\Entity\Settings\BillingProfile;
 use App\Entity\Settings\Country;
 use App\Entity\Settings\Currency;
@@ -28,7 +29,7 @@ use App\Service\Config\ConfigField as F;
 final class ConfigListRegistry
 {
     /** The URL slugs, for the route requirement. */
-    public const KINDS = 'task-statuses|task-types|currencies|tags|payers|wallet-entities|payment-methods|email-templates|countries|billing-profiles|expense-categories';
+    public const KINDS = 'task-statuses|task-types|currencies|tags|payers|wallet-entities|payment-methods|email-templates|countries|billing-profiles|expense-categories|subscription-categories';
 
     /** @var array<string, ConfigListDefinition>|null */
     private ?array $definitions = null;
@@ -154,6 +155,14 @@ final class ConfigListRegistry
                 $active('isActive', 'setIsActive'),
             ], ['sortOrder' => 'ASC', 'name' => 'ASC'], false,
                 'What expenses are for (Expenses menu). Switch one off rather than removing it: existing expenses keep it.',
+                defaults: ['isActive' => true]),
+
+            new ConfigListDefinition('subscription-categories', SubscriptionCategory::class, 'Subscription Categories', 'Subscription category', [
+                new F('name', 'Name', 'getName', 'setName', required: true, maxLength: 80, unique: 'This category already exists.'),
+                new F('sortOrder', 'Order', 'getSortOrder', 'setSortOrder', F::INTEGER, help: 'Lower numbers come first.'),
+                $active('isActive', 'setIsActive'),
+            ], ['sortOrder' => 'ASC', 'name' => 'ASC'], false,
+                'Kinds of apps and services (Subscriptions menu). Switch one off rather than removing it: existing subscriptions keep it.',
                 defaults: ['isActive' => true]),
         ];
 

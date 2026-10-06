@@ -4211,3 +4211,6 @@ ADR-088 (2026-10-10): /rent/year with tenant + year dropdowns, Jan–Dec rows, M
 ADR-089 (2026-10-10): Expenses module (/expense month list, /expense/year, Config › Expense Categories),
 migration Version20261010140000. Browser-checked add/edit/delete/validation/year totals. No tests yet.
 ADR-090 (2026-10-10): expense category optional (migration Version20261010150000); totals show "Uncategorised". Browser-checked.
+ADR-091 (2026-10-11): Subscription Manager (/subscription list, renewals, cost summary, payments, dashboard alert), migration Version20261011120000. Browser-checked. No tests yet.
+ADR-092 (2026-10-11): Password Manager (/vault), browser-side AES-256-GCM, PBKDF2 600k, per-admin vaults, strict CSP, migration Version20261011130000. Browser-checked setup/unlock/lock/CRUD/copy/master change/reset/isolation; DB holds ciphertext only. No tests yet.
+ADR-093 (2026-10-11): Logs menu — Activity Log (areas, filters, detail, CSV), Email Log (queued/sent/failed via Mailer+Messenger events), Error Log (5xx, console, browser JS). Migration Version20261011140000. Browser-checked; existing AuditLogFilterParser unit tests pass (AuditLogAdminViewTest errors pre-existing: tests/Support references missing App\Entity\Admin).

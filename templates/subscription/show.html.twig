@@ -1,0 +1,91 @@
+{% extends 'base.html.twig' %}
+{% import '_work/macros.html.twig' as ui %}
+{% import 'subscription/_macros.html.twig' as sm %}
+
+{% block title %}{{ s.name }} · Subscription{% endblock %}
+
+{% macro link(url) %}{% if url and (url starts with 'http://' or url starts with 'https://') %}<a href="{{ url }}" target="_blank" rel="noopener noreferrer">{{ url }}</a>{% else %}—{% endif %}{% endmacro %}
+
+{% block body %}
+{% import _self as me %}
+<div class="page-head">
+    <div class="ph-main">
+        <div class="eyebrow">Subscriptions{{ s.category ? ' · ' ~ s.category.name : '' }}</div>
+        <div class="ph-title"><h1>{{ s.name }}</h1> {{ sm.status(s.status) }}</div>
+        <p class="lead">{{ s.amount|invoice_money(s.currency) }} · {{ s.cycle.label }}{% if s.plan %} · {{ s.plan }}{% endif %}{% if s.vendor %} · {{ s.vendor }}{% endif %}</p>
+    </div>
+    <div class="ph-actions">
+        <a class="btn secondary back" href="{{ path('app_subscription_index') }}">Back</a>
+        <a class="btn warning" href="{{ path('app_subscription_edit', {id: s.id}) }}">Edit</a>
+        <form class="mx-form" method="post" action="{{ path('app_subscription_delete', {id: s.id}) }}" style="display:inline" onsubmit="return confirm('Delete {{ s.name|e('js') }} and its payment history?');">
+            <input type="hidden" name="_token" value="{{ csrf_token('subscription_delete_' ~ s.id) }}">
+            <button class="btn danger" type="submit">Delete</button>
+        </form>
+    </div>
+</div>
+{{ ui.flashes() }}
+<div class="kpis rent-kpis">
+    <div class="kpi"><span>Next renewal</span><b>{{ sm.renewal(s, state) }}</b><small>{{ s.cycle.recurring ? (s.autoRenew ? 'Renews automatically' : 'Manual renewal') : 'Does not renew' }}</small></div>
+    <div class="kpi"><span>Per month</span><b>{{ s.cycle.recurring ? sm.money(monthly, s.currency) : '—' }}</b><small>equivalent</small></div>
+    <div class="kpi"><span>Per year</span><b>{{ s.cycle.recurring ? sm.money(yearly, s.currency) : '—' }}</b><small>equivalent</small></div>
+    <div class="kpi"><span>Paid so far</span><b>{{ sm.money(payments|reduce((c, p) => c + (p.amount * 100)|round, 0), s.currency) }}</b><small>{{ payments|length }} payment{{ payments|length == 1 ? '' : 's' }} recorded</small></div>
+</div>
+
+<div class="split" style="margin-top:16px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px">
+    <div class="card">
+        <div class="section-label">Details</div>
+        <table class="t v-kv">
+            <tr><th>Account email</th><td>{{ s.accountEmail ?: '—' }}</td></tr>
+            <tr><th>Seats / devices</th><td>{{ s.seats ?: '—' }}</td></tr>
+            <tr><th>Assigned to</th><td>{{ s.assignedTo ?: '—' }}</td></tr>
+            <tr><th>Paid with</th><td>{{ s.paymentMethod ?: '—' }}</td></tr>
+            <tr><th>Start date</th><td>{{ s.startDate ? s.startDate|date('M j, Y') : '—' }}</td></tr>
+            <tr><th>Website</th><td>{{ me.link(s.websiteUrl) }}</td></tr>
+            <tr><th>Billing portal</th><td>{{ me.link(s.billingUrl) }}</td></tr>
+            <tr><th>Notes</th><td>{{ s.notes ? s.notes|nl2br : '—' }}</td></tr>
+        </table>
+    </div>
+    <div class="card">
+        <div class="section-label">Record a payment</div>
+        {{ ui.errors(errors) }}
+        <form class="mx-form" method="post" action="{{ path('app_subscription_payment_new', {id: s.id}) }}">
+            <input type="hidden" name="_token" value="{{ csrf_token('subscription_payment_' ~ s.id) }}">
+            <div class="form-grid">
+                <div class="field"><label for="p-date">Paid on <span class="req">*</span></label><input type="date" id="p-date" name="paidOn" value="{{ paymentValues.paidOn ?? '' }}" required></div>
+                <div class="field"><label for="p-amount">Amount ({{ s.currency }}) <span class="req">*</span></label><input type="text" inputmode="decimal" id="p-amount" name="amount" value="{{ paymentValues.amount ?? '' }}" required></div>
+                <div class="field span-all"><label for="p-note">Note</label><input type="text" id="p-note" name="note" value="{{ paymentValues.note ?? '' }}" maxlength="255" placeholder="e.g. invoice number"></div>
+                {% if s.cycle.recurring %}
+                <div class="field span-all"><label class="check"><input type="checkbox" name="advance" value="1" {{ (paymentValues.advance ?? false) ? 'checked' }}> Move the next renewal forward one cycle{% if s.nextRenewal %} (to {{ s.nextRenewal|date_modify('+' ~ s.cycle.months ~ ' months')|date('M j, Y') }}){% endif %}</label></div>
+                {% endif %}
+            </div>
+            <div class="form-actions" style="margin-top:12px"><button class="btn success" type="submit">Record payment</button></div>
+        </form>
+    </div>
+</div>
+
+<div class="table-card" style="margin-top:16px">
+    <div class="table-header"><b>Payment history</b><span class="grow"></span></div>
+    <div class="tscroll">
+        <table class="t">
+            <thead><tr><th>Paid on</th><th class="num">Amount</th><th>Note</th><th></th></tr></thead>
+            <tbody>
+                {% for p in payments %}
+                    <tr>
+                        <td class="nowrap">{{ p.paidOn|date('M j, Y') }}</td>
+                        <td class="num bold">{{ p.amount|invoice_money(p.currency) }}</td>
+                        <td>{{ p.note ?: '—' }}</td>
+                        <td class="actions">
+                            <form class="mx-form" method="post" action="{{ path('app_subscription_payment_delete', {id: p.id}) }}" style="display:inline" onsubmit="return confirm('Delete this payment?');">
+                                <input type="hidden" name="_token" value="{{ csrf_token('subscription_payment_delete_' ~ p.id) }}">
+                                <button class="btn danger xs" type="submit">Delete</button>
+                            </form>
+                        </td>
+                    </tr>
+                {% else %}
+                    <tr><td colspan="4" class="empty">No payments recorded yet.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

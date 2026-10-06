@@ -1,0 +1,26 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Activity #{{ e.id }} — Admin{% endblock %}
+
+{% block body %}
+<div class="page-head">
+    <div class="ph-main">
+        <div class="eyebrow">Logs › Activity Log</div>
+        <div class="ph-title"><h1>{{ e.action }}</h1> <span class="badge {{ e.outcome == 'success' ? 'success' : 'danger' }}">{{ e.outcome }}</span></div>
+        <p class="lead">{{ e.createdAt|date('Y-m-d H:i:s') }} UTC · {{ e.actor }}</p>
+    </div>
+    <div class="ph-actions"><a class="btn secondary back" href="{{ path('app_admin_audit_log') }}">Back</a>
+        <a class="btn info" href="{{ path('app_admin_audit_log', {actor: e.actor}) }}">All by this user</a></div>
+</div>
+<div class="card">
+    <table class="t v-kv">
+        <tr><th>User</th><td>{{ e.actor }}</td></tr>
+        <tr><th>User type</th><td>{{ e.actorType }}</td></tr>
+        <tr><th>IP address</th><td>{{ e.ip }}</td></tr>
+        <tr><th>Area</th><td>{{ area }}</td></tr>
+        <tr><th>Action</th><td><code>{{ e.action }}</code></td></tr>
+        <tr><th>Outcome</th><td>{{ e.outcome }}</td></tr>
+        <tr><th>Details</th><td><pre class="log-pre">{{ e.context ?: '—' }}</pre></td></tr>
+    </table>
+</div>
+{% endblock %}

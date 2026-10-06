@@ -1,0 +1,116 @@
+{% extends 'base.html.twig' %}
+{% import '_work/macros.html.twig' as ui %}
+
+{#
+    Password Manager (ADR-092). Everything secret is encrypted and decrypted in this page by public/js/vault.js; the
+    server only stores ciphertext. No inline script or event handlers here: the page runs under a strict CSP.
+#}
+{% block title %}Password Manager{% endblock %}
+
+{% block javascripts %}
+    {{ parent() }}
+    <script src="{{ versioned('/js/vault.js') }}" defer></script>
+{% endblock %}
+
+{% block body %}
+<div class="page-head">
+    <div class="ph-main">
+        <div class="eyebrow">Password Manager</div>
+        <div class="ph-title"><h1>My vault</h1> <span class="badge success" id="v-lock-badge" hidden>Unlocked</span></div>
+        <p class="lead">Website and app logins, app MPINs, licence keys and secure notes — encrypted in your browser with your master password (AES-256-GCM). The server and the database only ever hold ciphertext.</p>
+    </div>
+    <div class="ph-actions" id="v-actions" hidden>
+        <button class="btn secondary" type="button" id="v-change-master">Change master password</button>
+        <button class="btn warning" type="button" id="v-lock">Lock</button>
+        <button class="btn primary" type="button" id="v-new">+ New entry</button>
+    </div>
+</div>
+{{ ui.flashes() }}
+
+<div id="vault" class="vault" data-state-url="{{ path('app_vault_state') }}" data-setup-url="{{ path('app_vault_setup') }}"
+     data-master-url="{{ path('app_vault_master_password') }}" data-entries-url="{{ path('app_vault_entry_create') }}"
+     data-reset-url="{{ path('app_vault_reset') }}" data-csrf="{{ csrf_token(csrfId) }}" data-user="{{ app.user.id }}"
+     data-min-iterations="{{ minIterations }}">
+
+    <div class="v-msg" id="v-msg" role="status" aria-live="polite" hidden></div>
+
+    <div class="card" id="v-loading">Loading your vault…</div>
+
+    <noscript><div class="card"><b>The Password Manager needs JavaScript:</b> your entries are decrypted in the browser.</div></noscript>
+
+    {# First use #}
+    <form class="card mx-form v-narrow" id="v-setup" autocomplete="off" hidden>
+        <div class="section-label">Create your vault</div>
+        <p>Choose a <b>master password</b>. It encrypts everything in your vault and is never sent to the server.</p>
+        <div class="v-warn"><b>There is no recovery.</b> If you forget the master password, nobody — not even an administrator with the database — can open your vault. You would have to delete it and start again.</div>
+        <div class="field"><label for="v-setup-pass">Master password <span class="req">*</span></label>
+            <input type="password" id="v-setup-pass" autocomplete="new-password" minlength="12" required>
+            <div class="v-meter"><span id="v-setup-meter"></span></div><small class="muted" id="v-setup-hint">At least 12 characters. A long phrase of unrelated words is best.</small></div>
+        <div class="field"><label for="v-setup-confirm">Repeat master password <span class="req">*</span></label><input type="password" id="v-setup-confirm" autocomplete="new-password" required></div>
+        <div class="field"><label class="check"><input type="checkbox" id="v-setup-ack" required> I understand a forgotten master password cannot be recovered.</label></div>
+        <div class="form-actions"><button class="btn primary" type="submit">Create vault</button></div>
+    </form>
+
+    {# Locked #}
+    <div class="v-narrow" id="v-unlock-wrap" hidden>
+        <form class="card mx-form" id="v-unlock" autocomplete="off">
+            <div class="section-label">Vault locked</div>
+            <div class="field"><label for="v-unlock-pass">Master password</label><input type="password" id="v-unlock-pass" autocomplete="current-password" required></div>
+            <div class="form-actions"><button class="btn primary" type="submit">Unlock</button></div>
+        </form>
+        <details class="card v-reset">
+            <summary>Forgot your master password?</summary>
+            <p>It cannot be recovered. You can delete your vault (all its entries) and create a new one.</p>
+            <form class="mx-form" id="v-reset" autocomplete="off">
+                <div class="field"><label for="v-reset-pass">Your account password (the one you sign in with)</label><input type="password" id="v-reset-pass" autocomplete="current-password" required></div>
+                <div class="field"><label for="v-reset-confirm">Type <b>DELETE MY VAULT</b> to confirm</label><input type="text" id="v-reset-confirm" required></div>
+                <div class="form-actions"><button class="btn danger" type="submit">Delete my vault</button></div>
+            </form>
+        </details>
+    </div>
+
+    {# Unlocked #}
+    <div id="v-main" hidden>
+        <div class="table-card">
+            <div class="table-header mx-form">
+                <input type="search" id="v-search" placeholder="Search title, username, site, app, group…" aria-label="Search the vault" autocomplete="off" style="max-width:360px">
+                <select id="v-type-filter" aria-label="Type" style="width:auto"><option value="">All types</option></select>
+                <span class="grow"></span>
+                <span class="muted" id="v-count"></span>
+            </div>
+            <div class="tscroll">
+                <table class="t v-table">
+                    <thead><tr><th>Title</th><th>Type</th><th>App name</th><th>URL</th><th>Username / account</th><th>Password / PIN / key</th><th>Updated</th><th></th></tr></thead>
+                    <tbody id="v-list"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    {# One entry, read-only #}
+    <div class="card v-panel" id="v-detail" hidden>
+        <div class="v-panel-head"><div><div class="eyebrow" id="v-detail-type"></div><h2 id="v-detail-title"></h2></div>
+            <div class="btn-row"><button class="btn warning sm" type="button" id="v-detail-edit">Edit</button><button class="btn danger sm" type="button" id="v-detail-delete">Delete</button><button class="btn secondary sm" type="button" id="v-detail-close">Close</button></div></div>
+        <table class="t v-kv" id="v-detail-fields"></table>
+    </div>
+
+    {# New / edit #}
+    <form class="card mx-form v-panel" id="v-edit" autocomplete="off" hidden>
+        <div class="section-label" id="v-edit-heading">New entry</div>
+        <div class="field"><label for="v-edit-type">Type</label><select id="v-edit-type"></select></div>
+        <div class="form-grid" id="v-edit-fields"></div>
+        <div class="form-actions" style="margin-top:12px"><button class="btn secondary" type="button" id="v-edit-cancel">Cancel</button><button class="btn primary" type="submit">Save entry</button></div>
+    </form>
+
+    {# Change master password #}
+    <form class="card mx-form v-panel v-narrow" id="v-master" autocomplete="off" hidden>
+        <div class="section-label">Change master password</div>
+        <div class="field"><label for="v-master-current">Current master password</label><input type="password" id="v-master-current" autocomplete="current-password" required></div>
+        <div class="field"><label for="v-master-new">New master password</label><input type="password" id="v-master-new" autocomplete="new-password" minlength="12" required><div class="v-meter"><span id="v-master-meter"></span></div></div>
+        <div class="field"><label for="v-master-confirm">Repeat new master password</label><input type="password" id="v-master-confirm" autocomplete="new-password" required></div>
+        <div class="form-actions"><button class="btn secondary" type="button" id="v-master-cancel">Cancel</button><button class="btn primary" type="submit">Change master password</button></div>
+    </form>
+
+    <p class="muted small v-foot">Locks itself after 5 minutes without activity and when you leave the page. Copied secrets are cleared from the clipboard after 30 seconds.</p>
+</div>
+{% endblock %}

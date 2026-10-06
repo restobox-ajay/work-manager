@@ -1,0 +1,27 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Error #{{ e.id }} — Admin{% endblock %}
+
+{% block body %}
+<div class="page-head">
+    <div class="ph-main">
+        <div class="eyebrow">Logs › Error Log</div>
+        <div class="ph-title"><h1>{{ e.exceptionClass ? e.exceptionClass|split('\\')|last : 'Browser error' }}</h1> <span class="badge {{ e.source == 'browser' ? 'warn' : 'danger' }}">{{ e.source|capitalize }}</span></div>
+        <p class="lead">{{ e.createdAt|date('Y-m-d H:i:s') }} UTC{% if e.statusCode %} · HTTP {{ e.statusCode }}{% endif %}</p>
+    </div>
+    <div class="ph-actions"><a class="btn secondary back" href="{{ path('app_admin_error_log') }}">Back</a></div>
+</div>
+<div class="card">
+    <table class="t v-kv">
+        <tr><th>Message</th><td><pre class="log-pre">{{ e.message }}</pre></td></tr>
+        {% if e.exceptionClass %}<tr><th>Exception</th><td><code>{{ e.exceptionClass }}</code></td></tr>{% endif %}
+        <tr><th>{{ e.source == 'browser' ? 'Script' : 'File' }}</th><td><code>{{ e.file ?: '—' }}{% if e.line %}:{{ e.line }}{% endif %}</code></td></tr>
+        <tr><th>Request</th><td>{{ e.method }} {{ e.path ?: '—' }}</td></tr>
+        <tr><th>Came from</th><td>{{ e.referrer ?: '—' }}</td></tr>
+        <tr><th>User</th><td>{{ e.userEmail ?: '—' }}</td></tr>
+        <tr><th>IP address</th><td>{{ e.ip ?: '—' }}</td></tr>
+        <tr><th>Browser</th><td class="small">{{ e.userAgent ?: '—' }}</td></tr>
+        {% if e.trace %}<tr><th>Stack trace</th><td><pre class="log-pre log-trace">{{ e.trace }}</pre></td></tr>{% endif %}
+    </table>
+</div>
+{% endblock %}

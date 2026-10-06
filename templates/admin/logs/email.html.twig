@@ -1,0 +1,52 @@
+{% extends 'base.html.twig' %}
+{% import '_work/macros.html.twig' as ui %}
+
+{% block title %}Email Log — Admin{% endblock %}
+
+{% block body %}
+<div class="page-head">
+    <div class="ph-main">
+        <div class="eyebrow">Logs</div>
+        <div class="ph-title"><h1>Email Log</h1></div>
+        <p class="lead">Every email the app sends — invoices, invitations, password resets, sign-in links, login alerts. Queued emails are waiting for the Messenger worker (<code>php bin/console messenger:consume async</code>). Message bodies are not kept: some carry sign-in links.</p>
+    </div>
+    <div class="ph-actions">{% include 'admin/logs/_purge.html.twig' with {kind: 'email'} %}</div>
+</div>
+{{ ui.flashes() }}
+<div class="kpis rent-kpis">
+    {% for k, label in statuses %}
+        <a class="kpi" href="{{ path('app_admin_email_log', {status: k}) }}"><span>{{ label }}</span><b class="{{ k == 'failed' and (counts[k] ?? 0) > 0 ? 'text-danger' }}">{{ counts[k] ?? 0 }}</b><small>all time</small></a>
+    {% endfor %}
+</div>
+<form class="table-card mx-form" method="get" action="{{ path('app_admin_email_log') }}" style="margin:16px 0">
+    <div class="form-grid log-filters">
+        <div class="field"><label for="f-q">Search</label><input type="search" id="f-q" name="q" value="{{ query.q ?? '' }}" placeholder="recipient or subject"></div>
+        <div class="field"><label for="f-status">Status</label><select id="f-status" name="status"><option value="">Any</option>{% for k, label in statuses %}<option value="{{ k }}" {{ (query.status ?? '') == k ? 'selected' }}>{{ label }}</option>{% endfor %}</select></div>
+        <div class="field"><label for="f-from">From</label><input type="date" id="f-from" name="from" value="{{ query.from ?? '' }}"></div>
+        <div class="field"><label for="f-to">To</label><input type="date" id="f-to" name="to" value="{{ query.to ?? '' }}"></div>
+    </div>
+    <div class="table-foot"><span class="grow"></span><a class="btn secondary sm" href="{{ path('app_admin_email_log') }}">Clear</a><button class="btn primary sm" type="submit">Filter</button></div>
+</form>
+<div class="table-card">
+    <div class="tscroll">
+        <table class="t">
+            <thead><tr><th>Sent</th><th>To</th><th>Subject</th><th>Attachments</th><th>Status</th><th></th></tr></thead>
+            <tbody>
+                {% for m in items %}
+                    <tr>
+                        <td class="nowrap">{{ m.createdAt|date('Y-m-d H:i') }}</td>
+                        <td>{{ ui.short(m.recipients, 60) }}</td>
+                        <td>{{ m.subject }}</td>
+                        <td class="small">{{ m.attachmentNames|join(', ') ?: '—' }}</td>
+                        <td><span class="badge {{ {sent: 'success', queued: 'warn', failed: 'danger'}[m.status] ?? 'plain' }}">{{ statuses[m.status] ?? m.status }}</span>{% if m.error %}<div class="small text-danger">{{ ui.short(m.error, 70) }}</div>{% endif %}</td>
+                        <td class="actions"><a class="btn secondary xs" href="{{ path('app_admin_email_log_show', {id: m.id}) }}">Details</a></td>
+                    </tr>
+                {% else %}
+                    <tr><td colspan="6" class="empty">No emails have been sent yet.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {{ ui.pager(page, 'app_admin_email_log', query) }}
+</div>
+{% endblock %}

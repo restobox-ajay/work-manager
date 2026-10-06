@@ -2506,3 +2506,62 @@ month, top category). Money is handled in paise (RentMoney), shown in ₹; chang
 `expense.category_id` becomes nullable (migration `Version20261010150000`); a posted category must still exist.
 Uncategorised expenses show "—" in the month list and are totalled under "Uncategorised"
 (`ExpenseService::UNCATEGORISED`) in the month and year views.
+
+## ADR-091: Subscription Manager (owner request, 2026-10-11)
+
+**Decision.** Admin-only module `/subscription` for the apps and services the business pays for (Claude, PhpStorm,
+Microsoft 365, Windows…). `subscription`: name, vendor, category (Config › Subscription Categories, seeded), plan,
+cost + currency (per subscription; any code InvoiceMoney has a symbol for plus Config › Currencies), billing cycle
+(`App\Enum\BillingCycle`: monthly, quarterly, every 6 months, yearly, one-time, lifetime), start date, next renewal
+(blank → rolled forward from the start date), auto-renew, status (active/paused/cancelled), account email, seats,
+assigned to, paid with, website and billing-portal URLs, notes. `subscription_payment` is the renewal history;
+recording a payment can move the next renewal forward one cycle. Pages: list (status/category filters, per-currency
+monthly/yearly tiles), upcoming renewals (7/30/60/90 days, overdue included), cost summary per currency by category,
+one subscription with its payments. The admin dashboard shows subscriptions renewing within 30 days. Migration
+`Version20261011120000`. Currencies are never added together (no FX conversion).
+
+**Consequences.** No secrets are stored on a subscription: licence keys and logins go in the Password Manager (ADR-092).
+
+## ADR-092: Password Manager — browser-side encrypted personal vaults (owner request, 2026-10-11)
+
+**Decision.** `/vault` (menu "Password Manager"), admins only, one personal vault per admin. All encryption happens in
+the browser (`public/js/vault.js`, Web Crypto): master password → PBKDF2-SHA256 (600,000 iterations, random 16-byte
+salt) → key-encryption key, which AES-256-GCM-wraps a random 256-bit vault key; each entry (type, title, site,
+username, password/PIN/licence key, group, notes — everything) is a JSON blob encrypted with the vault key under a
+fresh 12-byte IV, with additional authenticated data binding it to the owning user. The server (`VaultService`,
+tables `vault_key` / `vault_entry`, migration `Version20261011130000`) stores only salt, iteration count, wrapped key
+and ciphertext, validates their shape and size, enforces ownership (another admin's entry id is a 404), refuses
+fewer than 600,000 iterations, and audits actions without content. Entry types: website login, app login, app
+MPIN/PIN, licence key, secure note; password generator (rejection-sampled `getRandomValues`). The page is no-store,
+sends a strict Content-Security-Policy (scripts from 'self' only — base.html.twig's inline head script moved to
+`public/js/early.js` for this), locks after 5 idle minutes and on leaving the page, and clears copied secrets from the
+clipboard after 30 seconds. Changing the master password re-wraps the same vault key. Updates carry a version, so
+a stale tab gets 409 instead of overwriting.
+
+**Consequences.** A database dump, the server code and the .env together still cannot open a vault; the cost of
+guessing a master password offline is 600,000 PBKDF2 rounds per guess, so the setup form insists on a strong one.
+A forgotten master password is unrecoverable by design: the only way out is deleting the vault, which needs the
+account password. The vault is only as safe as the page's JavaScript: anyone able to change the deployed code (or
+an XSS on /vault, which the CSP is there to stop) could capture the master password as it is typed.
+
+## ADR-093: Logs menu — Activity Log, Email Log, Error Log (owner request, 2026-10-11)
+
+**Decision.** A "Logs" menu for admins, after the Maxeme Auto mockup.
+- **Activity Log** is the existing audit log (`/admin/audit-log`, Administration › Audit Log moved here) with an
+  area for every action (`ActivityAreas`: the `<area>.` prefix, or "Sign-in & security" for unprefixed actions),
+  area / action / outcome / user / date filters, a detail page and a CSV export (formula-safe cells, at most 20,000
+  rows). Existing filter names and markup are kept for the tests and the admin API.
+- **Email Log** (`email_log`): every outbound email, recorded by `EmailLogSubscriber` from Mailer and Messenger
+  events — queued (row written, id carried as `EmailLogStamp`, because Mailer fires the queued event on a copy of
+  the email), then sent (Message-ID) or failed (reason; "queued" with "Will retry" while Messenger retries). Direct
+  sends are tagged with an `X-Email-Log-Id` header. Bodies are not stored: reset, magic-link and invitation emails
+  carry sign-in tokens.
+- **Error Log** (`error_log`): exceptions that become a 5xx (`kernel.exception`), console command failures, and
+  JavaScript errors from signed-in pages (`public/js/app.js` → `POST /logs/client-error`, same-origin only, 16 KB,
+  20 per minute per session, 5 distinct per page view). Written with plain DBAL by `ErrorLogWriter` so logging
+  works when the EntityManager is closed and never flushes unrelated changes; it never throws (falls back to
+  error_log()). Query strings, request bodies and trace arguments are never stored; 4xx are not errors.
+Email and error entries older than 30 / 90 / 180 days can be cleared from their pages (audited `logs.purge_*`);
+activity retention stays with `app:prune`. Migration `Version20261011140000`.
+
+**Consequences.** Queued emails stay "queued" until a Messenger worker runs (`messenger:consume async`).

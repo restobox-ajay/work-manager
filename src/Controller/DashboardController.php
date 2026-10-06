@@ -8,6 +8,7 @@ use App\Repository\TaskRepository;
 use App\Service\Client\ClientService;
 use App\Service\Dashboard\DashboardService;
 use App\Service\Project\ProjectService;
+use App\Service\Subscription\SubscriptionService;
 use App\Service\Task\TaskListService;
 use App\Service\Task\TaskLookups;
 use Symfony\Component\HttpFoundation\Request;
@@ -27,6 +28,7 @@ final class DashboardController extends AbstractWorkController
         TaskLookups $lookups,
         ClientService $clients,
         ProjectService $projects,
+        SubscriptionService $subscriptions,
     ): Response {
         $viewer = $this->viewer();
         $lookupMaps = [
@@ -49,7 +51,12 @@ final class DashboardController extends AbstractWorkController
         $page = $taskList->search($viewer, $filters, 1, $request->query->getString('sort'), DashboardService::MANAGER_TASK_LIMIT);
         $clientId = $filters['clientId'];
 
+        // Admins see subscriptions renewing soon (ADR-091); nobody else manages them.
+        $renewing = $this->isGranted('ROLE_ADMIN') ? $subscriptions->renewing() : [];
+
         return $this->render('dashboard/index.html.twig', $lookupMaps + [
+            'renewing'       => $renewing,
+            'renewingStates' => $subscriptions->renewalStates($renewing),
             'page'     => $page,
             'rows'     => $taskList->rowDetails($viewer, $page->items),
             'filters'  => $filters,

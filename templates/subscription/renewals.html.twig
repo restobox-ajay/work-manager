@@ -1,0 +1,49 @@
+{% extends 'base.html.twig' %}
+{% import '_work/macros.html.twig' as ui %}
+{% import 'subscription/_macros.html.twig' as sm %}
+
+{% block title %}Upcoming renewals{% endblock %}
+
+{% block body %}
+<div class="page-head">
+    <div class="ph-main">
+        <div class="eyebrow">Subscriptions</div>
+        <div class="ph-title"><h1>Upcoming renewals</h1></div>
+        <p class="lead">Active subscriptions renewing in the next {{ days }} days, and any whose renewal date has passed. Record the payment on a subscription to move its renewal forward.</p>
+    </div>
+    <div class="ph-actions btn-row">
+        {% for d in windows %}<a class="btn {{ d == days ? 'primary' : 'secondary' }} sm" href="{{ path('app_subscription_renewals', {days: d}) }}">{{ d }} days</a>{% endfor %}
+    </div>
+</div>
+{{ ui.flashes() }}
+<div class="table-card">
+    <div class="tscroll">
+        <table class="t">
+            <thead><tr><th>Renews</th><th>Name</th><th>Category</th><th class="num">Cost</th><th>Billing</th><th>Auto-renew</th><th>Paid with</th><th></th></tr></thead>
+            <tbody>
+                {% for s in subscriptions %}
+                    <tr>
+                        <td>{{ sm.renewal(s, states[s.id]) }}</td>
+                        <td class="bold"><a href="{{ path('app_subscription_show', {id: s.id}) }}">{{ s.name }}</a></td>
+                        <td>{{ s.category ? s.category.name : '—' }}</td>
+                        <td class="num bold nowrap">{{ s.amount|invoice_money(s.currency) }}</td>
+                        <td>{{ s.cycle.label }}</td>
+                        <td>{{ s.autoRenew ? 'Yes' : 'No' }}</td>
+                        <td>{{ s.paymentMethod ?: '—' }}</td>
+                        <td class="actions"><a class="btn success xs" href="{{ path('app_subscription_show', {id: s.id}) }}#p-date">Record payment</a></td>
+                    </tr>
+                {% else %}
+                    <tr><td colspan="8" class="empty">Nothing renews in the next {{ days }} days.</td></tr>
+                {% endfor %}
+            </tbody>
+            {% if subscriptions is not empty %}
+            <tfoot>
+                {% set due = {} %}
+                {% for s in subscriptions %}{% set due = due|merge({(s.currency): (due[s.currency] ?? 0) + (s.amount * 100)|round}) %}{% endfor %}
+                <tr class="group-total"><td colspan="3" class="bold">Due in {{ days }} days</td><td class="num bold" colspan="5">{% for c, h in due %}{{ sm.money(h, c) }}{{ not loop.last ? ' · ' }}{% endfor %}</td></tr>
+            </tfoot>
+            {% endif %}
+        </table>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,69 @@
+{% extends 'base.html.twig' %}
+{% import '_work/macros.html.twig' as ui %}
+{% import 'subscription/_macros.html.twig' as sm %}
+
+{% block title %}Subscriptions{% endblock %}
+
+{% block body %}
+<div class="page-head">
+    <div class="ph-main">
+        <div class="eyebrow">Subscriptions</div>
+        <div class="ph-title"><h1>Subscriptions</h1></div>
+        <p class="lead">Every app and service you pay for, soonest renewal first. Store their passwords and licence keys in the Password Manager.</p>
+    </div>
+    <div class="ph-actions">
+        <a class="btn info" href="{{ path('app_subscription_renewals') }}">Upcoming renewals</a>
+        <a class="btn primary" href="{{ path('app_subscription_new') }}">+ New subscription</a>
+    </div>
+</div>
+{{ ui.flashes() }}
+<form class="table-card mx-form" method="get" action="{{ path('app_subscription_index') }}" style="margin-bottom:16px">
+    <div class="table-header">
+        <label for="f-status" class="bold">Status</label>
+        <select id="f-status" name="status" style="width:auto" onchange="this.form.submit()">
+            {% for k, label in {active: 'Active', paused: 'Paused', cancelled: 'Cancelled', all: 'All'} %}<option value="{{ k }}" {{ status == k ? 'selected' }}>{{ label }}</option>{% endfor %}
+        </select>
+        <label for="f-category" class="bold">Category</label>
+        <select id="f-category" name="category" style="width:auto" onchange="this.form.submit()">
+            <option value="">All categories</option>
+            {% for c in categories %}<option value="{{ c.id }}" {{ categoryId == c.id ? 'selected' }}>{{ c.name }}</option>{% endfor %}
+        </select>
+        <noscript><button class="btn primary sm" type="submit">Filter</button></noscript>
+        <span class="grow"></span>
+    </div>
+</form>
+
+{% if costs is not empty %}
+<div class="kpis rent-kpis">
+    {% for currency, c in costs %}
+        <div class="kpi"><span>{{ currency }} · {{ c.count }} recurring</span><b>{{ sm.money(c.monthly, currency) }}<small> / month</small></b><small>{{ sm.money(c.yearly, currency) }} a year</small></div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<div class="table-card" style="margin-top:16px">
+    <div class="tscroll">
+        <table class="t">
+            <thead><tr><th>Name</th><th>Category</th><th>Plan</th><th class="num">Cost</th><th>Billing</th><th>Next renewal</th><th>Auto-renew</th><th>Account</th><th>Status</th><th></th></tr></thead>
+            <tbody>
+                {% for s in subscriptions %}
+                    <tr>
+                        <td class="bold"><a href="{{ path('app_subscription_show', {id: s.id}) }}">{{ s.name }}</a>{% if s.vendor %}<div class="muted small">{{ s.vendor }}</div>{% endif %}</td>
+                        <td>{{ s.category ? s.category.name : '—' }}</td>
+                        <td>{{ s.plan ?: '—' }}</td>
+                        <td class="num bold nowrap">{{ s.amount|invoice_money(s.currency) }}</td>
+                        <td>{{ s.cycle.label }}</td>
+                        <td>{{ sm.renewal(s, states[s.id]) }}</td>
+                        <td>{{ s.cycle.recurring ? (s.autoRenew ? 'Yes' : 'No') : '—' }}</td>
+                        <td>{{ s.accountEmail ?: '—' }}{% if s.seats %}<div class="muted small">{{ s.seats }} seat{{ s.seats == 1 ? '' : 's' }}</div>{% endif %}</td>
+                        <td>{{ sm.status(s.status) }}</td>
+                        <td class="actions"><a class="btn warning xs" href="{{ path('app_subscription_edit', {id: s.id}) }}">Edit</a></td>
+                    </tr>
+                {% else %}
+                    <tr><td colspan="10" class="empty"><b>No subscriptions here yet.</b> <a href="{{ path('app_subscription_new') }}">Add one</a>.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

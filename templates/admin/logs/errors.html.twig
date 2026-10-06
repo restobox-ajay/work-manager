@@ -1,0 +1,53 @@
+{% extends 'base.html.twig' %}
+{% import '_work/macros.html.twig' as ui %}
+
+{% block title %}Error Log — Admin{% endblock %}
+
+{% block body %}
+<div class="page-head">
+    <div class="ph-main">
+        <div class="eyebrow">Logs</div>
+        <div class="ph-title"><h1>Error Log</h1></div>
+        <p class="lead">Server exceptions (anything that became a 500), failed console commands, and JavaScript errors reported by signed-in users' browsers. Query strings and function arguments are never stored.</p>
+    </div>
+    <div class="ph-actions">{% include 'admin/logs/_purge.html.twig' with {kind: 'errors'} %}</div>
+</div>
+{{ ui.flashes() }}
+<div class="kpis rent-kpis">
+    {% for k, label in sources %}
+        <a class="kpi" href="{{ path('app_admin_error_log', {source: k}) }}"><span>{{ label }}</span><b class="{{ (last24h[k] ?? 0) > 0 ? 'text-danger' }}">{{ last24h[k] ?? 0 }}</b><small>in the last 24 hours</small></a>
+    {% endfor %}
+</div>
+<form class="table-card mx-form" method="get" action="{{ path('app_admin_error_log') }}" style="margin:16px 0">
+    <div class="form-grid log-filters">
+        <div class="field"><label for="f-q">Search</label><input type="search" id="f-q" name="q" value="{{ query.q ?? '' }}" placeholder="message, path, class, user"></div>
+        <div class="field"><label for="f-source">Source</label><select id="f-source" name="source"><option value="">Any</option>{% for k, label in sources %}<option value="{{ k }}" {{ (query.source ?? '') == k ? 'selected' }}>{{ label }}</option>{% endfor %}</select></div>
+        <div class="field"><label for="f-from">From</label><input type="date" id="f-from" name="from" value="{{ query.from ?? '' }}"></div>
+        <div class="field"><label for="f-to">To</label><input type="date" id="f-to" name="to" value="{{ query.to ?? '' }}"></div>
+    </div>
+    <div class="table-foot"><span class="grow"></span><a class="btn secondary sm" href="{{ path('app_admin_error_log') }}">Clear</a><button class="btn primary sm" type="submit">Filter</button></div>
+</form>
+<div class="table-card">
+    <div class="tscroll">
+        <table class="t">
+            <thead><tr><th>When</th><th>Source</th><th>Message</th><th>Where</th><th>User</th><th>IP</th><th></th></tr></thead>
+            <tbody>
+                {% for e in items %}
+                    <tr>
+                        <td class="nowrap">{{ e.createdAt|date('Y-m-d H:i:s') }}</td>
+                        <td><span class="badge {{ e.source == 'browser' ? 'warn' : 'danger' }}">{{ sources[e.source] ?? e.source }}</span>{% if e.statusCode %} <span class="muted small">{{ e.statusCode }}</span>{% endif %}</td>
+                        <td>{{ ui.short(e.message, 110) }}{% if e.exceptionClass %}<div class="muted small">{{ e.exceptionClass|split('\\')|last }}</div>{% endif %}</td>
+                        <td class="small">{{ e.method }} {{ ui.short(e.path ?? '—', 50) }}</td>
+                        <td class="small">{{ e.userEmail ?: '—' }}</td>
+                        <td class="small nowrap">{{ e.ip ?: '—' }}</td>
+                        <td class="actions"><a class="btn secondary xs" href="{{ path('app_admin_error_log_show', {id: e.id}) }}">Details</a></td>
+                    </tr>
+                {% else %}
+                    <tr><td colspan="7" class="empty">No errors recorded.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {{ ui.pager(page, 'app_admin_error_log', query) }}
+</div>
+{% endblock %}

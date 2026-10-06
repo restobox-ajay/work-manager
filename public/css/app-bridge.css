@@ -755,3 +755,38 @@ td.actions > :last-child, .page-body td.actions > a.btn:last-child, table.t td.a
 .rent-year tr.muted-row td { color: var(--muted); }
 .rent-mark { display: flex; gap: 4px; align-items: center; margin-top: 4px; }
 .rent-mark input[type="date"] { height: 24px; font-size: .72rem; padding: 0 4px; width: 118px; }
+
+/* Dashboard: subscriptions renewing soon (ADR-091) */
+.renew-alert{border-left:4px solid #f59e0b;margin-bottom:16px;padding:12px 16px}
+.renew-alert .ra-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px}
+.renew-alert ul{margin:0;padding-left:18px}
+.renew-alert li{margin:3px 0}
+
+/* Password Manager (ADR-092) */
+.vault .v-narrow{max-width:560px}
+.vault .card + .card,.vault .v-panel{margin-top:16px}
+.vault .v-warn{background:var(--warning-soft);border:1px solid #faebcc;color:#8a6d3b;border-radius:8px;padding:10px 14px;margin:10px 0 14px;font-size:.85rem}
+.vault .v-meter{height:6px;background:var(--line-light);border-radius:3px;margin:6px 0 4px;overflow:hidden}
+.vault .v-meter span{display:block;height:100%;width:0;transition:width .2s}
+.vault .v-meter span.weak{background:#dc2626}.vault .v-meter span.fair{background:#f59e0b}.vault .v-meter span.strong{background:#16a34a}
+.vault .v-row{cursor:pointer}
+.vault .v-group{margin-left:8px;font-weight:500}
+.vault .v-url{max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.vault .v-table .v-secret{max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;vertical-align:middle}
+.vault .v-secret{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;word-break:break-all;white-space:pre-wrap;margin:0;display:inline-block;max-width:100%}
+.vault .v-panel-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:8px}
+.vault .v-panel-head h2{margin:2px 0 0}
+.vault .v-field-tools{margin-top:6px}
+.vault .v-reset summary{cursor:pointer;font-weight:600}
+.vault .v-foot{margin-top:14px}
+.v-offscreen{position:fixed;left:-9999px;top:0;opacity:0}
+/* Key/value detail tables (subscription and vault entry pages) */
+.t.v-kv th{width:200px;text-align:left;vertical-align:top;white-space:nowrap}
+.t.v-kv td{vertical-align:top}
+/* Header controls with their own display rule still honour [hidden] (vault lock state) */
+#v-actions[hidden],#v-lock-badge[hidden]{display:none!important}
+/* Logs menu (ADR-093) */
+.log-filters{grid-template-columns:repeat(auto-fit,minmax(170px,1fr));padding:14px 16px}
+.log-pre{white-space:pre-wrap;word-break:break-word;margin:0;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.78rem}
+.log-trace{max-height:480px;overflow:auto;background:var(--line-light);padding:10px;border-radius:6px}
+a.kpi{text-decoration:none;color:inherit}a.kpi:hover{border-color:var(--primary,#206eb8)}
