@@ -1,0 +1,72 @@
+{% extends 'base.html.twig' %}
+{% import '_work/macros.html.twig' as ui %}
+{% import 'rent/_macros.html.twig' as r %}
+
+{% block title %}Expenses · {{ month|date('F Y') }}{% endblock %}
+
+{% block body %}
+<div class="page-head">
+    <div class="ph-main">
+        <div class="eyebrow">Expenses</div>
+        <div class="ph-title"><h1>Monthly expenses · {{ month|date('F Y') }}</h1></div>
+        <p class="lead">Every expense recorded in the month, with totals by category.</p>
+    </div>
+    <div class="ph-actions">
+        <a class="btn info" href="{{ path('app_expense_year', {year: month|date('Y')}) }}">Year view</a>
+        <a class="btn primary" href="{{ path('app_expense_new', {month: month|date('Y-m')}) }}">+ New expense</a>
+    </div>
+</div>
+{{ ui.flashes() }}
+<div class="btn-row" style="margin-bottom:12px">
+    {{ r.monthPicker('app_expense_index', month, categoryId ? {category: categoryId} : {}) }}
+    <form class="mx-form" method="get" action="{{ path('app_expense_index') }}">
+        <input type="hidden" name="month" value="{{ month|date('Y-m') }}">
+        <select name="category" aria-label="Category" style="width:auto" onchange="this.form.submit()">
+            <option value="">All categories</option>
+            {% for c in categories %}<option value="{{ c.id }}" {{ categoryId == c.id ? 'selected' }}>{{ c.name }}</option>{% endfor %}
+        </select>
+        <noscript><button class="btn primary sm" type="submit">Filter</button></noscript>
+    </form>
+</div>
+
+<div class="kpis rent-kpis">
+    <div class="kpi"><span>Total</span><b>{{ r.inr(data.total) }}</b><small>{{ data.expenses|length }} expense{{ data.expenses|length == 1 ? '' : 's' }}</small></div>
+    {% for name, h in data.byCategory|slice(0, 3, true) %}
+        <div class="kpi"><span>{{ name }}</span><b>{{ r.inr(h) }}</b><small>{{ data.total ? (h * 100 / data.total)|round }}% of the month</small></div>
+    {% endfor %}
+</div>
+
+<div class="table-card" style="margin-top:16px">
+    <div class="tscroll">
+        <table class="t">
+            <thead><tr><th>Date</th><th>Category</th><th>Description</th><th>Property</th><th>Paid by</th><th class="num">Amount</th><th></th></tr></thead>
+            <tbody>
+                {% for e in data.expenses %}
+                    <tr>
+                        <td class="nowrap">{{ e.spentOn|date('M j, Y') }}</td>
+                        <td>{{ e.category ? e.category.name : '—' }}</td>
+                        <td>{{ e.description }}{% if e.note %}<div class="muted small">{{ ui.short(e.note) }}</div>{% endif %}</td>
+                        <td>{{ e.property ? e.property.name : '—' }}</td>
+                        <td>{{ methods[e.method] ?? e.method }}</td>
+                        <td class="num bold">{{ e.amount|invoice_money('INR') }}</td>
+                        <td class="actions">
+                            <a class="btn warning xs" href="{{ path('app_expense_edit', {id: e.id}) }}">Edit</a>
+                            <form class="mx-form" method="post" action="{{ path('app_expense_delete', {id: e.id}) }}" style="display:inline" onsubmit="return confirm('Delete this expense?');">
+                                <input type="hidden" name="_token" value="{{ csrf_token('expense_delete_' ~ e.id) }}">
+                                <button class="btn danger xs" type="submit">Delete</button>
+                            </form>
+                        </td>
+                    </tr>
+                {% else %}
+                    <tr><td colspan="7" class="empty"><b>No expenses this month.</b> <a href="{{ path('app_expense_new', {month: month|date('Y-m')}) }}">Add one</a>.</td></tr>
+                {% endfor %}
+            </tbody>
+            {% if data.expenses is not empty %}
+            <tfoot>
+                <tr class="group-total"><td colspan="5" class="bold">Total {{ month|date('F Y') }}</td><td class="num bold">{{ r.inr(data.total) }}</td><td></td></tr>
+            </tfoot>
+            {% endif %}
+        </table>
+    </div>
+</div>
+{% endblock %}

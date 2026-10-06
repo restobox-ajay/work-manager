@@ -1,0 +1,101 @@
+{% extends 'base.html.twig' %}
+{% import '_work/macros.html.twig' as ui %}
+{% import 'rent/_macros.html.twig' as r %}
+
+{% block title %}{{ tenant.name }} · Rent{% endblock %}
+
+{% block body %}
+{% set t = ledger.totals %}
+<div class="page-head">
+    <div class="ph-main">
+        <div class="eyebrow">Rent · {{ tenant.property.name }}</div>
+        <div class="ph-title"><h1>{{ tenant.name }}</h1>{% if not tenant.active %}<span class="badge plain">Moved out</span>{% endif %}</div>
+        <p class="lead">{{ tenant.monthlyRent|invoice_money('INR') }} a month{% if tenant.startDate %} · since {{ tenant.startDate|date('M j, Y') }}{% endif %}{% if tenant.endDate %} · until {{ tenant.endDate|date('M j, Y') }}{% endif %}{% if tenant.deposit != '0.00' %} · deposit {{ tenant.deposit|invoice_money('INR') }}{% endif %}{% if tenant.phone %} · {{ tenant.phone }}{% endif %}</p>
+    </div>
+    <div class="ph-actions">
+        <a class="btn secondary back" href="{{ path('app_rent_tenants') }}">Back</a>
+        <a class="btn info" href="{{ path('app_rent_year', {tenant: tenant.id}) }}">Year view</a>
+        <a class="btn success" href="{{ path('app_rent_bill_new', {id: tenant.id}) }}">+ Monthly bill</a>
+        <a class="btn primary" href="{{ path('app_rent_payment_new', {id: tenant.id}) }}">+ Payment</a>
+        <a class="btn warning" href="{{ path('app_rent_tenant_edit', {id: tenant.id}) }}">Edit</a>
+    </div>
+</div>
+{{ ui.flashes() }}
+
+<div class="kpis rent-kpis">
+    <div class="kpi"><span>Rent</span><b>{{ r.inr(t.remaining.rent) }}</b><small>owed · billed {{ r.inr(t.due.rent) }}, paid {{ r.inr(t.paid.rent) }}</small></div>
+    <div class="kpi"><span>Electricity</span><b>{{ r.inr(t.remaining.electricity) }}</b><small>owed · billed {{ r.inr(t.due.electricity) }}, paid {{ r.inr(t.paid.electricity) }}</small></div>
+    <div class="kpi"><span>Units</span><b>{{ r.units(t.unitsRemaining) }}</b><small>unpaid · {{ r.units(t.units) }} billed, {{ r.units(t.unitsPaid) }} paid{% if t.rate %} at {{ r.inr(t.rate) }}/unit{% endif %}</small></div>
+    <div class="kpi"><span>Total owed</span><b class="{{ t.remainingTotal > 0 ? 'text-danger' }}">{{ r.inr(t.remainingTotal) }}</b><small>{% if t.oldestUnpaid %}unpaid since {{ t.oldestUnpaid|date('M Y') }}{% elseif t.remainingTotal < 0 %}paid in advance{% else %}all paid{% endif %}{% if t.due.other or t.paid.other %} · other {{ r.inr(t.remaining.other) }}{% endif %}</small></div>
+</div>
+
+<div class="table-card" style="margin-top:16px">
+    <div class="table-header"><h2>Ledger</h2><span class="grow"></span><span class="muted small">Month by month; payments count in the month they were made</span></div>
+    <div class="tscroll">
+        <table class="t">
+            <thead>
+                <tr><th>Month</th><th class="num">Rent</th><th class="num">Meter</th><th class="num">Units</th><th class="num">Electricity</th><th class="num">Other</th><th class="num">Billed</th><th class="num">Rent paid</th><th class="num">Elec. paid</th><th class="num">Other paid</th><th class="num">Balance</th><th></th></tr>
+            </thead>
+            <tbody>
+                {% for row in ledger.rows|reverse %}
+                    {% set b = row.bill %}
+                    <tr>
+                        <td class="nowrap bold">{{ (row.month ~ '-01')|date('M Y') }}</td>
+                        <td class="num">{{ b ? r.inr(row.due.rent) : '—' }}</td>
+                        <td class="num nowrap small">{{ b ? r.units(b.meterPrevious * 100) ~ ' → ' ~ r.units(b.meterCurrent * 100) : '—' }}</td>
+                        <td class="num">{{ b ? r.units(row.units) : '—' }}</td>
+                        <td class="num">{{ b ? r.inr(row.due.electricity) : '—' }}{% if b and b.rate != '0.00' %}<div class="muted small">@ {{ b.rate|invoice_money('INR') }}</div>{% endif %}</td>
+                        <td class="num">{{ b and row.due.other ? r.inr(row.due.other) : '—' }}{% if b and b.otherNote %}<div class="muted small">{{ b.otherNote }}</div>{% endif %}</td>
+                        <td class="num bold">{{ b ? r.inr(row.dueTotal) : '—' }}</td>
+                        <td class="num">{{ row.paid.rent ? r.inr(row.paid.rent) : '—' }}</td>
+                        <td class="num">{{ row.paid.electricity ? r.inr(row.paid.electricity) : '—' }}</td>
+                        <td class="num">{{ row.paid.other ? r.inr(row.paid.other) : '—' }}</td>
+                        <td class="num bold {{ row.balance > 0 ? 'text-danger' }}">{{ r.inr(row.balance) }}</td>
+                        <td class="actions">{% if b %}<a class="btn warning xs" href="{{ path('app_rent_bill_edit', {id: b.id}) }}">Edit</a>{% endif %}</td>
+                    </tr>
+                {% else %}
+                    <tr><td colspan="12" class="empty"><b>No bills or payments yet.</b> <a href="{{ path('app_rent_bill_new', {id: tenant.id}) }}">Add the first monthly bill</a>.</td></tr>
+                {% endfor %}
+            </tbody>
+            {% if ledger.rows is not empty %}
+            <tfoot><tr class="group-total">
+                <td class="bold">Total</td><td class="num bold">{{ r.inr(t.due.rent) }}</td><td></td><td class="num bold">{{ r.units(t.units) }}</td>
+                <td class="num bold">{{ r.inr(t.due.electricity) }}</td><td class="num bold">{{ r.inr(t.due.other) }}</td><td class="num bold">{{ r.inr(t.dueTotal) }}</td>
+                <td class="num bold">{{ r.inr(t.paid.rent) }}</td><td class="num bold">{{ r.inr(t.paid.electricity) }}</td><td class="num bold">{{ r.inr(t.paid.other) }}</td>
+                <td class="num bold">{{ r.inr(t.remainingTotal) }}</td><td></td>
+            </tr></tfoot>
+            {% endif %}
+        </table>
+    </div>
+</div>
+
+<div class="table-card" style="margin-top:16px">
+    <div class="table-header"><h2>Payments</h2></div>
+    <div class="tscroll">
+        <table class="t">
+            <thead><tr><th>Date</th><th>For</th><th>Method</th><th class="num">Amount</th><th>Note</th><th></th></tr></thead>
+            <tbody>
+                {% set payments = [] %}{% for row in ledger.rows %}{% set payments = payments|merge(row.payments) %}{% endfor %}
+                {% for p in payments|reverse %}
+                    <tr>
+                        <td class="nowrap">{{ p.paidOn|date('M j, Y') }}</td>
+                        <td>{{ kinds[p.kind] ?? p.kind }}</td>
+                        <td>{{ methods[p.method] ?? p.method }}</td>
+                        <td class="num bold">{{ p.amount|invoice_money('INR') }}</td>
+                        <td class="small">{{ p.note ?? '' }}</td>
+                        <td class="actions">
+                            <form class="mx-form" method="post" action="{{ path('app_rent_payment_delete', {id: p.id}) }}" onsubmit="return confirm('Delete this payment?');">
+                                <input type="hidden" name="_token" value="{{ csrf_token('rent_payment_delete_' ~ p.id) }}">
+                                <button class="btn danger xs" type="submit">Delete</button>
+                            </form>
+                        </td>
+                    </tr>
+                {% else %}
+                    <tr><td colspan="6" class="empty">No payments yet.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% if tenant.notes %}<div class="card" style="margin-top:16px"><h2>Notes</h2><div style="white-space:pre-line">{{ tenant.notes }}</div></div>{% endif %}
+{% endblock %}

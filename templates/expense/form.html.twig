@@ -1,0 +1,49 @@
+{% extends 'base.html.twig' %}
+{% import '_work/macros.html.twig' as ui %}
+
+{% block title %}{{ expense ? 'Edit expense' : 'New expense' }}{% endblock %}
+
+{% block body %}
+{% set back = path('app_expense_index', {month: (values.spentOn ?? 'now')|date('Y-m')}) %}
+<div class="page-head">
+    <div class="ph-main">
+        <div class="eyebrow">Expenses</div>
+        <div class="ph-title"><h1>{{ expense ? 'Edit expense' : 'New expense' }}</h1></div>
+    </div>
+    <div class="ph-actions"><a class="btn secondary back" href="{{ back }}">Back</a></div>
+</div>
+{{ ui.flashes() }}
+{{ ui.errors(errors) }}
+<form class="card mx-form" method="post" style="max-width:760px">
+    <input type="hidden" name="_token" value="{{ csrf_token('expense_form') }}">
+    <div class="form-grid">
+        <div class="field"><label for="f-date">Date <span class="req">*</span></label><input type="date" id="f-date" name="spentOn" value="{{ values.spentOn ?? '' }}" required></div>
+        <div class="field">
+            <label for="f-category">Category</label>
+            <select id="f-category" name="categoryId">
+                <option value="">None</option>
+                {% for c in categories %}<option value="{{ c.id }}" {{ (values.categoryId ?? '') == c.id ? 'selected' }}>{{ c.name }}</option>{% endfor %}
+            </select>
+        </div>
+        <div class="field"><label for="f-amount">Amount (₹) <span class="req">*</span></label><input type="text" inputmode="decimal" id="f-amount" name="amount" value="{{ values.amount ?? '' }}" required {{ expense ? '' : 'autofocus' }}></div>
+        <div class="field">
+            <label for="f-method">Paid by <span class="req">*</span></label>
+            <select id="f-method" name="method" required>{% for k, label in methods %}<option value="{{ k }}" {{ (values.method ?? '') == k ? 'selected' }}>{{ label }}</option>{% endfor %}</select>
+        </div>
+        <div class="field span-all"><label for="f-description">Description <span class="req">*</span></label><input type="text" id="f-description" name="description" value="{{ values.description ?? '' }}" maxlength="255" required placeholder="e.g. Plumber for kitchen leak"></div>
+        <div class="field">
+            <label for="f-property">Property</label>
+            <select id="f-property" name="propertyId">
+                <option value="">None</option>
+                {% for p in properties %}<option value="{{ p.id }}" {{ (values.propertyId ?? '') == p.id ? 'selected' }}>{{ p.name }}</option>{% endfor %}
+            </select>
+        </div>
+        <div class="field span-all"><label for="f-note">Note</label><textarea id="f-note" name="note" rows="3">{{ values.note ?? '' }}</textarea></div>
+    </div>
+    <div class="form-actions" style="margin-top:16px">
+        <a class="btn secondary" href="{{ back }}">Cancel</a>
+        {% if not expense %}<button class="btn info" type="submit" name="another" value="1">Save and add another</button>{% endif %}
+        <button class="btn primary" type="submit">Save expense</button>
+    </div>
+</form>
+{% endblock %}

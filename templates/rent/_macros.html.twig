@@ -1,0 +1,19 @@
+{# Rent module helpers (ADR-085). #}
+{# hundredths → "₹1,250.00" #}
+{% macro inr(h) %}{{ (h / 100)|number_format(2, '.', '')|invoice_money('INR') }}{% endmacro %}
+{# hundredths of a unit → "123.5" #}
+{% macro units(h) %}{{ (h / 100)|number_format(2, '.', '')|trim('0', 'right')|trim('.', 'right') ?: '0' }}{% endmacro %}
+{% macro monthPicker(route, month, extra = {}) %}
+    <form class="mx-form btn-row" method="get" action="{{ path(route) }}">
+        {% for k, v in extra %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
+        <a class="btn secondary sm" href="{{ path(route, extra|merge({month: month.modify('-1 month')|date('Y-m')})) }}" aria-label="Previous month">‹</a>
+        <input type="month" name="month" value="{{ month|date('Y-m') }}" aria-label="Month" style="width:auto" onchange="this.form.submit()">
+        <a class="btn secondary sm" href="{{ path(route, extra|merge({month: month.modify('+1 month')|date('Y-m')})) }}" aria-label="Next month">›</a>
+        <noscript><button class="btn primary sm" type="submit">Show</button></noscript>
+    </form>
+{% endmacro %}
+{# A month's payment status (ADR-087): paid / part / unpaid / not-billed / none #}
+{% macro status(status, short = false) %}
+    {%- set map = {paid: ['success', 'Paid'], part: ['warn', short ? 'Part' : 'Part paid'], unpaid: ['danger', 'Unpaid'], 'not-billed': ['plain', short ? 'No bill' : 'Not billed']} -%}
+    {%- if map[status] is defined %}<span class="badge {{ map[status][0] }}">{{ map[status][1] }}</span>{% else %}<span class="muted">—</span>{% endif -%}
+{% endmacro %}

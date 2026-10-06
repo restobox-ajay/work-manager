@@ -1,0 +1,53 @@
+{% extends 'base.html.twig' %}
+{% import '_work/macros.html.twig' as ui %}
+
+{% block title %}{{ tenant ? 'Edit ' ~ tenant.name : 'New tenant' }}{% endblock %}
+
+{% block body %}
+{% set back = tenant ? path('app_rent_tenant', {id: tenant.id}) : path('app_rent_tenants') %}
+<div class="page-head">
+    <div class="ph-main">
+        <div class="eyebrow">Rent · Tenants</div>
+        <div class="ph-title"><h1>{{ tenant ? 'Edit tenant' : 'New tenant' }}</h1></div>
+    </div>
+    <div class="ph-actions"><a class="btn secondary back" href="{{ back }}">Back</a></div>
+</div>
+{{ ui.errors(errors) }}
+{% if properties is empty %}<div class="alert warning">Add a property first: <a href="{{ path('app_rent_property_new') }}">New property</a>.</div>{% endif %}
+<form class="card mx-form" method="post" style="max-width:900px" id="tenant-form">
+    <input type="hidden" name="_token" value="{{ csrf_token('rent_tenant') }}">
+    <div class="form-grid">
+        <div class="field"><label for="f-name">Tenant name <span class="req">*</span></label><input type="text" id="f-name" name="name" value="{{ values.name ?? '' }}" maxlength="120" required></div>
+        <div class="field">
+            <label for="f-property">Property <span class="req">*</span></label>
+            <select id="f-property" name="propertyId" required>
+                <option value="">— Choose —</option>
+                {% for p in properties %}<option value="{{ p.id }}" data-rent="{{ p.defaultRent }}" {{ values.propertyId == p.id ? 'selected' }}>{{ p.name }}{{ p.active ? '' : ' (inactive)' }}</option>{% endfor %}
+            </select>
+        </div>
+        <div class="field"><label for="f-phone">Phone</label><input type="text" id="f-phone" name="phone" value="{{ values.phone ?? '' }}" maxlength="30"></div>
+        <div class="field"><label for="f-email">Email</label><input type="email" id="f-email" name="email" value="{{ values.email ?? '' }}" maxlength="180"></div>
+        <div class="field"><label for="f-rent">Monthly rent (₹) <span class="req">*</span></label><input type="text" inputmode="decimal" id="f-rent" name="monthlyRent" value="{{ values.monthlyRent ?? '' }}" required></div>
+        <div class="field"><label for="f-deposit">Security deposit (₹)</label><input type="text" inputmode="decimal" id="f-deposit" name="deposit" value="{{ values.deposit ?? '' }}"></div>
+        <div class="field"><label for="f-start">Move-in date <span class="req">*</span></label><input type="date" id="f-start" name="startDate" value="{{ values.startDate ?? '' }}" required></div>
+        <div class="field"><label for="f-end">Move-out date</label><input type="date" id="f-end" name="endDate" value="{{ values.endDate ?? '' }}"></div>
+        <div class="field"><label for="f-meter">Opening meter reading</label><input type="text" inputmode="decimal" id="f-meter" name="openingMeter" value="{{ values.openingMeter ?? '' }}"><small>The electricity meter on move-in: the first bill's previous reading.</small></div>
+        <label class="mx-check"><span>Current tenant <small>(untick when they move out)</small></span><input type="checkbox" name="isActive" value="1" {{ (values.isActive ?? true) ? 'checked' }}></label>
+        <div class="field span-all"><label for="f-notes">Notes</label><textarea id="f-notes" name="notes" rows="3">{{ values.notes ?? '' }}</textarea></div>
+    </div>
+    <div class="form-actions" style="margin-top:16px">
+        <a class="btn secondary" href="{{ back }}">Cancel</a>
+        <button class="btn primary" type="submit">{{ tenant ? 'Save' : 'Create tenant' }}</button>
+    </div>
+</form>
+<script>
+    // Choosing a property fills an empty rent with that property's usual rent.
+    (function () {
+        var property = document.getElementById('f-property'), rent = document.getElementById('f-rent');
+        property.addEventListener('change', function () {
+            var option = property.options[property.selectedIndex];
+            if (rent.value.trim() === '' && option && option.dataset.rent) { rent.value = option.dataset.rent; }
+        });
+    })();
+</script>
+{% endblock %}

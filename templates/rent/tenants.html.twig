@@ -1,0 +1,52 @@
+{% extends 'base.html.twig' %}
+{% import '_work/macros.html.twig' as ui %}
+{% import 'rent/_macros.html.twig' as r %}
+
+{% block title %}Tenants{% endblock %}
+
+{% block body %}
+<div class="page-head">
+    <div class="ph-main">
+        <div class="eyebrow">Rent</div>
+        <div class="ph-title"><h1>Tenants</h1></div>
+        <p class="lead">Each tenancy with what it has been billed, paid and still owes.</p>
+    </div>
+    <div class="ph-actions"><a class="btn success" href="{{ path('app_rent_tenant_new') }}">+ New tenant</a></div>
+</div>
+{{ ui.flashes() }}
+<nav class="tabs" aria-label="Tenancies">
+    {% for key, label in {active: 'Current', past: 'Past', all: 'All'} %}
+        <a href="{{ path('app_rent_tenants', {show: key}) }}" class="{{ show == key ? 'active' }}">{{ label }}</a>
+    {% endfor %}
+</nav>
+<div class="table-card">
+    <div class="tscroll">
+        <table class="t">
+            <thead><tr><th>Tenant</th><th>Property</th><th class="num">Monthly rent</th><th>Since</th><th class="num">Billed</th><th class="num">Paid</th><th class="num">Rent owed</th><th class="num">Electricity owed</th><th class="num">Total owed</th><th></th></tr></thead>
+            <tbody>
+                {% for t in tenants %}
+                    {% set b = balances[t.id] %}
+                    <tr>
+                        <td><a class="bold" href="{{ path('app_rent_tenant', {id: t.id}) }}">{{ t.name }}</a>{% if not t.active %} <span class="badge plain">Moved out</span>{% endif %}{% if t.phone %}<div class="muted small">{{ t.phone }}</div>{% endif %}</td>
+                        <td>{{ t.property.name }}</td>
+                        <td class="num">{{ t.monthlyRent|invoice_money('INR') }}</td>
+                        <td class="nowrap">{{ t.startDate ? t.startDate|date('M j, Y') : '—' }}</td>
+                        <td class="num">{{ r.inr(b.dueTotal) }}</td>
+                        <td class="num">{{ r.inr(b.paidTotal) }}</td>
+                        <td class="num">{{ r.inr(b.remaining.rent) }}</td>
+                        <td class="num">{{ r.inr(b.remaining.electricity) }}</td>
+                        <td class="num bold">{{ r.inr(b.remainingTotal) }}</td>
+                        <td class="actions">
+                            <a class="btn info xs" href="{{ path('app_rent_year', {tenant: t.id}) }}">Year</a>
+                            <a class="btn success xs" href="{{ path('app_rent_bill_new', {id: t.id}) }}">+ Bill</a>
+                            <a class="btn primary xs" href="{{ path('app_rent_payment_new', {id: t.id}) }}">+ Payment</a>
+                        </td>
+                    </tr>
+                {% else %}
+                    <tr><td colspan="10" class="empty"><b>No tenants here.</b> <a href="{{ path('app_rent_tenant_new') }}">Add one</a>.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,114 @@
+{% extends 'base.html.twig' %}
+{% import '_work/macros.html.twig' as ui %}
+{% import 'rent/_macros.html.twig' as r %}
+
+{% block title %}Rent year view · {{ year }}{% endblock %}
+
+{% macro mark(bill, kind, state) %}
+    {%- if state.status in ['unpaid', 'part'] -%}
+        <form class="mx-form rent-mark" method="post" action="{{ path('app_rent_bill_mark_paid', {id: bill.id}) }}">
+            <input type="hidden" name="_token" value="{{ csrf_token('rent_mark_' ~ bill.id) }}">
+            <input type="hidden" name="kind" value="{{ kind }}">
+            <input type="date" name="paidOn" value="{{ 'now'|date('Y-m-d') }}" aria-label="Paid on" required>
+            <button class="btn success xs" type="submit" title="Record {{ ((state.due - state.paid) / 100)|number_format(2, '.', '')|invoice_money('INR') }} as paid on this date">Mark paid</button>
+        </form>
+    {%- elseif state.status == 'paid' and state.marked -%}
+        <form class="mx-form rent-mark" method="post" action="{{ path('app_rent_bill_mark_unpaid', {id: bill.id}) }}" onsubmit="return confirm('Mark this as not paid? The payment made with Mark paid is removed.');">
+            <input type="hidden" name="_token" value="{{ csrf_token('rent_mark_' ~ bill.id) }}">
+            <input type="hidden" name="kind" value="{{ kind }}">
+            <button class="btn danger xs" type="submit">Mark not paid</button>
+        </form>
+    {%- endif -%}
+{% endmacro %}
+
+{% block body %}
+{% import _self as y %}
+<div class="page-head">
+    <div class="ph-main">
+        <div class="eyebrow">Rent</div>
+        <div class="ph-title"><h1>Year view{{ tenant ? ' · ' ~ tenant.name : '' }} · {{ year }}</h1></div>
+        <p class="lead">Choose a tenant and a year: every month from January to December, what was billed, whether it is paid, and when. Use Mark paid / Mark not paid to update a month; other payments settle the oldest bill first, rent with rent payments and electricity with electricity payments.</p>
+    </div>
+    {% if tenant %}
+    <div class="ph-actions">
+        <a class="btn info" href="{{ path('app_rent_tenant', {id: tenant.id}) }}">Tenant page</a>
+        <a class="btn primary" href="{{ path('app_rent_payment_new', {id: tenant.id}) }}">+ Payment</a>
+    </div>
+    {% endif %}
+</div>
+{{ ui.flashes() }}
+<form class="table-card mx-form" method="get" action="{{ path('app_rent_year') }}" style="margin-bottom:16px">
+    <div class="table-header">
+        <label for="f-tenant" class="bold">Tenant</label>
+        <select id="f-tenant" name="tenant" style="width:auto" onchange="this.form.submit()">
+            {% for t in tenants %}<option value="{{ t.id }}" {{ tenant and tenant.id == t.id ? 'selected' }}>{{ t.name }} — {{ t.property.name }}{{ t.active ? '' : ' (moved out)' }}</option>{% endfor %}
+        </select>
+        <label for="f-year" class="bold">Year</label>
+        <select id="f-year" name="year" style="width:auto" onchange="this.form.submit()">
+            {% for y in years|merge([year])|sort|reverse|reduce((c, v) => v in c ? c : c|merge([v]), []) %}<option value="{{ y }}" {{ y == year ? 'selected' }}>{{ y }}</option>{% endfor %}
+        </select>
+        <noscript><button class="btn primary sm" type="submit">Show</button></noscript>
+        <span class="grow"></span>
+    </div>
+</form>
+{% if not tenant %}
+    <div class="card"><b>No tenants yet.</b> <a href="{{ path('app_rent_tenant_new') }}">Add a tenant</a>.</div>
+{% else %}
+{% set t = view.totals %}
+<div class="kpis rent-kpis">
+    <div class="kpi"><span>Months paid</span><b>{{ t.paidMonths }} / {{ t.billed }}</b><small>of the months billed in {{ year }}</small></div>
+    <div class="kpi"><span>Billed</span><b>{{ r.inr(t.due) }}</b><small>Rent {{ r.inr(t.rent) }} · Electricity {{ r.inr(t.electricity) }}</small></div>
+    <div class="kpi"><span>Paid</span><b>{{ r.inr(t.paid) }}</b><small>against {{ year }}'s bills</small></div>
+    <div class="kpi"><span>Still owed</span><b class="{{ t.owed > 0 ? 'text-danger' }}">{{ r.inr(t.owed) }}</b><small>{{ r.units(t.units) }} units billed</small></div>
+</div>
+
+<div class="table-card" style="margin-top:16px">
+    <div class="tscroll">
+        <table class="t rent-year">
+            <thead>
+                <tr>
+                    <th>Month</th>
+                    <th class="num">Rent</th><th>Rent status</th><th>Rent paid on</th>
+                    <th class="num">Units</th><th class="num">Electricity</th><th>Electricity status</th><th>Elec. paid on</th>
+                    <th class="num">Other</th><th class="num">Total</th><th>Status</th><th>Paid on</th><th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for m in view.months %}
+                    {% set b = m.bill %}{% set p = m.paid %}
+                    <tr class="{{ not m.let and not b ? 'muted-row' }}">
+                        <td class="bold nowrap">{{ m.month|date('F') }}</td>
+                        {% if b %}
+                            <td class="num">{{ b.rentAmount|invoice_money('INR') }}</td>
+                            <td>{{ r.status(p.kinds.rent.status) }}{% if p.kinds.rent.status == 'part' %}<div class="muted small">{{ r.inr(p.kinds.rent.paid) }} paid</div>{% endif %}{{ y.mark(b, 'rent', p.kinds.rent) }}</td>
+                            <td class="nowrap">{{ p.kinds.rent.paidOn ? p.kinds.rent.paidOn|date('M j, Y') : '—' }}</td>
+                            <td class="num">{{ r.units(b.units * 100) }}</td>
+                            <td class="num">{{ b.electricityAmount|invoice_money('INR') }}</td>
+                            <td>{{ r.status(p.kinds.electricity.status) }}{% if p.kinds.electricity.status == 'part' %}<div class="muted small">{{ r.inr(p.kinds.electricity.paid) }} paid</div>{% endif %}{{ y.mark(b, 'electricity', p.kinds.electricity) }}</td>
+                            <td class="nowrap">{{ p.kinds.electricity.paidOn ? p.kinds.electricity.paidOn|date('M j, Y') : '—' }}</td>
+                            <td class="num">{{ b.otherAmount != '0.00' ? b.otherAmount|invoice_money('INR') : '—' }}{% if b.otherAmount != '0.00' %} {{ r.status(p.kinds.other.status, true) }}{% endif %}</td>
+                            <td class="num bold">{{ b.total|invoice_money('INR') }}</td>
+                            <td>{{ r.status(p.status) }}</td>
+                            <td class="nowrap">{{ p.paidOn ? p.paidOn|date('M j, Y') : '—' }}</td>
+                            <td class="actions"><a class="btn warning xs" href="{{ path('app_rent_bill_edit', {id: b.id}) }}">Edit</a></td>
+                        {% else %}
+                            <td colspan="10" class="muted">{{ m.let ? (m.future ? 'Not billed yet' : 'No bill for this month') : 'Not let to ' ~ tenant.name }}</td>
+                            <td>{{ r.status(m.status) }}</td>
+                            <td class="actions">{% if m.let %}<a class="btn success xs" href="{{ path('app_rent_bill_new', {id: tenant.id, month: m.month|date('Y-m')}) }}">+ Bill</a>{% endif %}</td>
+                        {% endif %}
+                    </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot>
+                <tr class="group-total">
+                    <td class="bold">{{ year }}</td><td class="num bold">{{ r.inr(t.rent) }}</td><td colspan="2"></td>
+                    <td class="num bold">{{ r.units(t.units) }}</td><td class="num bold">{{ r.inr(t.electricity) }}</td><td colspan="2"></td>
+                    <td class="num bold">{{ r.inr(t.other) }}</td><td class="num bold">{{ r.inr(t.due) }}</td>
+                    <td colspan="3" class="bold">Paid {{ r.inr(t.paid) }} · owed {{ r.inr(t.owed) }}</td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

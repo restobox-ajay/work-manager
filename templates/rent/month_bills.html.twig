@@ -1,0 +1,52 @@
+{% extends 'base.html.twig' %}
+{% import '_work/macros.html.twig' as ui %}
+{% import 'rent/_macros.html.twig' as r %}
+
+{% block title %}Bills for {{ month|date('F Y') }}{% endblock %}
+
+{% block body %}
+<div class="page-head">
+    <div class="ph-main">
+        <div class="eyebrow">Rent</div>
+        <div class="ph-title"><h1>Monthly bills · {{ month|date('F Y') }}</h1></div>
+        <p class="lead">Enter each tenant's current meter reading and save: a bill is made for every row with a reading. Rows left blank are skipped.</p>
+    </div>
+    <div class="ph-actions"><a class="btn info" href="{{ path('app_rent_summary', {month: month|date('Y-m')}) }}">Summary</a></div>
+</div>
+{{ ui.flashes() }}
+{{ ui.errors(errors) }}
+<div style="margin-bottom:12px">{{ r.monthPicker('app_rent_month_bills', month) }}</div>
+<form class="table-card mx-form" method="post" action="{{ path('app_rent_month_bills') }}">
+    <input type="hidden" name="_token" value="{{ csrf_token('rent_month_bills') }}">
+    <input type="hidden" name="month" value="{{ month|date('Y-m') }}">
+    <div class="tscroll">
+        <table class="t">
+            <thead><tr><th>Tenant</th><th>Property</th><th>Rent (₹)</th><th>Previous reading</th><th>Current reading</th><th>Rate (₹/unit)</th><th>Other (₹)</th><th>For</th></tr></thead>
+            <tbody>
+                {% for row in rows %}
+                    {% set n = 'rows[' ~ row.tenant.id ~ ']' %}
+                    {% set v = row.values %}
+                    <tr>
+                        <td class="bold"><a href="{{ path('app_rent_tenant', {id: row.tenant.id}) }}">{{ row.tenant.name }}</a></td>
+                        <td>{{ row.tenant.property.name }}</td>
+                        {% if row.bill %}
+                            <td colspan="6"><span class="badge success">Billed</span> {{ row.bill.total|invoice_money('INR') }} · {{ r.units(row.bill.units * 100) }} units
+                                <a class="btn warning xs" href="{{ path('app_rent_bill_edit', {id: row.bill.id}) }}">Edit</a></td>
+                        {% else %}
+                            <td><input type="text" inputmode="decimal" name="{{ n }}[rentAmount]" value="{{ v.rentAmount }}" style="width:100px"></td>
+                            <td><input type="text" inputmode="decimal" name="{{ n }}[meterPrevious]" value="{{ v.meterPrevious }}" style="width:100px"></td>
+                            <td><input type="text" inputmode="decimal" name="{{ n }}[meterCurrent]" value="{{ v.meterCurrent }}" style="width:100px" placeholder="reading"></td>
+                            <td><input type="text" inputmode="decimal" name="{{ n }}[rate]" value="{{ v.rate }}" style="width:80px"></td>
+                            <td><input type="text" inputmode="decimal" name="{{ n }}[otherAmount]" value="{{ v.otherAmount }}" style="width:90px"></td>
+                            <td><input type="text" name="{{ n }}[otherNote]" value="{{ v.otherNote }}" maxlength="255" style="width:140px"></td>
+                        {% endif %}
+                    </tr>
+                {% else %}
+                    <tr><td colspan="8" class="empty"><b>No current tenants.</b> <a href="{{ path('app_rent_tenant_new') }}">Add one</a>.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <div class="table-foot"><span class="grow">Electricity = (current − previous) × rate.</span><button class="btn primary" type="submit">Create bills</button></div>
+</form>
+{% endblock %}

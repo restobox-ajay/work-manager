@@ -1,0 +1,38 @@
+{% extends 'base.html.twig' %}
+{% import '_work/macros.html.twig' as ui %}
+{% import 'rent/_macros.html.twig' as r %}
+
+{% block title %}Payment · {{ tenant.name }}{% endblock %}
+
+{% block body %}
+{% set back = path('app_rent_tenant', {id: tenant.id}) %}
+<div class="page-head">
+    <div class="ph-main">
+        <div class="eyebrow">Rent · {{ tenant.name }} · {{ tenant.property.name }}</div>
+        <div class="ph-title"><h1>Record a payment</h1></div>
+        <p class="lead">Owed now: rent {{ r.inr(remaining.rent) }} · electricity {{ r.inr(remaining.electricity) }}{% if remaining.other %} · other {{ r.inr(remaining.other) }}{% endif %}</p>
+    </div>
+    <div class="ph-actions"><a class="btn secondary back" href="{{ back }}">Back</a></div>
+</div>
+{{ ui.errors(errors) }}
+<form class="card mx-form" method="post" style="max-width:760px">
+    <input type="hidden" name="_token" value="{{ csrf_token('rent_payment') }}">
+    <div class="form-grid">
+        <div class="field"><label for="f-date">Date <span class="req">*</span></label><input type="date" id="f-date" name="paidOn" value="{{ values.paidOn ?? '' }}" required></div>
+        <div class="field"><label for="f-amount">Amount (₹) <span class="req">*</span></label><input type="text" inputmode="decimal" id="f-amount" name="amount" value="{{ values.amount ?? '' }}" required autofocus></div>
+        <div class="field">
+            <label for="f-kind">For <span class="req">*</span></label>
+            <select id="f-kind" name="kind" required>{% for k, label in kinds %}<option value="{{ k }}" {{ values.kind == k ? 'selected' }}>{{ label }}{% if remaining[k] is defined and remaining[k] > 0 %} — {{ r.inr(remaining[k]) }} owed{% endif %}</option>{% endfor %}</select>
+        </div>
+        <div class="field">
+            <label for="f-method">Paid by <span class="req">*</span></label>
+            <select id="f-method" name="method" required>{% for k, label in methods %}<option value="{{ k }}" {{ values.method == k ? 'selected' }}>{{ label }}</option>{% endfor %}</select>
+        </div>
+        <div class="field span-all"><label for="f-note">Note</label><input type="text" id="f-note" name="note" value="{{ values.note ?? '' }}" maxlength="255" placeholder="e.g. UPI ref, cheque no."></div>
+    </div>
+    <div class="form-actions" style="margin-top:16px">
+        <a class="btn secondary" href="{{ back }}">Cancel</a>
+        <button class="btn primary" type="submit">Save payment</button>
+    </div>
+</form>
+{% endblock %}

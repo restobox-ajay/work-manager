@@ -1,0 +1,30 @@
+{% extends 'base.html.twig' %}
+{% import '_work/macros.html.twig' as ui %}
+
+{% block title %}{{ property ? 'Edit ' ~ property.name : 'New property' }}{% endblock %}
+
+{% block body %}
+<div class="page-head">
+    <div class="ph-main">
+        <div class="eyebrow">Rent · Properties</div>
+        <div class="ph-title"><h1>{{ property ? 'Edit property' : 'New property' }}</h1></div>
+    </div>
+    <div class="ph-actions"><a class="btn secondary back" href="{{ path('app_rent_properties') }}">Back</a></div>
+</div>
+{{ ui.errors(errors) }}
+<form class="card mx-form" method="post" style="max-width:760px">
+    <input type="hidden" name="_token" value="{{ csrf_token('rent_property') }}">
+    <div class="form-grid">
+        <div class="field span-all"><label for="f-name">Name <span class="req">*</span></label><input type="text" id="f-name" name="name" value="{{ values.name ?? '' }}" maxlength="120" required placeholder="e.g. Flat 2B, Green Park"></div>
+        <div class="field span-all"><label for="f-address">Address</label><textarea id="f-address" name="address" rows="3">{{ values.address ?? '' }}</textarea></div>
+        <div class="field"><label for="f-rent">Monthly rent (₹) <span class="req">*</span></label><input type="text" inputmode="decimal" id="f-rent" name="defaultRent" value="{{ values.defaultRent ?? '' }}" required><small>Offered to a new tenant; each tenant has their own.</small></div>
+        <div class="field"><label for="f-rate">Electricity rate per unit (₹) <span class="req">*</span></label><input type="text" inputmode="decimal" id="f-rate" name="electricityRate" value="{{ values.electricityRate ?? '' }}" required><small>Used for new bills; a saved bill keeps its rate.</small></div>
+        <label class="mx-check span-all"><span>Active <small>(offered when adding tenants)</small></span><input type="checkbox" name="isActive" value="1" {{ (values.isActive ?? true) ? 'checked' }}></label>
+        <div class="field span-all"><label for="f-notes">Notes</label><textarea id="f-notes" name="notes" rows="3">{{ values.notes ?? '' }}</textarea></div>
+    </div>
+    <div class="form-actions" style="margin-top:16px">
+        <a class="btn secondary" href="{{ path('app_rent_properties') }}">Cancel</a>
+        <button class="btn primary" type="submit">{{ property ? 'Save' : 'Create property' }}</button>
+    </div>
+</form>
+{% endblock %}

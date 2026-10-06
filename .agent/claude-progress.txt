@@ -4204,3 +4204,10 @@ ADR-081/082 (2026-10-07): invoice list year/month filters + month/year grouping 
 all buttons in Bootstrap 5 colours by action. Not committed.
 ADR-083 (2026-10-07): project tasks grid (edit form + Add Tasks on the project page); Add Task/Add Budget choice removed. Browser-checked.
 ADR-084 (2026-10-07): authorization queue removed (pages, review, read marks); queued tasks released by migration Version20261009140000.
+ADR-085/086 (2026-10-07): house rent module (properties, tenants, monthly bills, payments, ledger, summary, dues); login background fully blue. Migration Version20261010120000. Browser-checked. Not committed.
+ADR-087 (2026-10-07): rent year view per tenant + all tenants, payments allocated oldest-first per kind with paid dates.
+ADR-088 (2026-10-10): /rent/year with tenant + year dropdowns, Jan–Dec rows, Mark paid / Mark not paid per month
+(rent_payment.bill_id, migration Version20261010130000). Browser-checked. No tests yet.
+ADR-089 (2026-10-10): Expenses module (/expense month list, /expense/year, Config › Expense Categories),
+migration Version20261010140000. Browser-checked add/edit/delete/validation/year totals. No tests yet.
+ADR-090 (2026-10-10): expense category optional (migration Version20261010150000); totals show "Uncategorised". Browser-checked.

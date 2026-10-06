@@ -1,0 +1,62 @@
+{% extends 'base.html.twig' %}
+{% import '_work/macros.html.twig' as ui %}
+
+{% block title %}{{ bill ? 'Edit bill' : 'New bill' }} · {{ tenant.name }}{% endblock %}
+
+{% block body %}
+{% set back = path('app_rent_tenant', {id: tenant.id}) %}
+<div class="page-head">
+    <div class="ph-main">
+        <div class="eyebrow">Rent · {{ tenant.name }} · {{ tenant.property.name }}</div>
+        <div class="ph-title"><h1>{{ bill ? 'Edit monthly bill' : 'New monthly bill' }}</h1></div>
+        <p class="lead">Rent, electricity (units used × rate) and any other charge for one month.</p>
+    </div>
+    <div class="ph-actions"><a class="btn secondary back" href="{{ back }}">Back</a></div>
+</div>
+{{ ui.errors(errors) }}
+<form class="card mx-form" method="post" style="max-width:900px" id="bill-form">
+    <input type="hidden" name="_token" value="{{ csrf_token('rent_bill') }}">
+    <div class="form-grid three">
+        <div class="field"><label for="f-period">Month <span class="req">*</span></label><input type="month" id="f-period" name="period" value="{{ values.period ?? '' }}" required></div>
+        <div class="field"><label for="f-rent">Rent (₹) <span class="req">*</span></label><input type="text" inputmode="decimal" id="f-rent" name="rentAmount" value="{{ values.rentAmount ?? '' }}" required data-calc></div>
+        <div class="field"></div>
+        <div class="section-label span-all">Electricity</div>
+        <div class="field"><label for="f-prev">Previous reading <span class="req">*</span></label><input type="text" inputmode="decimal" id="f-prev" name="meterPrevious" value="{{ values.meterPrevious ?? '' }}" required data-calc></div>
+        <div class="field"><label for="f-curr">Current reading <span class="req">*</span></label><input type="text" inputmode="decimal" id="f-curr" name="meterCurrent" value="{{ values.meterCurrent ?? '' }}" required autofocus data-calc></div>
+        <div class="field"><label for="f-rate">Rate per unit (₹) <span class="req">*</span></label><input type="text" inputmode="decimal" id="f-rate" name="rate" value="{{ values.rate ?? '' }}" required data-calc></div>
+        <div class="section-label span-all">Other</div>
+        <div class="field"><label for="f-other">Other charges (₹)</label><input type="text" inputmode="decimal" id="f-other" name="otherAmount" value="{{ values.otherAmount ?? '' }}" data-calc></div>
+        <div class="field span-2"><label for="f-note">For</label><input type="text" id="f-note" name="otherNote" value="{{ values.otherNote ?? '' }}" maxlength="255" placeholder="e.g. water, maintenance"></div>
+    </div>
+    <div class="rent-calc" data-calc-out>Units — · Electricity — · Total —</div>
+    <div class="form-actions" style="margin-top:16px">
+        {% if bill %}
+            <button class="btn danger" type="submit" form="bill-delete">Delete bill</button>
+            <span class="grow" style="flex:1"></span>
+        {% endif %}
+        <a class="btn secondary" href="{{ back }}">Cancel</a>
+        <button class="btn primary" type="submit">{{ bill ? 'Save' : 'Create bill' }}</button>
+    </div>
+</form>
+{% if bill %}
+    <form id="bill-delete" method="post" action="{{ path('app_rent_bill_delete', {id: bill.id}) }}" class="mx-form" onsubmit="return confirm('Delete this bill?');">
+        <input type="hidden" name="_token" value="{{ csrf_token('rent_bill_delete_' ~ bill.id) }}">
+    </form>
+{% endif %}
+<script>
+    // A preview of what the bill will total; the server works it out again when it is saved.
+    (function () {
+        var form = document.getElementById('bill-form'), out = form.querySelector('[data-calc-out]');
+        function num(name) { var v = (form.elements[name].value || '').replace(/,/g, ''); return v === '' ? 0 : Number(v); }
+        function inr(v) { return '₹' + v.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2}); }
+        function calc() {
+            var units = num('meterCurrent') - num('meterPrevious');
+            var elec = Math.round(units * num('rate') * 100) / 100;
+            var total = num('rentAmount') + (units > 0 ? elec : 0) + num('otherAmount');
+            out.textContent = units < 0 ? 'The current reading is lower than the previous one.'
+                : 'Units ' + (Math.round(units * 100) / 100) + ' · Electricity ' + inr(elec) + ' · Total ' + inr(total);
+        }
+        form.addEventListener('input', calc); calc();
+    })();
+</script>
+{% endblock %}

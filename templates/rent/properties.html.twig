@@ -1,0 +1,40 @@
+{% extends 'base.html.twig' %}
+{% import '_work/macros.html.twig' as ui %}
+
+{% block title %}Rent properties{% endblock %}
+
+{% block body %}
+<div class="page-head">
+    <div class="ph-main">
+        <div class="eyebrow">Rent</div>
+        <div class="ph-title"><h1>Properties</h1></div>
+        <p class="lead">The houses and flats you let, with the electricity rate per unit their bills use.</p>
+    </div>
+    <div class="ph-actions"><a class="btn success" href="{{ path('app_rent_property_new') }}">+ New property</a></div>
+</div>
+{{ ui.flashes() }}
+<div class="table-card">
+    <div class="tscroll">
+        <table class="t">
+            <thead><tr><th>Name</th><th>Address</th><th class="num">Monthly rent</th><th class="num">Rate / unit</th><th>Status</th><th></th></tr></thead>
+            <tbody>
+                {% for p in properties %}
+                    <tr>
+                        <td class="bold">{{ p.name }}</td>
+                        <td class="small" style="white-space:pre-line">{{ p.address ?? '—' }}</td>
+                        <td class="num">{{ p.defaultRent|invoice_money('INR') }}</td>
+                        <td class="num">{{ p.electricityRate|invoice_money('INR') }}</td>
+                        <td>{{ ui.activeBadge(p.active) }}</td>
+                        <td class="actions">
+                            <a class="btn success xs" href="{{ path('app_rent_tenant_new', {propertyId: p.id}) }}">+ Tenant</a>
+                            <a class="btn warning xs" href="{{ path('app_rent_property_edit', {id: p.id}) }}">Edit</a>
+                        </td>
+                    </tr>
+                {% else %}
+                    <tr><td colspan="6" class="empty"><b>No properties yet.</b> <a href="{{ path('app_rent_property_new') }}">Add one</a>.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

@@ -57,7 +57,7 @@
 {# On an invoice's own pages, the menu entry of its kind is the current one. #}
 {% set invoiceKind = app.request.attributes.get('_invoice_kind') %}
 {% set configLinks = [] %}
-{% for l in [['tags','Tags','New tag'],['payers','Payer Entities','New payer entity'],['wallet-entities','Wallet Entities','New wallet entity'],['payment-methods','Payment Methods','New payment method'],['task-types','Task Types','New task type'],['task-statuses','Task Status','New task status'],['email-templates','Email Templates','New email template'],['currencies','Currency','New currency'],['countries','Country','New country'],['billing-profiles','Billing Profiles','New billing profile']] %}
+{% for l in [['tags','Tags','New tag'],['payers','Payer Entities','New payer entity'],['wallet-entities','Wallet Entities','New wallet entity'],['payment-methods','Payment Methods','New payment method'],['task-types','Task Types','New task type'],['task-statuses','Task Status','New task status'],['email-templates','Email Templates','New email template'],['currencies','Currency','New currency'],['countries','Country','New country'],['billing-profiles','Billing Profiles','New billing profile'],['expense-categories','Expense Categories','New expense category']] %}
     {% set configLinks = configLinks|merge([{ label: l[1], href: path('app_config_list', {kind: l[0]}), current: cur starts with 'app_config_' and kind == l[0],
       add: { label: l[2], href: path('app_config_new', {kind: l[0]}) } }]) %}
 {% endfor %}
@@ -71,6 +71,20 @@
             { label: 'Approved Tasks Invoice', href: path('app_invoice_tasks'),
               current: cur starts with 'app_invoice_' and (cur == 'app_invoice_tasks' or cur == 'app_invoice_new_tasks' or (invoiceKind ?? '') == 'tasks'),
               add: { label: 'Invoice approved tasks', href: path('app_invoice_new_tasks') } },
+        ] },
+        { label: 'Rent', icon: 'home', children: [
+            { label: 'Summary', href: path('app_rent_summary'), current: cur == 'app_rent_summary' },
+            { label: 'Tenants', href: path('app_rent_tenants'), current: (cur starts with 'app_rent_tenant' and cur != 'app_rent_tenant_year_all') or cur starts with 'app_rent_bill' or cur starts with 'app_rent_payment',
+              add: { label: 'New tenant', href: path('app_rent_tenant_new') } },
+            { label: 'Monthly Bills', href: path('app_rent_month_bills'), current: cur == 'app_rent_month_bills' },
+            { label: 'Year View', href: path('app_rent_year'), current: cur == 'app_rent_year' },
+            { label: 'Properties', href: path('app_rent_properties'), current: cur starts with 'app_rent_propert',
+              add: { label: 'New property', href: path('app_rent_property_new') } },
+        ] },
+        { label: 'Expenses', icon: 'wallet', children: [
+            { label: 'Year View', href: path('app_expense_year'), current: cur == 'app_expense_year' },
+            { label: 'Monthly Expenses', href: path('app_expense_index'), current: cur starts with 'app_expense_' and cur != 'app_expense_year',
+              add: { label: 'New expense', href: path('app_expense_new') } },
         ] },
         { label: 'Users', icon: 'users', children: [
             { label: 'All Users', href: path('app_admin_users'), current: cur starts with 'app_admin_users' and cur != 'app_admin_users_invite' and cur != 'app_admin_users_invitations',

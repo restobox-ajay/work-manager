@@ -1,0 +1,104 @@
+{% extends 'base.html.twig' %}
+{% import '_work/macros.html.twig' as ui %}
+{% import 'rent/_macros.html.twig' as r %}
+
+{% block title %}Rent summary{% endblock %}
+
+{% block body %}
+{% set t = summary.totals %}
+<div class="page-head">
+    <div class="ph-main">
+        <div class="eyebrow">Rent</div>
+        <div class="ph-title"><h1>Summary · {{ month|date('F Y') }}</h1></div>
+        <p class="lead">Billed and collected this month for every tenancy, and who still owes what.</p>
+    </div>
+    <div class="ph-actions">
+        <a class="btn success" href="{{ path('app_rent_month_bills', {month: month|date('Y-m')}) }}">+ Bills for {{ month|date('M Y') }}</a>
+        <a class="btn info" href="{{ path('app_rent_tenants') }}">Tenants</a>
+    </div>
+</div>
+
+{{ ui.flashes() }}
+<div style="margin-bottom:12px">{{ r.monthPicker('app_rent_summary', month) }}</div>
+
+<div class="kpis rent-kpis">
+    <div class="kpi"><span>Billed this month</span><b>{{ r.inr(t.dueTotal) }}</b><small>Rent {{ r.inr(t.rentDue) }} · Electricity {{ r.inr(t.electricityDue) }}</small></div>
+    <div class="kpi"><span>Electricity units</span><b>{{ r.units(t.units) }}</b><small>billed this month</small></div>
+    <div class="kpi"><span>Collected this month</span><b>{{ r.inr(t.paidTotal) }}</b><small>Rent {{ r.inr(t.rentPaid) }} · Electricity {{ r.inr(t.electricityPaid) }}</small></div>
+    <div class="kpi"><span>Owed now (all months)</span><b>{{ r.inr(summary.duesTotal.total) }}</b><small>Rent {{ r.inr(summary.duesTotal.rent) }} · Electricity {{ r.inr(summary.duesTotal.electricity) }}</small></div>
+</div>
+
+<div class="table-card" style="margin-top:16px">
+    <div class="table-header"><h2>{{ month|date('F Y') }} by tenant</h2></div>
+    <div class="tscroll">
+        <table class="t">
+            <thead>
+                <tr><th>Tenant</th><th>Property</th><th class="num">Rent</th><th class="num">Units</th><th class="num">Electricity</th><th class="num">Other</th><th class="num">Billed</th><th class="num">Rent paid</th><th class="num">Elec. paid</th><th class="num">Other paid</th><th class="num">Owed at month end</th><th></th></tr>
+            </thead>
+            <tbody>
+                {% for row in summary.rows %}
+                    <tr>
+                        <td><a class="bold" href="{{ path('app_rent_tenant', {id: row.tenant.id}) }}">{{ row.tenant.name }}</a></td>
+                        <td>{{ row.tenant.property.name }}</td>
+                        <td class="num">{{ r.inr(row.rentDue) }}</td>
+                        <td class="num">{{ r.units(row.units) }}</td>
+                        <td class="num">{{ r.inr(row.electricityDue) }}</td>
+                        <td class="num">{{ r.inr(row.otherDue) }}</td>
+                        <td class="num bold">{{ row.bill ? r.inr(row.dueTotal) : '' }}{% if not row.bill %}<span class="badge warn">No bill</span>{% endif %}</td>
+                        <td class="num">{{ r.inr(row.rentPaid) }}</td>
+                        <td class="num">{{ r.inr(row.electricityPaid) }}</td>
+                        <td class="num">{{ r.inr(row.otherPaid) }}</td>
+                        <td class="num bold {{ row.owedAtMonthEnd > 0 ? 'text-danger' }}">{{ r.inr(row.owedAtMonthEnd) }}</td>
+                        <td class="actions">
+                            {% if not row.bill %}<a class="btn success xs" href="{{ path('app_rent_bill_new', {id: row.tenant.id}) }}">+ Bill</a>{% endif %}
+                            <a class="btn primary xs" href="{{ path('app_rent_payment_new', {id: row.tenant.id}) }}">+ Payment</a>
+                        </td>
+                    </tr>
+                {% else %}
+                    <tr><td colspan="12" class="empty"><b>No tenancies this month.</b> <a href="{{ path('app_rent_tenant_new') }}">Add a tenant</a>.</td></tr>
+                {% endfor %}
+            </tbody>
+            {% if summary.rows is not empty %}
+            <tfoot>
+                <tr class="group-total">
+                    <td colspan="2" class="bold">Total</td>
+                    <td class="num bold">{{ r.inr(t.rentDue) }}</td><td class="num bold">{{ r.units(t.units) }}</td><td class="num bold">{{ r.inr(t.electricityDue) }}</td>
+                    <td class="num bold">{{ r.inr(t.otherDue) }}</td><td class="num bold">{{ r.inr(t.dueTotal) }}</td><td class="num bold">{{ r.inr(t.rentPaid) }}</td>
+                    <td class="num bold">{{ r.inr(t.electricityPaid) }}</td><td class="num bold">{{ r.inr(t.otherPaid) }}</td><td class="num bold">{{ r.inr(t.owedAtMonthEnd) }}</td><td></td>
+                </tr>
+            </tfoot>
+            {% endif %}
+        </table>
+    </div>
+</div>
+
+<div class="table-card" style="margin-top:16px" id="dues">
+    <div class="table-header"><h2>Dues</h2><span class="grow"></span><span class="muted small">Everything still owed, longest waiting first</span></div>
+    <div class="tscroll">
+        <table class="t">
+            <thead><tr><th>Tenant</th><th>Property</th><th>Unpaid since</th><th class="num">Rent</th><th class="num">Electricity</th><th class="num">Units unpaid</th><th class="num">Other</th><th class="num">Total owed</th><th></th></tr></thead>
+            <tbody>
+                {% for due in summary.dues %}
+                    {% set d = due.totals %}
+                    <tr>
+                        <td><a class="bold" href="{{ path('app_rent_tenant', {id: due.tenant.id}) }}">{{ due.tenant.name }}</a></td>
+                        <td>{{ due.tenant.property.name }}</td>
+                        <td class="nowrap">{{ d.oldestUnpaid ? d.oldestUnpaid|date('M Y') : '—' }}</td>
+                        <td class="num">{{ r.inr(d.remaining.rent) }}</td>
+                        <td class="num">{{ r.inr(d.remaining.electricity) }}</td>
+                        <td class="num">{{ r.units(d.unitsRemaining) }}</td>
+                        <td class="num">{{ r.inr(d.remaining.other) }}</td>
+                        <td class="num bold">{{ r.inr(d.remainingTotal) }}</td>
+                        <td class="actions"><a class="btn primary xs" href="{{ path('app_rent_payment_new', {id: due.tenant.id}) }}">+ Payment</a></td>
+                    </tr>
+                {% else %}
+                    <tr><td colspan="9" class="empty"><b>Nothing owed.</b></td></tr>
+                {% endfor %}
+            </tbody>
+            {% if summary.dues is not empty %}
+            <tfoot><tr class="group-total"><td colspan="3" class="bold">Total</td><td class="num bold">{{ r.inr(summary.duesTotal.rent) }}</td><td class="num bold">{{ r.inr(summary.duesTotal.electricity) }}</td><td></td><td class="num bold">{{ r.inr(summary.duesTotal.other) }}</td><td class="num bold">{{ r.inr(summary.duesTotal.total) }}</td><td></td></tr></tfoot>
+            {% endif %}
+        </table>
+    </div>
+</div>
+{% endblock %}

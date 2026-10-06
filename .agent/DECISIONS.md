@@ -2446,3 +2446,63 @@ TaskService::decideAuthorization, WorkAccess::filesDirectly/canReviewTask, the N
 TaskReadStatus and its table. A task's creator may still correct it while it is Pending. Migration
 `Version20261009140000` releases tasks still waiting in the queue into normal work and drops `task_read_status`;
 previously denied requests stay out of the lists (the lists keep showing `authorized` = normal work only).
+
+## ADR-085: House rent module (owner request, 2026-10-07)
+
+**Decision.** A Rent menu (admins, amounts in ₹) for a landlord: Summary, Tenants, Monthly Bills, Properties.
+- `rent_property` (house/flat: address, usual rent, electricity rate per unit), `rent_tenant` (tenancy: property,
+  rent, deposit, move-in/out, opening meter reading), `rent_bill` (one per tenancy per month: rent, previous/current
+  meter, units, rate, electricity = units × rate, other charge + note, total) and `rent_payment` (date, amount, for
+  rent / electricity / other, method, note). Migration `Version20261010120000`.
+- A bill starts from the tenancy: next month, previous reading = last bill's current (or the opening reading), the
+  tenant's rent and the property's rate; a reading below the previous one and a second bill for the same month are
+  refused. Monthly Bills makes a whole month's bills at once from each tenant's current reading.
+- Tenant page: owed / billed / paid for rent, electricity and other; electricity units billed, paid (electricity
+  paid ÷ latest rate) and unpaid; the month-by-month ledger with a running balance; the payments.
+- Summary: a month across every tenancy (billed, units, collected, owed at month end) and the dues list (who owes
+  what now, unpaid since the oldest month not covered by payments, oldest first).
+- All sums in whole paise (InvoiceMoney); every change audited as rent.<record>_<action>.
+
+## ADR-086: Sign-in pages fully blue (owner request, 2026-10-07)
+
+**Decision.** The sign-in pages' background is the blue gradient edge to edge instead of the mockup's half-blue diagonal.
+
+## ADR-087: Rent year view per tenant and for all tenants (owner request, 2026-10-07)
+
+**Decision.** /rent/tenants/{id}/year shows the twelve months of a year for one tenancy: rent, units, electricity,
+other, total, each with its status (Paid / Part paid / Unpaid / Not billed) and the date it was paid. /rent/year (menu
+"Year View") shows every tenant's twelve months as status cells with the paid date, and the year's billed / paid / owed.
+Payments settle bills oldest first and kind by kind (rent payments pay rent, electricity payments pay electricity,
+other pays other); a bill's paid date is when its last charge was covered (RentLedger::allocate). A month that is let
+but not billed links to a new bill for that month.
+
+## ADR-088: Rent year view by tenant, with Mark paid / Mark not paid (owner request, 2026-10-10)
+
+**Decision.** `/rent/year` takes a tenant dropdown (default: the first tenant) and a year dropdown, and shows
+January to December for that tenant; `/rent/tenants/{id}/year` now redirects there. Each month's rent and
+electricity can be marked paid (POST `/rent/bills/{id}/mark-paid`, kind + date, CSRF `rent_mark_<id>`): this
+records a cash payment for exactly the amount still owed, linked to the bill through the new nullable
+`rent_payment.bill_id` (migration `Version20261010130000`, FK ON DELETE SET NULL). `RentLedger::allocate()` applies
+linked payments to their bill first; the rest still settle FIFO per kind. "Mark not paid" deletes only the
+payments linked to that bill and kind, so a month settled by a general payment cannot be un-marked from here.
+Every mark is audited (`rent.mark_paid` / `rent.mark_unpaid`).
+
+**Consequences.** Unlinked payments behave exactly as before.
+
+## ADR-089: Monthly expenses with a year view (owner request, 2026-10-10)
+
+**Decision.** New admin-only module `/expense`: `expense` (date, category, amount DECIMAL(12,2), paid-by method,
+description, note, optional rent property) and `expense_category` (managed under Config › Expense Categories,
+seeded with ten categories), migration `Version20261010140000`. Pages: a month's expenses with a category filter
+and totals by category; the year view, January to December with one column per category that had spending,
+month totals, entry counts, a totals row and tiles (total, monthly average over months with spending, highest
+month, top category). Money is handled in paise (RentMoney), shown in ₹; changes are audited as `expense.*`.
+
+**Consequences.** Not linked to the rent ledger: expenses are recorded, not deducted from rent.
+
+## ADR-090: An expense's category is optional (owner request, 2026-10-10)
+
+**Decision.** Category is no longer required on the expense form (e.g. upkeep of a rent property needs none).
+`expense.category_id` becomes nullable (migration `Version20261010150000`); a posted category must still exist.
+Uncategorised expenses show "—" in the month list and are totalled under "Uncategorised"
+(`ExpenseService::UNCATEGORISED`) in the month and year views.

@@ -1,0 +1,62 @@
+{% extends 'base.html.twig' %}
+{% import '_work/macros.html.twig' as ui %}
+{% import 'rent/_macros.html.twig' as r %}
+
+{% block title %}Expenses · {{ year }}{% endblock %}
+
+{% block body %}
+<div class="page-head">
+    <div class="ph-main">
+        <div class="eyebrow">Expenses</div>
+        <div class="ph-title"><h1>Year view · {{ year }}</h1></div>
+        <p class="lead">Every month from January to December, split by category. Click a month to see its expenses.</p>
+    </div>
+    <div class="ph-actions"><a class="btn primary" href="{{ path('app_expense_new') }}">+ New expense</a></div>
+</div>
+{{ ui.flashes() }}
+<form class="table-card mx-form" method="get" action="{{ path('app_expense_year') }}" style="margin-bottom:16px">
+    <div class="table-header">
+        <label for="f-year" class="bold">Year</label>
+        <select id="f-year" name="year" style="width:auto" onchange="this.form.submit()">
+            {% for y in years|merge([year])|sort|reverse|reduce((c, v) => v in c ? c : c|merge([v]), []) %}<option value="{{ y }}" {{ y == year ? 'selected' }}>{{ y }}</option>{% endfor %}
+        </select>
+        <noscript><button class="btn primary sm" type="submit">Show</button></noscript>
+        <span class="grow"></span>
+    </div>
+</form>
+
+<div class="kpis rent-kpis">
+    <div class="kpi"><span>Total {{ year }}</span><b>{{ r.inr(data.total) }}</b><small>{{ data.months|reduce((c, m) => c + m.count, 0) }} expenses</small></div>
+    <div class="kpi"><span>Monthly average</span><b>{{ r.inr(data.average) }}</b><small>over months with spending</small></div>
+    <div class="kpi"><span>Highest month</span><b>{{ data.highest ? data.highest|date('F') : '—' }}</b><small>{% for m in data.months %}{% if data.highest and m.month == data.highest %}{{ r.inr(m.total) }}{% endif %}{% endfor %}</small></div>
+    <div class="kpi"><span>Top category</span><b>{{ data.categories|first ?: '—' }}</b><small>{% if data.categories is not empty %}{{ r.inr(data.totals[data.categories|first]) }}{% endif %}</small></div>
+</div>
+
+<div class="table-card" style="margin-top:16px">
+    <div class="tscroll">
+        <table class="t rent-year">
+            <thead>
+                <tr><th>Month</th>{% for c in data.categories %}<th class="num">{{ c }}</th>{% endfor %}<th class="num">Total</th><th class="num">Entries</th></tr>
+            </thead>
+            <tbody>
+                {% for m in data.months %}
+                    <tr class="{{ m.total == 0 ? 'muted-row' }}">
+                        <td class="bold nowrap"><a href="{{ path('app_expense_index', {month: m.month|date('Y-m')}) }}">{{ m.month|date('F') }}</a></td>
+                        {% for c in data.categories %}<td class="num">{{ m.byCategory[c] is defined ? r.inr(m.byCategory[c]) : '—' }}</td>{% endfor %}
+                        <td class="num bold">{{ m.total ? r.inr(m.total) : '—' }}</td>
+                        <td class="num">{{ m.count ?: '—' }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot>
+                <tr class="group-total">
+                    <td class="bold">{{ year }}</td>
+                    {% for c in data.categories %}<td class="num bold">{{ r.inr(data.totals[c]) }}</td>{% endfor %}
+                    <td class="num bold">{{ r.inr(data.total) }}</td>
+                    <td class="num bold">{{ data.months|reduce((c, m) => c + m.count, 0) }}</td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+</div>
+{% endblock %}

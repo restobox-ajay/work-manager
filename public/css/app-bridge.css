@@ -739,3 +739,19 @@ td.actions > :last-child, .page-body td.actions > a.btn:last-child, table.t td.a
 .ptg-table select, .ptg-table input[type="date"] { min-width: 120px; }
 .ptg-table input[type="text"] { min-width: 90px; }
 .ptg-table tr.locked td { color: var(--muted); background: #fafafa; }
+/* Rent module (ADR-085): figure tiles, the bill preview line, owed amounts in red. */
+.rent-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.rent-kpis .kpi { background: #fff; border: 1.5px solid var(--line); border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 2px; }
+.rent-kpis .kpi span { font-size: .72rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
+.rent-kpis .kpi b { font-size: 1.35rem; color: var(--heading); }
+.rent-kpis .kpi small { font-size: .74rem; color: var(--muted); }
+@media (max-width: 900px) { .rent-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.text-danger { color: #dc3545 !important; }
+.rent-calc { margin-top: 14px; padding: 10px 14px; border-radius: 8px; background: var(--primary-soft); font-weight: 600; }
+/* Sign-in pages: the whole background blue (owner request), not the mockup's half-blue diagonal. */
+.auth { background: linear-gradient(160deg, #206eb8 0, #428bca 100%); }
+.rent-grid th.c, .rent-grid td.c { text-align: center; white-space: nowrap; }
+.rent-grid .cell-link { text-decoration: none; }
+.rent-year tr.muted-row td { color: var(--muted); }
+.rent-mark { display: flex; gap: 4px; align-items: center; margin-top: 4px; }
+.rent-mark input[type="date"] { height: 24px; font-size: .72rem; padding: 0 4px; width: 118px; }
