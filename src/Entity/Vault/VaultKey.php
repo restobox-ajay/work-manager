@@ -44,6 +44,14 @@ class VaultKey
     #[ORM\Column(length: 32)]
     private string $wrapIv = '';
 
+    /**
+     * SHA-256 (hex) of the auth key the browser derives from the master password next to the KEK (ADR-094). Proving
+     * it is what lets a request change or delete entries, so a hijacked session alone cannot wreck the vault. NULL
+     * for a vault created before ADR-094 until its first unlock registers it.
+     */
+    #[ORM\Column(length: 64, nullable: true)]
+    private ?string $authHash = null;
+
     #[ORM\Column]
     private int $createdAt = 0;
 
@@ -92,7 +100,7 @@ class VaultKey
         return $this->wrapIv;
     }
 
-    /** A new master password: the same vault key wrapped under a new salt / iteration count. */
+    /** A vault key wrapped under a master password's salt / iteration count. */
     public function wrap(int $iterations, string $salt, string $wrappedKey, string $wrapIv): static
     {
         $this->iterations = $iterations;
@@ -105,6 +113,25 @@ class VaultKey
         }
 
         return $this;
+    }
+
+    public function hasAuth(): bool
+    {
+        return $this->authHash !== null;
+    }
+
+    /** @param string $authKey the raw 32-byte auth key */
+    public function setAuth(string $authKey): static
+    {
+        $this->authHash = hash('sha256', $authKey);
+
+        return $this;
+    }
+
+    /** @param string $authKey the raw 32-byte auth key */
+    public function authMatches(string $authKey): bool
+    {
+        return $this->authHash !== null && hash_equals($this->authHash, hash('sha256', $authKey));
     }
 
     public function getCreatedAt(): int

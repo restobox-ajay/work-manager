@@ -1,11 +1,13 @@
 // Password Manager (ADR-092). Everything secret is encrypted and decrypted here, in the browser, with Web Crypto:
 //
-//   master password --PBKDF2-SHA256 (>= 600,000 iterations, random 16-byte salt)--> key-encryption key (KEK)
+//   master password --PBKDF2-SHA256 (>= 600,000 iterations, random 16-byte salt)--> 256-bit master key
+//   master key, as is --> key-encryption key (KEK); master key --HKDF-SHA256--> auth key (ADR-094)
 //   KEK --AES-256-GCM--> wraps a random 256-bit vault key (stored wrapped on the server)
 //   vault key --AES-256-GCM, fresh 12-byte IV per save--> each entry as JSON (type, title, username, password…)
 //
 // The master password, the KEK and the unwrapped vault key never leave this page; the server stores salt, iteration
-// count, wrapped key and entry ciphertext only. Additional authenticated data binds the wrapped key and entries to
+// count, wrapped key and entry ciphertext only. The auth key is sent with every change (X-Vault-Auth) to prove the
+// master password — the server keeps only its hash, and it cannot decrypt anything. Additional authenticated data binds the wrapped key and entries to
 // this user, so ciphertext copied between accounts will not decrypt. Decrypted values are only ever written to the
 // page with textContent / input.value (never innerHTML). The vault locks after 5 idle minutes and on leaving the page.
 (function () {
@@ -37,6 +39,9 @@
     var USER = root.dataset.user;
     var AAD_KEY = utf8('mwm-vault-key:v1:u' + USER);
     var AAD_ENTRY = utf8('mwm-vault-entry:v1:u' + USER);
+    var AUTH_INFO = utf8('mwm-vault-auth:v1:u' + USER);
+    var MIN_MASTER_LENGTH = 14;
+    var MIN_MASTER_BITS = 60;
 
     // Entry types and their fields. secret: masked with Show / Copy; generate: offers the password generator.
     var TYPES = {
@@ -80,7 +85,8 @@
     var MAX_FIELD = 20000;
 
     var vaultKey = null;     // CryptoKey, non-extractable; null when locked
-    var keyInfo = null;      // {kdf, iterations, salt, wrappedKey, wrapIv} from the server
+    var authKey = null;      // base64 auth key proving the master password to the server; null when locked
+    var keyInfo = null;      // {kdf, iterations, salt, wrappedKey, wrapIv, hasAuth} from the server
     var entries = [];        // [{id, version, updatedAt, data:{type, fields}|null}]
     var current = null;      // the entry shown or edited
     var idleTimer = null;
@@ -116,12 +122,15 @@
         if (text) { box.scrollIntoView({ block: 'nearest' }); }
     }
 
-    function api(method, url, body) {
+    // auth: the auth key to prove (defaults to the unlocked vault's; the master-password change proves the current one).
+    function api(method, url, body, auth) {
+        var headers = { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-Token': root.dataset.csrf };
+        if (auth || authKey) { headers['X-Vault-Auth'] = auth || authKey; }
         return fetch(url, {
             method: method,
             credentials: 'same-origin',
             cache: 'no-store',
-            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-Token': root.dataset.csrf },
+            headers: headers,
             body: body === undefined ? undefined : JSON.stringify(body)
         }).then(function (response) {
             return response.json().catch(function () { return {}; }).then(function (json) {
@@ -136,34 +145,50 @@
     }
 
     // ---- crypto --------------------------------------------------------------------------------------------------
-    function deriveKek(password, salt, iterations) {
-        return crypto.subtle.importKey('raw', utf8(password), 'PBKDF2', false, ['deriveKey']).then(function (base) {
-            return crypto.subtle.deriveKey({ name: 'PBKDF2', hash: 'SHA-256', salt: salt, iterations: iterations },
-                base, { name: 'AES-GCM', length: 256 }, false, ['wrapKey', 'unwrapKey']);
+    // Master password → {kek, auth}. The KEK is the raw 256 PBKDF2 bits, exactly what deriveKey produced before
+    // ADR-094, so existing vaults still open. The auth key is an HKDF output of the same bits: it proves the master
+    // password to the server, and neither it nor its hash leads back to the KEK.
+    function deriveSecrets(password, salt, iterations) {
+        if (!(iterations >= MIN_ITERATIONS)) { return Promise.reject(new Error('The vault key settings are too weak.')); }
+        return crypto.subtle.importKey('raw', utf8(password), 'PBKDF2', false, ['deriveBits']).then(function (base) {
+            return crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt: salt, iterations: iterations }, base, 256);
+        }).then(function (bits) {
+            return Promise.all([
+                crypto.subtle.importKey('raw', bits, { name: 'AES-GCM' }, false, ['wrapKey', 'unwrapKey']),
+                crypto.subtle.importKey('raw', bits, 'HKDF', false, ['deriveBits']).then(function (ikm) {
+                    return crypto.subtle.deriveBits({ name: 'HKDF', hash: 'SHA-256', salt: new Uint8Array(0), info: AUTH_INFO }, ikm, 256);
+                })
+            ]).then(function (pair) {
+                new Uint8Array(bits).fill(0);
+                return { kek: pair[0], auth: toB64(pair[1]) };
+            });
         });
     }
 
-    // Wrapped vault key → CryptoKey. Rejects (OperationError) on a wrong master password: GCM authentication fails.
-    function unwrap(password, info, extractable) {
-        return deriveKek(password, fromB64(info.salt), info.iterations).then(function (kek) {
-            return crypto.subtle.unwrapKey('raw', fromB64(info.wrappedKey), kek,
+    // Wrapped vault key → {key, auth}. Rejects (OperationError) on a wrong master password: GCM authentication fails.
+    function unwrap(password, info) {
+        return deriveSecrets(password, fromB64(info.salt), info.iterations).then(function (secrets) {
+            return crypto.subtle.unwrapKey('raw', fromB64(info.wrappedKey), secrets.kek,
                 { name: 'AES-GCM', iv: fromB64(info.wrapIv), additionalData: AAD_KEY },
-                { name: 'AES-GCM', length: 256 }, extractable, ['encrypt', 'decrypt']);
+                { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt'])
+                .then(function (key) { return { key: key, auth: secrets.auth }; });
         });
     }
 
+    // Vault key → the wrapping the server stores, plus the new auth key for it to hash.
     function wrap(password, key) {
-        var salt = random(16), iv = random(12);
-        return deriveKek(password, salt, MIN_ITERATIONS).then(function (kek) {
-            return crypto.subtle.wrapKey('raw', key, kek, { name: 'AES-GCM', iv: iv, additionalData: AAD_KEY });
+        var salt = random(16), iv = random(12), auth;
+        return deriveSecrets(password, salt, MIN_ITERATIONS).then(function (secrets) {
+            auth = secrets.auth;
+            return crypto.subtle.wrapKey('raw', key, secrets.kek, { name: 'AES-GCM', iv: iv, additionalData: AAD_KEY });
         }).then(function (wrapped) {
-            return { kdf: 'PBKDF2-SHA256', iterations: MIN_ITERATIONS, salt: toB64(salt), wrappedKey: toB64(wrapped), wrapIv: toB64(iv) };
+            return { kdf: 'PBKDF2-SHA256', iterations: MIN_ITERATIONS, salt: toB64(salt), wrappedKey: toB64(wrapped), wrapIv: toB64(iv), auth: auth };
         });
     }
 
-    function encryptEntry(data) {
+    function encryptEntry(data, key) {
         var iv = random(12);
-        return crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv, additionalData: AAD_ENTRY }, vaultKey, utf8(JSON.stringify(data)))
+        return crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv, additionalData: AAD_ENTRY }, key || vaultKey, utf8(JSON.stringify(data)))
             .then(function (ct) { return { ciphertext: toB64(ct), iv: toB64(iv) }; });
     }
 
@@ -177,14 +202,44 @@
     }
 
     // ---- password strength and generator ---------------------------------------------------------------------------
+    // Words, keyboard runs and fragments that guessing tools try first; matched after undoing l33t substitutions.
+    var COMMON_PARTS = ['password', 'passwort', 'pass', 'qwerty', 'asdf', 'zxcv', 'letmein', 'welcome', 'admin', 'login',
+        'iloveyou', 'love', 'monkey', 'dragon', 'master', 'secret', 'sunshine', 'princess', 'football', 'cricket', 'shadow',
+        'superman', 'batman', 'trustno', 'whatever', 'freedom', 'hello', 'summer', 'winter', 'india', 'google', 'gmail',
+        'facebook', 'bank', 'money', 'vault', 'modexbyte'];
+    var LEET = { '0': 'o', '1': 'i', '3': 'e', '4': 'a', '5': 's', '7': 't', '@': 'a', '$': 's', '!': 'i' };
+
+    // A rough guess-resistance estimate: common words, years, sequences (abc, 4321) and repeats count for almost
+    // nothing; only the rest is scored by length and character variety.
     function strengthBits(password) {
+        var lower = password.toLowerCase(), plain = lower.replace(/[013457@$!]/g, function (c) { return LEET[c]; });
+        var predictable = new Array(password.length).fill(false), chunks = 0, i, j;
+        function mark(from, to) { chunks++; for (var k = from; k < to; k++) { predictable[k] = true; } }
+        COMMON_PARTS.forEach(function (word) {
+            for (var at = plain.indexOf(word); at !== -1; at = plain.indexOf(word, at + 1)) { mark(at, at + word.length); }
+        });
+        lower.replace(/(?:19|20)\d\d/g, function (m, at) { mark(at, at + m.length); return m; });
+        for (i = 0; i < lower.length; i = j) {
+            var step = lower.charCodeAt(i + 1) - lower.charCodeAt(i);
+            for (j = i + 1; j < lower.length && lower.charCodeAt(j) - lower.charCodeAt(j - 1) === step && Math.abs(step) <= 1; j++) { /* run */ }
+            if (j - i >= 3) { mark(i, j); } else { j = i + 1; }
+        }
+        var rest = password.split('').filter(function (c, k) { return !predictable[k]; }).join('');
         var pool = 0;
-        if (/[a-z]/.test(password)) { pool += 26; }
-        if (/[A-Z]/.test(password)) { pool += 26; }
-        if (/[0-9]/.test(password)) { pool += 10; }
-        if (/[^a-zA-Z0-9]/.test(password)) { pool += 33; }
-        var unique = new Set(password).size;
-        return Math.round(Math.min(password.length, unique * 2) * Math.log2(Math.max(pool, 1)));
+        if (/[a-z]/.test(rest)) { pool += 26; }
+        if (/[A-Z]/.test(rest)) { pool += 26; }
+        if (/[0-9]/.test(rest)) { pool += 10; }
+        if (/[^a-zA-Z0-9]/.test(rest)) { pool += 33; }
+        var unique = new Set(rest).size;
+        return Math.round(Math.min(rest.length, unique * 2) * Math.log2(Math.max(pool, 1)) + chunks * 4);
+    }
+    // Why a new master password is not good enough, or '' when it is.
+    function masterPasswordProblem(password) {
+        if (password.length < MIN_MASTER_LENGTH) { return 'Use at least ' + MIN_MASTER_LENGTH + ' characters for the master password.'; }
+        if (strengthBits(password) < MIN_MASTER_BITS) {
+            return 'That master password is too easy to guess. Avoid common words, names, years, sequences like 1234 or abcd and repeated characters — four or five unrelated words work well.';
+        }
+        return '';
     }
     function meter(input, bar) {
         var bits = strengthBits(input.value);
@@ -204,13 +259,19 @@
     }
 
     // ---- clipboard -----------------------------------------------------------------------------------------------
+    // Browsers only let a focused page write the clipboard, and the usual flow is copy → switch to the bank's tab. So
+    // the clear is retried each time this tab gets focus again until it succeeds. Best effort: the OS clipboard
+    // history (Windows: Win+V) keeps its own copy.
+    var clipboardDirty = false;
+    function clearClipboard() {
+        if (!clipboardDirty || !navigator.clipboard || !document.hasFocus()) { return; }
+        navigator.clipboard.writeText('').then(function () { clipboardDirty = false; }, function () {});
+    }
     function copy(text, what) {
         var done = function () {
-            message(what + ' copied. The clipboard is cleared in 30 seconds.');
+            message(what + ' copied. It is cleared from the clipboard after 30 seconds (or when you return to this tab).');
             clearTimeout(clipboardTimer);
-            clipboardTimer = setTimeout(function () {
-                if (navigator.clipboard) { navigator.clipboard.writeText('').catch(function () {}); }
-            }, CLIPBOARD_CLEAR_MS);
+            clipboardTimer = setTimeout(function () { clipboardTimer = null; clipboardDirty = true; clearClipboard(); }, CLIPBOARD_CLEAR_MS);
         };
         if (navigator.clipboard && window.isSecureContext) {
             navigator.clipboard.writeText(text).then(done, function () { message('Copying was blocked by the browser.', 'danger'); });
@@ -234,9 +295,12 @@
         el('v-lock-badge').hidden = !open;
     }
 
+    function fetchState() {
+        return api('GET', root.dataset.stateUrl).then(function (state) { keyInfo = state.key; return state; });
+    }
+
     function load() {
-        return api('GET', root.dataset.stateUrl).then(function (state) {
-            keyInfo = state.key;
+        return fetchState().then(function (state) {
             if (!state.setUp) {
                 view(['v-setup']);
                 el('v-setup-pass').focus();
@@ -257,8 +321,11 @@
 
     function lock(reason) {
         vaultKey = null;
+        authKey = null;
         entries = [];
+        if (clipboardTimer) { clearTimeout(clipboardTimer); clipboardTimer = null; clipboardDirty = true; clearClipboard(); }
         current = null;
+        setRevealAll(false);
         clearTimeout(idleTimer);
         el('v-list').replaceChildren();
         el('v-detail-fields').replaceChildren();
@@ -282,11 +349,12 @@
     }
 
     var MASK = '••••••••••';
+    var revealAll = false;   // list-wide "Show all passwords"; reset on lock
     // A masked secret with Show / Hide and Copy; used by the list and the detail panel.
-    function secretControl(value, label, tag) {
+    function secretControl(value, label, tag, startShown) {
         var wrap = make('span', { className: 'v-secret-ctl' });
-        var shown = make(tag || 'span', { className: 'v-secret' }, MASK);
-        var toggle = make('button', { type: 'button', className: 'btn secondary xs' }, 'Show');
+        var shown = make(tag || 'span', { className: 'v-secret' }, startShown ? value : MASK);
+        var toggle = make('button', { type: 'button', className: 'btn secondary xs' }, startShown ? 'Hide' : 'Show');
         toggle.addEventListener('click', function (ev) {
             ev.stopPropagation();
             var hidden = toggle.textContent === 'Show';
@@ -337,7 +405,7 @@
             tr.appendChild(make('td', {}, field(e, 'username') || '—'));
             var secret = secretOf(e);
             var secretCell = make('td', { className: 'nowrap' });
-            if (secret && secret.value) { secretCell.appendChild(secretControl(secret.value, secret.label)); } else { secretCell.textContent = '—'; }
+            if (secret && secret.value) { secretCell.appendChild(secretControl(secret.value, secret.label, 'span', revealAll)); } else { secretCell.textContent = '—'; }
             tr.appendChild(secretCell);
             tr.appendChild(make('td', { className: 'nowrap muted' }, new Date(e.updatedAt * 1000).toLocaleDateString()));
             var actions = make('td', { className: 'actions' });
@@ -455,10 +523,9 @@
 
     el('v-setup').addEventListener('submit', function (ev) {
         ev.preventDefault();
-        var form = this, pass = el('v-setup-pass').value;
-        if (pass.length < 12) { message('Use at least 12 characters for the master password.', 'danger'); return; }
+        var form = this, pass = el('v-setup-pass').value, problem = masterPasswordProblem(pass);
+        if (problem) { message(problem, 'danger'); return; }
         if (pass !== el('v-setup-confirm').value) { message('The two master passwords do not match.', 'danger'); return; }
-        if (strengthBits(pass) < 50) { message('That master password is too easy to guess. Make it longer or mix in words, digits and symbols.', 'danger'); return; }
         busy(form, true);
         message('Creating your vault…');
         var key;
@@ -466,9 +533,11 @@
             key = k;
             return wrap(pass, key);
         }).then(function (wrapped) {
-            return api('POST', root.dataset.setupUrl, wrapped).then(function () { return unwrap(pass, wrapped, false); });
-        }).then(function (k) {
-            vaultKey = k;
+            // Unwrap again so the key kept in memory is non-extractable.
+            return api('POST', root.dataset.setupUrl, wrapped).then(function () { return unwrap(pass, wrapped); });
+        }).then(function (opened) {
+            vaultKey = opened.key;
+            authKey = opened.auth;
             el('v-setup-pass').value = el('v-setup-confirm').value = '';
             message('Vault created and unlocked.');
             return load();
@@ -478,22 +547,29 @@
     var failures = 0;
     el('v-unlock').addEventListener('submit', function (ev) {
         ev.preventDefault();
-        var form = this, input = el('v-unlock-pass');
+        var form = this, input = el('v-unlock-pass'), password = input.value;
+        input.value = '';
         busy(form, true);
         message('Unlocking…');
-        unwrap(input.value, keyInfo, false).then(function (k) {
-            vaultKey = k;
-            failures = 0;
-            input.value = '';
-            message('');
-            return load(); // lock() dropped the entries: fetch them again and decrypt with the key
-        }, function () {
-            failures++;
-            input.value = '';
-            message('Wrong master password.', 'danger');
-            // Slow down guessing at the keyboard (an offline attacker is held back by PBKDF2's cost instead).
-            return new Promise(function (resolve) { setTimeout(resolve, Math.min(30000, 1000 * Math.pow(2, failures - 1))); });
-        }).finally(function () { busy(form, false); input.focus(); });
+        // Fresh key settings first: another tab may have changed the master password since this page loaded.
+        fetchState().then(function (state) {
+            if (!state.setUp) { return load(); }
+            return unwrap(password, keyInfo).then(function (opened) {
+                vaultKey = opened.key;
+                authKey = opened.auth;
+                failures = 0;
+                message('');
+                // A vault from before ADR-094 registers its auth key now (409: another tab already did).
+                var registered = keyInfo.hasAuth ? Promise.resolve()
+                    : api('POST', root.dataset.authUrl, { auth: authKey }).catch(function (error) { if (error.status !== 409) { throw error; } });
+                return registered.then(load); // lock() dropped the entries: fetch them again and decrypt with the key
+            }, function () {
+                failures++;
+                message('Wrong master password.', 'danger');
+                // Slow down guessing at the keyboard (an offline attacker is held back by PBKDF2's cost instead).
+                return new Promise(function (resolve) { setTimeout(resolve, Math.min(30000, 1000 * Math.pow(2, failures - 1))); });
+            });
+        }).catch(function (error) { message(error.message, 'danger'); }).finally(function () { busy(form, false); input.focus(); });
     });
 
     el('v-reset').addEventListener('submit', function (ev) {
@@ -508,6 +584,12 @@
         }).catch(function (error) { message(error.message, 'danger'); }).finally(function () { busy(form, false); });
     });
 
+    function setRevealAll(on) {
+        revealAll = on;
+        el('v-reveal-all').textContent = on ? 'Hide all passwords' : 'Show all passwords';
+        el('v-reveal-all').setAttribute('aria-pressed', on ? 'true' : 'false');
+    }
+    el('v-reveal-all').addEventListener('click', function () { setRevealAll(!revealAll); renderList(); });
     el('v-search').addEventListener('input', renderList);
     el('v-type-filter').addEventListener('change', renderList);
     el('v-new').addEventListener('click', function () { openEdit(null); });
@@ -560,26 +642,42 @@
     el('v-master-cancel').addEventListener('click', function () { ['v-master-current', 'v-master-new', 'v-master-confirm'].forEach(function (id) { el(id).value = ''; }); view(['v-main']); });
     el('v-master').addEventListener('submit', function (ev) {
         ev.preventDefault();
-        var form = this, next = el('v-master-new').value;
-        if (next.length < 12) { message('Use at least 12 characters for the master password.', 'danger'); return; }
+        var form = this, next = el('v-master-new').value, problem = masterPasswordProblem(next);
+        if (problem) { message(problem, 'danger'); return; }
         if (next !== el('v-master-confirm').value) { message('The two new master passwords do not match.', 'danger'); return; }
-        if (strengthBits(next) < 50) { message('That master password is too easy to guess.', 'danger'); return; }
+        if (entries.some(function (e) { return !e.data; })) {
+            message('Some entries cannot be decrypted. Delete them before changing the master password.', 'danger');
+            return;
+        }
         busy(form, true);
-        message('Changing the master password…');
-        // Unwrap again with the current password (extractable just for this) and wrap the same key under the new one.
-        unwrap(el('v-master-current').value, keyInfo, true).then(function (key) {
-            return wrap(next, key);
-        }, function () { throw new Error('The current master password is wrong.'); }).then(function (wrapped) {
-            return api('POST', root.dataset.masterUrl, wrapped).then(function () { keyInfo = wrapped; });
-        }).then(function () {
+        message('Changing the master password and re-encrypting ' + entries.length + ' entries…');
+        // A brand-new vault key, with every entry re-encrypted under it (ADR-094). The current password's auth key
+        // proves to the server that whoever asks knows it.
+        var currentAuth;
+        unwrap(el('v-master-current').value, keyInfo).then(function (opened) { currentAuth = opened.auth; },
+            function () { throw new Error('The current master password is wrong.'); }).then(function () {
+            return crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
+        }).then(function (newKey) {
+            return Promise.all([wrap(next, newKey)].concat(entries.map(function (e) {
+                return encryptEntry(e.data, newKey).then(function (sealed) { return { id: e.id, version: e.version, ciphertext: sealed.ciphertext, iv: sealed.iv }; });
+            })));
+        }).then(function (parts) {
+            var wrapped = parts[0];
+            return api('POST', root.dataset.masterUrl, { key: wrapped, entries: parts.slice(1) }, currentAuth)
+                .then(function () { return unwrap(next, wrapped); }); // keep a non-extractable copy of the new key
+        }).then(function (opened) {
+            vaultKey = opened.key;
+            authKey = opened.auth;
             ['v-master-current', 'v-master-new', 'v-master-confirm'].forEach(function (id) { el(id).value = ''; });
-            view(['v-main']);
-            message('Master password changed.');
+            message('Master password changed and the vault re-encrypted with a new key.');
+            return load();
         }).catch(function (error) { message(error.message, 'danger'); }).finally(function () { busy(form, false); });
     });
 
     ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'].forEach(function (name) { document.addEventListener(name, touch, { passive: true }); });
     window.addEventListener('pagehide', function () { lock(); });
+    window.addEventListener('focus', clearClipboard);
+    document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') { clearClipboard(); } });
 
     Object.keys(TYPES).forEach(function (k) {
         el('v-type-filter').appendChild(make('option', { value: k }, TYPES[k].label));

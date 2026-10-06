@@ -2565,3 +2565,36 @@ Email and error entries older than 30 / 90 / 180 days can be cleared from their 
 activity retention stays with `app:prune`. Migration `Version20261011140000`.
 
 **Consequences.** Queued emails stay "queued" until a Messenger worker runs (`messenger:consume async`).
+
+## ADR-094: Password Manager hardening — auth key, re-key on master change, HSTS (security review, 2026-10-11)
+
+**Decision.** From a security review of ADR-092:
+- **Auth key.** The browser now takes the 256 PBKDF2 bits of the master password as the master key: used as is it
+  is the KEK (byte-for-byte what `deriveKey` gave before, so existing vaults open unchanged), and HKDF-SHA256 of it
+  (info `mwm-vault-auth:v1:u<id>`) is a 32-byte auth key. `vault_key.auth_hash` holds its SHA-256 (migration
+  `Version20261011150000`). Creating, updating and deleting entries and changing the master password must send it
+  (`X-Vault-Auth`), so a hijacked session or script injected into another page can no longer overwrite, delete or
+  re-key the vault. A vault created before this registers its auth key at its first unlock (`POST /vault/api/auth`,
+  allowed only while none is stored).
+- **Re-key.** Changing the master password generates a new vault key and re-encrypts every entry under it in one
+  transaction (row-locked; every owned entry at its current version must be sent), so an old wrapped-key backup
+  plus an old master password no longer opens current entries.
+- **Isolation.** `/vault` sends `Cross-Origin-Opener-Policy: same-origin`: a page of the app that opens the vault
+  in a window loses its handle to it, so XSS elsewhere cannot read the open vault.
+- **Master password policy.** At least 14 characters, scored after discounting common words (l33t undone), years,
+  sequences and repeats; at least 60 bits.
+- **Clipboard.** Clearing is retried when the tab regains focus (browsers refuse clipboard writes from a
+  background tab) and on lock; the help page says Windows clipboard history keeps its own copy.
+- **Reset** (forgotten master password) is rate-limited per user (`EndpointRateLimiter`, action `vault_reset`) and
+  refused attempts are audited, so it cannot be used to guess the account password.
+- **Stale tabs** re-fetch the key settings before unlocking.
+- **HSTS** (`StrictTransportSecuritySubscriber`): `max-age=31536000` on production HTTPS responses only (dev hosts
+  with self-signed certificates would otherwise be pinned).
+
+**Not done.** Entry AAD still binds the user only, not entry id/version: a rollback needs write access to the
+database, and whoever has that and the server can serve altered JavaScript anyway (ADR-092's accepted residual
+risk). A site-wide strict CSP needs the inline scripts on other pages moved to files — separate work.
+
+**Tripwire:** verifiable — Verified by `tests/Functional/Vault/VaultApiTest.php` (CSRF, ownership, the auth key,
+the iteration floor, version conflicts, re-keying, legacy registration, the throttled reset, COOP) and
+`tests/Unit/EventListener/StrictTransportSecuritySubscriberTest.php` (HSTS on production HTTPS only).

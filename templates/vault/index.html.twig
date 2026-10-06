@@ -17,7 +17,7 @@
     <div class="ph-main">
         <div class="eyebrow">Password Manager</div>
         <div class="ph-title"><h1>My vault</h1> <span class="badge success" id="v-lock-badge" hidden>Unlocked</span></div>
-        <p class="lead">Website and app logins, app MPINs, licence keys and secure notes — encrypted in your browser with your master password (AES-256-GCM). The server and the database only ever hold ciphertext.</p>
+        <p class="lead">Website and app logins, app MPINs, licence keys and secure notes — encrypted in your browser with your master password (AES-256-GCM). The server and the database only ever hold ciphertext. <a href="{{ path('app_vault_help') }}">How the vault works</a></p>
     </div>
     <div class="ph-actions" id="v-actions" hidden>
         <button class="btn secondary" type="button" id="v-change-master">Change master password</button>
@@ -29,7 +29,7 @@
 
 <div id="vault" class="vault" data-state-url="{{ path('app_vault_state') }}" data-setup-url="{{ path('app_vault_setup') }}"
      data-master-url="{{ path('app_vault_master_password') }}" data-entries-url="{{ path('app_vault_entry_create') }}"
-     data-reset-url="{{ path('app_vault_reset') }}" data-csrf="{{ csrf_token(csrfId) }}" data-user="{{ app.user.id }}"
+     data-reset-url="{{ path('app_vault_reset') }}" data-auth-url="{{ path('app_vault_auth') }}" data-csrf="{{ csrf_token(csrfId) }}" data-user="{{ app.user.id }}"
      data-min-iterations="{{ minIterations }}">
 
     <div class="v-msg" id="v-msg" role="status" aria-live="polite" hidden></div>
@@ -44,8 +44,8 @@
         <p>Choose a <b>master password</b>. It encrypts everything in your vault and is never sent to the server.</p>
         <div class="v-warn"><b>There is no recovery.</b> If you forget the master password, nobody — not even an administrator with the database — can open your vault. You would have to delete it and start again.</div>
         <div class="field"><label for="v-setup-pass">Master password <span class="req">*</span></label>
-            <input type="password" id="v-setup-pass" autocomplete="new-password" minlength="12" required>
-            <div class="v-meter"><span id="v-setup-meter"></span></div><small class="muted" id="v-setup-hint">At least 12 characters. A long phrase of unrelated words is best.</small></div>
+            <input type="password" id="v-setup-pass" autocomplete="new-password" minlength="14" required>
+            <div class="v-meter"><span id="v-setup-meter"></span></div><small class="muted" id="v-setup-hint">At least 14 characters. Four or five unrelated words work best; avoid names, years and common words.</small></div>
         <div class="field"><label for="v-setup-confirm">Repeat master password <span class="req">*</span></label><input type="password" id="v-setup-confirm" autocomplete="new-password" required></div>
         <div class="field"><label class="check"><input type="checkbox" id="v-setup-ack" required> I understand a forgotten master password cannot be recovered.</label></div>
         <div class="form-actions"><button class="btn primary" type="submit">Create vault</button></div>
@@ -76,6 +76,7 @@
                 <input type="search" id="v-search" placeholder="Search title, username, site, app, group…" aria-label="Search the vault" autocomplete="off" style="max-width:360px">
                 <select id="v-type-filter" aria-label="Type" style="width:auto"><option value="">All types</option></select>
                 <span class="grow"></span>
+                <button class="btn secondary sm" type="button" id="v-reveal-all" aria-pressed="false">Show all passwords</button>
                 <span class="muted" id="v-count"></span>
             </div>
             <div class="tscroll">
@@ -106,7 +107,7 @@
     <form class="card mx-form v-panel v-narrow" id="v-master" autocomplete="off" hidden>
         <div class="section-label">Change master password</div>
         <div class="field"><label for="v-master-current">Current master password</label><input type="password" id="v-master-current" autocomplete="current-password" required></div>
-        <div class="field"><label for="v-master-new">New master password</label><input type="password" id="v-master-new" autocomplete="new-password" minlength="12" required><div class="v-meter"><span id="v-master-meter"></span></div></div>
+        <div class="field"><label for="v-master-new">New master password</label><input type="password" id="v-master-new" autocomplete="new-password" minlength="14" required><div class="v-meter"><span id="v-master-meter"></span></div></div>
         <div class="field"><label for="v-master-confirm">Repeat new master password</label><input type="password" id="v-master-confirm" autocomplete="new-password" required></div>
         <div class="form-actions"><button class="btn secondary" type="button" id="v-master-cancel">Cancel</button><button class="btn primary" type="submit">Change master password</button></div>
     </form>

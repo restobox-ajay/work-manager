@@ -790,3 +790,10 @@ td.actions > :last-child, .page-body td.actions > a.btn:last-child, table.t td.a
 .log-pre{white-space:pre-wrap;word-break:break-word;margin:0;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.78rem}
 .log-trace{max-height:480px;overflow:auto;background:var(--line-light);padding:10px;border-radius:6px}
 a.kpi{text-decoration:none;color:inherit}a.kpi:hover{border-color:var(--primary,#206eb8)}
+/* Password Manager guide (ADR-092) */
+.vault-help .card + .card{margin-top:16px}
+.vault-help h2{margin:0 0 8px}
+.vault-help h3{margin:16px 0 6px;font-size:1rem}
+.vault-help li{margin:4px 0}
+.vault-help .v-warn{background:var(--warning-soft);border:1px solid #faebcc;color:#8a6d3b;border-radius:8px;padding:10px 14px;margin:10px 0 0;font-size:.85rem}
+@media print{.sidebar,.topbar,.ph-actions,.nav-toggle{display:none!important}.vault-help .card{break-inside:avoid;box-shadow:none}}

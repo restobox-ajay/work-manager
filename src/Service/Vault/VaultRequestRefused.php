@@ -21,4 +21,15 @@ final class VaultRequestRefused extends \RuntimeException
     {
         return new self($message, 409);
     }
+
+    /** The request did not prove the master password's auth key (ADR-094): a stale tab, or not the vault's owner. */
+    public static function locked(): self
+    {
+        return new self('Your vault session is out of date. Lock the vault and unlock it again.', 403);
+    }
+
+    public static function tooManyAttempts(): self
+    {
+        return new self('Too many attempts. Wait a few minutes and try again.', 429);
+    }
 }

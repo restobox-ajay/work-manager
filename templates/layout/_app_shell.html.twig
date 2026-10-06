@@ -93,7 +93,8 @@
             { label: 'Cost Summary', href: path('app_subscription_summary'), current: cur == 'app_subscription_summary' },
         ] },
         { label: 'Password Manager', icon: 'lock', children: [
-            { label: 'My Vault', href: path('app_vault_index'), current: cur starts with 'app_vault_' },
+            { label: 'My Vault', href: path('app_vault_index'), current: cur starts with 'app_vault_' and cur != 'app_vault_help' },
+            { label: 'How It Works', href: path('app_vault_help'), current: cur == 'app_vault_help' },
         ] },
         { label: 'Users', icon: 'users', children: [
             { label: 'All Users', href: path('app_admin_users'), current: cur starts with 'app_admin_users' and cur != 'app_admin_users_invite' and cur != 'app_admin_users_invitations',

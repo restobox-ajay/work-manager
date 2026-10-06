@@ -1,0 +1,88 @@
+{% extends 'base.html.twig' %}
+
+{#
+    Password Manager guide (ADR-092): why there is a master password and how to use the vault. Static text only;
+    keep it in step with public/js/vault.js (idle lock, clipboard clearing, entry types).
+#}
+{% block title %}How the Password Manager works{% endblock %}
+
+{% block body %}
+<div class="page-head">
+    <div class="ph-main">
+        <div class="eyebrow">Password Manager</div>
+        <div class="ph-title"><h1>How the vault works</h1></div>
+        <p class="lead">Why the vault has its own master password, and how to use it day to day. To keep a copy, print this page or save it as a PDF (Ctrl+P, then “Save as PDF”).</p>
+    </div>
+    <div class="ph-actions">
+        <a class="btn primary" href="{{ path('app_vault_index') }}">Open my vault</a>
+    </div>
+</div>
+
+<div class="vault-help">
+    <section class="card">
+        <h2>Why is there a master password?</h2>
+        <p>Your passwords are <b>encrypted in your browser</b> before they are sent anywhere. The server and the database only ever store scrambled data (ciphertext) that they cannot read. The master password is the only thing that can unlock it.</p>
+        <ol>
+            <li>Your browser turns the master password into an encryption key (PBKDF2-SHA256, {{ minIterations|number_format }} rounds, so every guess an attacker makes is slow).</li>
+            <li>That key unlocks your <b>vault key</b>, which is stored only in encrypted (wrapped) form.</li>
+            <li>The vault key decrypts your entries with AES-256-GCM — inside the browser, never on the server.</li>
+        </ol>
+        <p>The master password is <b>never sent to the server</b>. That is what keeps your vault safe:</p>
+        <ul>
+            <li>Someone who gets the database, a backup, the server code or its configuration still cannot read your passwords.</li>
+            <li>Other admins — and whoever runs the server — cannot open your vault.</li>
+            <li>A stolen sign-in session is not enough: reading the vault needs the master password, and so does every change — adding, editing, deleting entries or changing the master password. Your browser proves it with a separate “auth key” derived from the master password, which cannot decrypt anything.</li>
+        </ul>
+        <p>Your sign-in password cannot do this job, because the server sees it every time you log in. The master password stays in your browser.</p>
+        <div class="v-warn"><b>There is no recovery.</b> If you forget the master password, nobody can open your vault — not even an administrator with the database. The only way out is to delete the vault and start again.</div>
+    </section>
+
+    <section class="card">
+        <h2>Setting up (first time)</h2>
+        <ol>
+            <li>Open <b>Password Manager › My Vault</b>.</li>
+            <li>Choose a master password of at least 14 characters. Common words, names, years, sequences like 1234 or abcd and repeated characters are refused. A passphrase of four or five unrelated words is easy to remember and hard to guess, for example <code>river-lamp-cotton-71-oak</code>.</li>
+            <li>Tick the box confirming you understand it cannot be recovered, and create the vault.</li>
+            <li>Keep the master password somewhere safe offline (written down and stored securely). Do not reuse your sign-in password.</li>
+        </ol>
+    </section>
+
+    <section class="card">
+        <h2>Everyday use</h2>
+        <h3>Unlock</h3>
+        <p>Enter your master password and click <b>Unlock</b>. The list shows every entry: title, type, app name, URL, username and the password / PIN / key.</p>
+
+        <h3>Add an entry</h3>
+        <p>Click <b>+ New entry</b> and choose a type:</p>
+        <table class="t v-kv">
+            <tr><th>Website login</th><td>Title, website, app name, username / email, password, group, notes.</td></tr>
+            <tr><th>App login</th><td>Title, app / platform, URL, username / email, password, group, notes.</td></tr>
+            <tr><th>App MPIN / PIN</th><td>Title, app, URL, account / phone / customer ID, MPIN / PIN, group, notes.</td></tr>
+            <tr><th>Licence key</th><td>Title, product, URL, licensed to, licence key, group, notes.</td></tr>
+            <tr><th>Secure note</th><td>Title, group and the note itself.</td></tr>
+        </table>
+        <p>For passwords, <b>Generate</b> creates a strong random one. Use <b>Group</b> (Work, Banking, Google…) to keep related entries together; search finds them by group.</p>
+
+        <h3>See and copy passwords</h3>
+        <ul>
+            <li>Passwords are hidden (<code>••••••••••</code>) by default.</li>
+            <li><b>Show</b> on a row reveals that one password; <b>Hide</b> masks it again.</li>
+            <li><b>Show all passwords</b> above the list reveals every password at once; <b>Hide all passwords</b> masks them again.</li>
+            <li><b>Copy</b> puts the value on the clipboard. It is cleared after 30 seconds — or, if you have switched to another tab or app by then, as soon as you come back to the vault. Windows clipboard history (Win+V) keeps its own copy: turn it off, or clear it, if others use your computer.</li>
+            <li>Click a row to open the full entry, with <b>Edit</b> and <b>Delete</b>.</li>
+            <li>Use the search box and the type filter to narrow the list.</li>
+        </ul>
+    </section>
+
+    <section class="card">
+        <h2>Staying safe</h2>
+        <ul>
+            <li>Click <b>Lock</b> when you are done. The vault also locks itself after 5 minutes without activity and whenever you leave the page; every password goes back to hidden.</li>
+            <li>Use <b>Show all passwords</b> only when nobody can see your screen.</li>
+            <li><b>Change master password</b> asks for the current one, then creates a brand-new vault key and re-encrypts every entry with it, so an old copy of the vault cannot be opened with an old password.</li>
+            <li><b>Forgot your master password?</b> (on the unlock screen) deletes the whole vault after you confirm with your sign-in password, so you can start again with an empty vault.</li>
+            <li>Each admin has their own private vault; entries are never shared.</li>
+        </ul>
+    </section>
+</div>
+{% endblock %}
