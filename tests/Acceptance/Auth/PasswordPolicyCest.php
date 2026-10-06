@@ -20,6 +20,12 @@ use App\Tests\Support\AcceptanceTester;
  */
 class PasswordPolicyCest
 {
+    // ADR-095: sign-up is invitation-only by default; these scenarios exercise the open form, so they open it.
+    public function _before(AcceptanceTester $I): void
+    {
+        $I->seedConfig('registration.mode', 'open');
+    }
+
     // AC1: a password below the configured minimum length is rejected on
     // registration with a validation error that names the rule, and no account
     // is created.

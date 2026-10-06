@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
+use App\Config\GeneralConfigPage;
 use App\Entity\User;
 use App\Exception\InvitationAlreadyUsedException;
 use App\Repository\InvitationRepository;
@@ -41,18 +42,20 @@ class RegistrationController extends AbstractController
         WebhookDispatcherInterface $webhookDispatcher,
         EndpointRateLimiterInterface $rateLimiter,
     ): Response {
-        $mode = $configService->getString('registration.mode', 'open');
+        $mode = $configService->getString(GeneralConfigPage::REGISTRATION_MODE_KEY, GeneralConfigPage::DEFAULT_REGISTRATION_MODE);
 
         $invitation      = null;
         $invitationEmail = '';
         $inviteToken     = '';
 
-        if ($mode === 'invitation-only') {
+        // Anything but an explicit "open" is invitation-only (ADR-095): the app is run by its owner, not signed up to.
+        if ($mode !== GeneralConfigPage::REGISTRATION_OPEN) {
             // Token may arrive via query string (GET) or hidden field (POST re-render)
             $inviteToken = (string) ($request->query->get('token') ?? $request->request->get('_invite_token', ''));
 
+            // Without an invitation there is no sign-up page at all — not even a "by invitation" notice.
             if ($inviteToken === '') {
-                return new Response('Registration is by invitation only.', Response::HTTP_FORBIDDEN);
+                throw $this->createNotFoundException();
             }
 
             $tokenHash  = hash('sha256', $inviteToken);

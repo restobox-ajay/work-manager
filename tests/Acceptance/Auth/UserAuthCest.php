@@ -61,6 +61,7 @@ class UserAuthCest
 
     public function selfRegistrationCreatesUsableAccount(AcceptanceTester $I): void
     {
+        $I->seedConfig('registration.mode', 'open'); // ADR-095: invitation-only by default
         $I->amOnPage('/register');
         $I->seeElement('input[name="email"]');
 

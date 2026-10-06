@@ -2598,3 +2598,18 @@ risk). A site-wide strict CSP needs the inline scripts on other pages moved to f
 **Tripwire:** verifiable — Verified by `tests/Functional/Vault/VaultApiTest.php` (CSRF, ownership, the auth key,
 the iteration floor, version conflicts, re-keying, legacy registration, the throttled reset, COOP) and
 `tests/Unit/EventListener/StrictTransportSecuritySubscriberTest.php` (HSTS on production HTTPS only).
+
+## ADR-095: No public sign-up — registration is invitation-only by default (owner request, 2026-10-06)
+
+**Decision.** The app is used by its owner (super admin) only, so nobody may create an account themselves. The
+`registration.mode` default is now `invitation-only` (`GeneralConfigPage::DEFAULT_REGISTRATION_MODE`; it was `open`),
+and any value other than an explicit `open` is treated as invitation-only. Without an invitation token `/register`
+is a 404 — the sign-up page does not exist for a visitor (it used to be a 403 "by invitation only" notice). Admins
+can still invite someone (Users › Invite), and `open` can still be chosen under Administration › General Config.
+
+**Consequences.** A stranger can no longer register, see the staff list on task pages or write to the Error Log as
+a signed-in user. Tests that exercise the open sign-up form switch it on for themselves (`OpenRegistrationTrait`,
+`seedConfig` in the Cests).
+
+**Tripwire:** verifiable — Verified by `tests/Functional/Registration/RegistrationClosedByDefaultTest.php` (no
+page and no account without an invitation, unknown mode treated as invitation-only).

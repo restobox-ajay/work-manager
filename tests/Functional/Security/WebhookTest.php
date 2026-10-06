@@ -10,10 +10,12 @@ use App\Service\ConfigService;
 use App\Service\InMemoryWebhookDispatcher;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
+use App\Tests\Support\OpenRegistrationTrait;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 
 final class WebhookTest extends WebTestCase
 {
+    use OpenRegistrationTrait;
     private KernelBrowser $client;
     private EntityManagerInterface $em;
     private ConfigService $configService;
@@ -37,10 +39,12 @@ final class WebhookTest extends WebTestCase
 
         InMemoryWebhookDispatcher::reset();
         $this->cleanup();
+        $this->openRegistration($this->em);
     }
 
     protected function tearDown(): void
     {
+        $this->restoreRegistrationMode($this->em);
         $this->cleanup();
         parent::tearDown();
     }

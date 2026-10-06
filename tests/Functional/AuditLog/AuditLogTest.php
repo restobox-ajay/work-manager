@@ -9,10 +9,12 @@ use App\Tests\Support\AuthenticationTestTrait;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
+use App\Tests\Support\OpenRegistrationTrait;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 
 final class AuditLogTest extends WebTestCase
 {
+    use OpenRegistrationTrait;
     use AuthenticationTestTrait;
 
     private KernelBrowser $client;
@@ -35,10 +37,12 @@ final class AuditLogTest extends WebTestCase
 
         // Reset audit_log for a clean baseline in each test
         $this->conn->executeStatement('DELETE FROM audit_log');
+        $this->openRegistration($this->em);
     }
 
     protected function tearDown(): void
     {
+        $this->restoreRegistrationMode($this->em);
         $this->cleanup();
         parent::tearDown();
     }

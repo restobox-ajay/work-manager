@@ -8,6 +8,7 @@ use App\Entity\User;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
+use App\Tests\Support\OpenRegistrationTrait;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 
 /**
@@ -17,6 +18,7 @@ use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
  */
 final class RegistrationSecurityTest extends WebTestCase
 {
+    use OpenRegistrationTrait;
     private const EMAILS = [
         'regsec1@example.com',
         'regsec2@example.com',
@@ -33,10 +35,12 @@ final class RegistrationSecurityTest extends WebTestCase
         $this->em = self::getContainer()->get(EntityManagerInterface::class);
         $this->conn = self::getContainer()->get(Connection::class);
         $this->cleanup();
+        $this->openRegistration($this->em);
     }
 
     protected function tearDown(): void
     {
+        $this->restoreRegistrationMode($this->em);
         $this->cleanup();
         parent::tearDown();
     }

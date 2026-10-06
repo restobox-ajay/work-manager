@@ -7,6 +7,7 @@ namespace App\Tests\Functional\Registration;
 use App\Repository\UserRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
+use App\Tests\Support\OpenRegistrationTrait;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 
 /**
@@ -21,6 +22,7 @@ use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
  */
 final class RegistrationRaceTest extends WebTestCase
 {
+    use OpenRegistrationTrait;
     private const EMAIL = 'race-dupe@example.com';
 
     private KernelBrowser $client;
@@ -50,10 +52,12 @@ final class RegistrationRaceTest extends WebTestCase
                 date('Y-m-d H:i:s'),
             ]
         );
+        $this->openRegistration($this->em);
     }
 
     protected function tearDown(): void
     {
+        $this->restoreRegistrationMode($this->em);
         $this->cleanup();
         parent::tearDown();
     }

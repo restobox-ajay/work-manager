@@ -7,11 +7,13 @@ namespace App\Tests\Functional\Registration;
 use App\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
+use App\Tests\Support\OpenRegistrationTrait;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 final class RegistrationTest extends WebTestCase
 {
+    use OpenRegistrationTrait;
     private KernelBrowser $client;
     private EntityManagerInterface $em;
 
@@ -31,10 +33,12 @@ final class RegistrationTest extends WebTestCase
         $this->em->persist($existing);
         $this->em->flush();
         $this->em->clear();
+        $this->openRegistration($this->em);
     }
 
     protected function tearDown(): void
     {
+        $this->restoreRegistrationMode($this->em);
         $this->removeTestUser('regtest@example.com');
         $this->removeTestUser('duplicate@example.com');
         parent::tearDown();

@@ -6,6 +6,12 @@ namespace App\Config;
 
 class GeneralConfigPage implements ConfigPageProviderInterface
 {
+    public const REGISTRATION_MODE_KEY = 'registration.mode';
+    public const REGISTRATION_OPEN = 'open';
+    public const REGISTRATION_INVITATION_ONLY = 'invitation-only';
+    /** ADR-095: nobody signs themselves up; the owner invites anyone else. */
+    public const DEFAULT_REGISTRATION_MODE = self::REGISTRATION_INVITATION_ONLY;
+
     public function getSlug(): string
     {
         return 'general';
@@ -19,11 +25,11 @@ class GeneralConfigPage implements ConfigPageProviderInterface
     public function getFields(): array
     {
         return [
-            'registration.mode' => [
+            self::REGISTRATION_MODE_KEY => [
                 'label'   => 'Registration Mode',
                 'type'    => 'enum',
-                'options' => ['open', 'invitation-only'],
-                'default' => 'open',
+                'options' => [self::REGISTRATION_INVITATION_ONLY, self::REGISTRATION_OPEN],
+                'default' => self::DEFAULT_REGISTRATION_MODE,
             ],
             'audit_log.retention_days' => [
                 'label'   => 'Audit Log Retention (days)',

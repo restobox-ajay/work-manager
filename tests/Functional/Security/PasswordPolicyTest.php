@@ -9,10 +9,12 @@ use App\Entity\User;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
+use App\Tests\Support\OpenRegistrationTrait;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 
 final class PasswordPolicyTest extends WebTestCase
 {
+    use OpenRegistrationTrait;
     private KernelBrowser $client;
     private EntityManagerInterface $em;
     private Connection $conn;
@@ -30,10 +32,12 @@ final class PasswordPolicyTest extends WebTestCase
         $this->em     = self::getContainer()->get(EntityManagerInterface::class);
         $this->conn   = self::getContainer()->get(Connection::class);
         $this->cleanUp();
+        $this->openRegistration($this->em);
     }
 
     protected function tearDown(): void
     {
+        $this->restoreRegistrationMode($this->em);
         $this->cleanUp();
         parent::tearDown();
     }

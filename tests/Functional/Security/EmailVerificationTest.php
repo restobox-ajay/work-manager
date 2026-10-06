@@ -8,11 +8,13 @@ use App\Entity\User;
 use App\Service\ConfigService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
+use App\Tests\Support\OpenRegistrationTrait;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 use SymfonyCasts\Bundle\VerifyEmail\VerifyEmailHelperInterface;
 
 final class EmailVerificationTest extends WebTestCase
 {
+    use OpenRegistrationTrait;
     private KernelBrowser $client;
     private EntityManagerInterface $em;
 
@@ -21,10 +23,12 @@ final class EmailVerificationTest extends WebTestCase
         $this->client = static::createClient();
         $this->em = self::getContainer()->get(EntityManagerInterface::class);
         $this->cleanup();
+        $this->openRegistration($this->em);
     }
 
     protected function tearDown(): void
     {
+        $this->restoreRegistrationMode($this->em);
         $this->cleanup();
         parent::tearDown();
     }
