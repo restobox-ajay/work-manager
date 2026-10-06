@@ -2588,7 +2588,7 @@ activity retention stays with `app:prune`. Migration `Version20261011140000`.
 - **Reset** (forgotten master password) is rate-limited per user (`EndpointRateLimiter`, action `vault_reset`) and
   refused attempts are audited, so it cannot be used to guess the account password.
 - **Stale tabs** re-fetch the key settings before unlocking.
-- **HSTS** (`StrictTransportSecuritySubscriber`): `max-age=31536000` on production HTTPS responses only (dev hosts
+- **HSTS** (`SecurityHeadersSubscriber`, ADR-096): `max-age=31536000` on production HTTPS responses only (dev hosts
   with self-signed certificates would otherwise be pinned).
 
 **Not done.** Entry AAD still binds the user only, not entry id/version: a rollback needs write access to the
@@ -2597,7 +2597,7 @@ risk). A site-wide strict CSP needs the inline scripts on other pages moved to f
 
 **Tripwire:** verifiable — Verified by `tests/Functional/Vault/VaultApiTest.php` (CSRF, ownership, the auth key,
 the iteration floor, version conflicts, re-keying, legacy registration, the throttled reset, COOP) and
-`tests/Unit/EventListener/StrictTransportSecuritySubscriberTest.php` (HSTS on production HTTPS only).
+`tests/Unit/EventListener/SecurityHeadersSubscriberTest.php` (HSTS on production HTTPS only).
 
 ## ADR-095: No public sign-up — registration is invitation-only by default (owner request, 2026-10-06)
 
@@ -2613,3 +2613,24 @@ a signed-in user. Tests that exercise the open sign-up form switch it on for the
 
 **Tripwire:** verifiable — Verified by `tests/Functional/Registration/RegistrationClosedByDefaultTest.php` (no
 page and no account without an invitation, unknown mode treated as invitation-only).
+
+## ADR-096: Baseline security headers, SameSite remember-me, no reset tokens in the Error Log (security review, 2026-10-06)
+
+**Decision.** From the whole-app security review:
+- **Headers on every response** (`SecurityHeadersSubscriber`, which also sends ADR-094's HSTS): `X-Frame-Options:
+  SAMEORIGIN` and CSP `frame-ancestors 'self'` (only the app may frame its own pages — the invoice view embeds the
+  print view — so a hostile site cannot overlay admin pages for clickjacking), `X-Content-Type-Options: nosniff`,
+  `Referrer-Policy: same-origin`. A header a page sets itself wins (the Password Manager's strict CSP and
+  no-referrer stay).
+- **Remember-me cookie** is `SameSite=Lax` (`ConfigAwareRememberMeHandler`): kept on links into the app, never sent
+  on another site's sub-requests or POSTs.
+- **Error Log** (`ErrorLogWriter`): the password-reset token travels in the URL path, so `/reset-password/<token>`
+  becomes `/reset-password/[token]` in the path, referrer, message, file and trace of every row.
+- The acceptance environment's security config no longer defines the `admin` firewall removed by ADR-068 (it made
+  every acceptance request a 500).
+
+**Not done.** A site-wide script CSP (needs the inline scripts on other pages moved to files).
+
+**Tripwire:** verifiable — Verified by `tests/Unit/EventListener/SecurityHeadersSubscriberTest.php`,
+`tests/Unit/Service/Log/ErrorLogWriterRedactionTest.php` and `tests/Functional/Security/RememberMeTest.php`
+(SameSite=Lax).

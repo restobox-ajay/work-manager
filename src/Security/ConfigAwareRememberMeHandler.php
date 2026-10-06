@@ -86,7 +86,9 @@ final class ConfigAwareRememberMeHandler implements RememberMeHandlerInterface
                 $request->isSecure(),
                 true,
                 false,
-                null,
+                // Lax: sent on top-level navigation (following a link into the app keeps you signed in), never on
+                // cross-site sub-requests or POSTs, so another site cannot ride the remember-me credential.
+                Cookie::SAMESITE_LAX,
             )
         );
     }

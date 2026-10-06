@@ -65,6 +65,24 @@ final class RememberMeTest extends WebTestCase
         $this->assertGreaterThan(time(), $cookie->getExpiresTime(), 'Cookie should be persistent (future expiry)');
     }
 
+    // ADR-096: the remember-me credential is never sent on another site's sub-requests or POSTs.
+    public function testRememberMeCookieIsHttpOnlyAndSameSiteLax(): void
+    {
+        $this->client->request('POST', '/login', [
+            'email'        => self::EMAIL,
+            'password'     => self::PASSWORD,
+            '_remember_me' => '1',
+        ]);
+
+        $issued = array_values(array_filter(
+            $this->client->getResponse()->headers->getCookies(),
+            static fn ($cookie) => $cookie->getName() === 'REMEMBERME',
+        ));
+        $this->assertCount(1, $issued);
+        $this->assertSame('lax', $issued[0]->getSameSite());
+        $this->assertTrue($issued[0]->isHttpOnly());
+    }
+
     public function testRememberMeCookieReauthenticatesAfterSessionExpiry(): void
     {
         // Login with remember_me

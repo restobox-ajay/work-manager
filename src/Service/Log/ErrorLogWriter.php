@@ -14,13 +14,17 @@ use Symfony\Component\HttpFoundation\RequestStack;
  * Writes Error Log rows (ADR-093). Plain DBAL rather than the EntityManager: the error being logged may have closed
  * the EntityManager, and flushing it here could save unrelated half-made changes. Logging never throws — a failure
  * to log falls back to PHP's error_log. Kept out on purpose: query strings (reset / magic-link tokens), trace
- * arguments (passwords passed to functions) and request bodies.
+ * arguments (passwords passed to functions) and request bodies. Tokens that travel in the URL path instead (the
+ * password-reset link) are blanked wherever a URL can appear: path, referrer, message, file and trace.
  */
 final class ErrorLogWriter
 {
     private const MAX_MESSAGE = 2000;
     private const MAX_TRACE = 12000;
     private const MAX_FRAMES = 40;
+    /** URL path segments that are bearer secrets, and what they are replaced with. */
+    private const SECRET_PATH_PATTERN = '#(/reset-password/)[^/?\#\s"\'<>]+#';
+    private const SECRET_PLACEHOLDER = '[token]';
 
     private bool $writing = false;
 
@@ -37,11 +41,11 @@ final class ErrorLogWriter
             'source'          => $source,
             'level'           => $statusCode !== null && $statusCode < 500 ? 'warning' : 'error',
             'status_code'     => $statusCode,
-            'message'         => self::cut($e->getMessage() !== '' ? $e->getMessage() : '(no message)', self::MAX_MESSAGE),
+            'message'         => self::cut(self::redact($e->getMessage() !== '' ? $e->getMessage() : '(no message)'), self::MAX_MESSAGE),
             'exception_class' => self::cut($e::class, 255),
             'file'            => self::cut($e->getFile(), 500),
             'line'            => $e->getLine(),
-            'trace'           => self::cut(self::trace($e), self::MAX_TRACE),
+            'trace'           => self::cut(self::redact(self::trace($e)), self::MAX_TRACE),
         ]);
     }
 
@@ -51,14 +55,14 @@ final class ErrorLogWriter
         $this->write([
             'source'          => 'browser',
             'level'           => 'error',
-            'message'         => self::cut($message, self::MAX_MESSAGE),
+            'message'         => self::cut(self::redact($message), self::MAX_MESSAGE),
             'exception_class' => null,
-            'file'            => $source !== null ? self::cut(self::withoutQuery($source), 500) : null,
+            'file'            => $source !== null ? self::cut(self::redact(self::withoutQuery($source)), 500) : null,
             'line'            => $line,
-            'trace'           => $stack !== null ? self::cut($stack, 4000) : null,
+            'trace'           => $stack !== null ? self::cut(self::redact($stack), 4000) : null,
             // The page the error happened on (not this report's own POST).
             'method'          => null,
-            'path'            => $pageUrl !== null ? self::cut((string) (parse_url($pageUrl, \PHP_URL_PATH) ?? '/'), 500) : null,
+            'path'            => $pageUrl !== null ? self::cut(self::redact((string) (parse_url($pageUrl, \PHP_URL_PATH) ?? '/')), 500) : null,
         ]);
     }
 
@@ -74,7 +78,7 @@ final class ErrorLogWriter
             $user = $this->security->getUser();
             $row += [
                 'method'     => $request?->getMethod(),
-                'path'       => $request !== null ? self::cut($request->getPathInfo(), 500) : null,
+                'path'       => $request !== null ? self::cut(self::redact($request->getPathInfo()), 500) : null,
                 'status_code' => null,
             ];
             $row['referrer'] = self::referrer($request);
@@ -113,7 +117,12 @@ final class ErrorLogWriter
     {
         $referrer = $request?->headers->get('referer');
 
-        return $referrer !== null && $referrer !== '' ? self::cut(self::withoutQuery($referrer), 500) : null;
+        return $referrer !== null && $referrer !== '' ? self::cut(self::redact(self::withoutQuery($referrer)), 500) : null;
+    }
+
+    private static function redact(string $text): string
+    {
+        return (string) preg_replace(self::SECRET_PATH_PATTERN, '$1'.self::SECRET_PLACEHOLDER, $text);
     }
 
     private static function withoutQuery(string $url): string
