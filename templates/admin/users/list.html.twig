@@ -10,7 +10,7 @@
     <div class="flash-success">{{ message }}</div>
 {% endfor %}
 
-<a href="{{ path('app_admin_users_new') }}">New User</a>
+<a class="btn success" href="{{ path('app_admin_users_new') }}">+ New User</a>
 
 <table>
     <thead>
@@ -32,8 +32,8 @@
             <td>{{ user.status }}{% if user.id in locked_user_ids %} <span class="locked-indicator">Locked</span>{% endif %}</td>
             <td>{{ user.primaryRole.label }}</td>
             <td><span class="active-token-count">{{ activeTokenCount }}</span></td>
-            <td>
-                <a href="{{ path('app_admin_users_edit', {id: user.id}) }}">Edit</a>
+            <td class="actions">
+                <a class="btn warning sm" href="{{ path('app_admin_users_edit', {id: user.id}) }}">Edit</a>
                 {# Only offered when auth-impersonate-bundle is registered (FEATURE-142 / ADR-041); the
                    Twig global is undefined ⇒ hidden when the bundle is removed. #}
                 {% if impersonation_available is defined and impersonation_available and impersonation_enabled %}
@@ -44,7 +44,7 @@
                 {% endif %}
                 <form method="post" action="{{ path('app_admin_users_password_reset', {id: user.id}) }}" style="display:inline">
                     <input type="hidden" name="_token" value="{{ csrf_token('admin_user_password_reset_' ~ user.id) }}">
-                    <button type="submit" class="btn warning password-reset-btn">Reset Password</button>
+                    <button type="submit" class="btn info password-reset-btn">Reset Password</button>
                 </form>
                 {% if activeTokenCount > 0 %}
                 <form method="post" action="{{ path('app_admin_users_revoke_tokens', {id: user.id}) }}" style="display:inline">
@@ -61,7 +61,7 @@
                 {% if user.id in two_factor_enabled_ids %}
                 <form method="post" action="{{ path('app_admin_users_reset_2fa', {id: user.id}) }}" style="display:inline">
                     <input type="hidden" name="_token" value="{{ csrf_token('admin_user_reset_2fa_' ~ user.id) }}">
-                    <button type="submit" class="btn warning reset-2fa-btn">Reset 2FA</button>
+                    <button type="submit" class="btn light reset-2fa-btn">Reset 2FA</button>
                 </form>
                 {% endif %}
                 <form method="post" action="{{ path('app_admin_users_delete', {id: user.id}) }}" style="display:inline">

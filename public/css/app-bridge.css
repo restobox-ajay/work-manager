@@ -322,7 +322,7 @@ html:not(.js) .user-menu:focus-within .dropdown {
     display: inline-flex;
     align-items: center;
     height: 32px;
-    margin: 0 6px 12px 0;
+    margin: 0 6px 5px 0;
     padding: 0 12px;
     border: 1px solid #ccc;
     border-radius: 8px;
@@ -471,7 +471,7 @@ html:not(.js) .user-menu:focus-within .dropdown {
 /* Action clusters in a cell: several one-button POST forms in a row, at the mockup's .btn.sm size. */
 .page-body td form {
     display: inline-flex;
-    margin: 2px 4px 2px 0;
+    margin: 2px 5px 2px 0;
 }
 
 .page-body td button:not(.btn) {
@@ -718,3 +718,24 @@ table.t .group-total.grand td { background: #ecebf3; font-size: .95rem; }
 .page-body td button.btn:not(.xs):not(.sm) { height: 28px; padding: 0 9px; border-radius: 5px; font-size: .76rem; }
 .auth-card button.btn { width: 100%; height: 40px; }
 .impersonation-banner button.btn { height: 26px; font-size: .75rem; }
+/* A link button next to one-button POST forms in a cell lines up with them (e.g. Edit on the users list). */
+.page-body td > a.btn { margin: 2px 5px 2px 0; vertical-align: middle; }
+/* A page-level link button ("+ New User", "+ New Invitation") sits 5px above what follows it. */
+.site-app .page-body > a.btn,
+.site-app .page-body > p > a.btn:only-child { margin: 0 6px 5px 0; }
+/* Buttons side by side are 5px apart everywhere: page-head actions, button rows, table footers and action cells.
+   An action cell drops the whitespace between its inline buttons (font-size 0; buttons size their text in rem),
+   so only the 5px margin separates them. */
+.ph-actions, .btn-row { gap: 5px; }
+.table-foot > .btn + .btn { margin-left: -9px; }
+td.actions { font-size: 0; }
+td.actions .btn { margin-right: 0; }
+td.actions > .btn, td.actions > form { margin: 2px 5px 2px 0; vertical-align: middle; }
+table.t td.actions .btn { margin-right: 5px; }
+td.actions > :last-child, .page-body td.actions > a.btn:last-child, table.t td.actions .btn:last-child { margin-right: 0; }
+/* Project tasks grid (ADR-083): compact inputs. */
+.ptg-table th { white-space: nowrap; vertical-align: top; }
+.ptg-table td { vertical-align: top; }
+.ptg-table select, .ptg-table input[type="date"] { min-width: 120px; }
+.ptg-table input[type="text"] { min-width: 90px; }
+.ptg-table tr.locked td { color: var(--muted); background: #fafafa; }

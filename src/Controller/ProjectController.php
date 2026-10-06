@@ -9,9 +9,11 @@ use App\Entity\ProjectStaff;
 use App\Repository\TaskRepository;
 use App\Repository\UserRepository;
 use App\Security\Voter\WorkVoter;
+use App\Security\Work\WorkAccess;
 use App\Service\Client\ClientService;
 use App\Service\Pagination\Paginated;
 use App\Service\Project\ProjectService;
+use App\Service\Project\ProjectTaskGrid;
 use App\Service\Project\ProjectStaffService;
 use App\Service\Task\TaskLookups;
 use App\Service\Validation\InputValue;
@@ -25,13 +27,16 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 #[Route('/project')]
 final class ProjectController extends AbstractWorkController
 {
-    /** The project page lists this many of the project's newest tasks; the task list has the rest. */
-    private const PROJECT_PAGE_TASKS = 50;
+    /** Empty task rows on the New Project form. */
+    private const NEW_PROJECT_TASK_ROWS = 3;
 
     public function __construct(
         private readonly ProjectService $projects,
         private readonly ProjectStaffService $staff,
         private readonly ClientService $clients,
+        private readonly ProjectTaskGrid $taskGrid,
+        private readonly TaskLookups $lookups,
+        private readonly WorkAccess $access,
     ) {
     }
 
@@ -67,42 +72,41 @@ final class ProjectController extends AbstractWorkController
     {
         $values = ['clientId' => InputValue::int($request->query->get('clientId')), 'status' => Project::STATUS_ACTIVE];
         $errors = [];
+        // Tasks can be added with the project (ADR-083): a few empty rows to start with.
+        $taskRows = array_fill(0, self::NEW_PROJECT_TASK_ROWS, $this->taskGrid->blankRow($this->viewer()));
 
         if ($request->isMethod('POST')) {
             $this->assertCsrf($request, 'project_form');
             $values = $request->request->all();
-            $result = $this->projects->create($values, $this->viewer());
-            if ($result->isSaved()) {
-                $this->addFlash('success', 'Project created.');
+            // New tasks only: a posted task id is ignored rather than trusted.
+            $taskRows = array_map(static fn (array $row) => ['existingTaskId' => null] + $row, $this->taskGrid->parse($values['taskRows'] ?? []));
+            // The rows are checked first, so a refused row never leaves a project created without its tasks.
+            $errors = $this->taskGrid->checkNewRows($taskRows, $this->access->canSetFeesForAnyProject($this->viewer()));
+            $result = $errors === [] ? $this->projects->create($values, $this->viewer()) : null;
+            if ($result?->isSaved()) {
+                $project = $result->record;
+                $grid = $this->taskGrid->save($project, $taskRows, $this->viewer());
+                if ($grid['errors'] !== []) {
+                    // Rare (e.g. a contractor removed meanwhile): the project exists, so continue on its edit page.
+                    $this->addFlash('error', 'Project created, but its tasks were not saved: '.implode(' ', $grid['errors']));
 
-                return $this->redirectToRoute('app_project_view', ['id' => $result->record->getId()]);
+                    return $this->redirectToRoute('app_project_edit', ['id' => $project->getId()]);
+                }
+                $this->addFlash('success', 'Project created.'.($grid['created'] > 0 ? sprintf(' %d task(s) added.', $grid['created']) : ''));
+
+                return $this->redirectToRoute('app_project_view', ['id' => $project->getId()]);
             }
-            $errors = $result->errors;
+            $errors = [...($result?->errors ?? []), ...$errors];
         }
 
-        return $this->renderForm(null, $values, $errors);
+        return $this->renderForm(null, $values, $errors, $taskRows);
     }
 
     #[Route('/{id}', name: 'app_project_view', requirements: ['id' => '\d+'], methods: ['GET'])]
     #[IsGranted(WorkVoter::PROJECT_VIEW, 'project')]
-    public function view(#[MapEntity(id: 'id')] Project $project, TaskRepository $tasks, TaskLookups $lookups): Response
+    public function view(#[MapEntity(id: 'id')] Project $project, TaskRepository $tasks): Response
     {
-        $canEdit = $this->isGranted(WorkVoter::PROJECT_EDIT, $project);
-        if ($canEdit) {
-            // A Client Manager granted after the project was made becomes staff the next time anyone looks.
-            $this->staff->ensureAutomaticStaff($project, $this->viewer());
-        }
-
-        return $this->render('project/view.html.twig', [
-            'project'         => $project,
-            'archivedReasons' => $this->projects->archivedReasons($project),
-            'staff'           => $this->staff->staffOf($project),
-            'selectableUsers' => $canEdit ? $this->staff->selectableUsers($project) : [],
-            'permissions'     => ProjectStaffService::ASSIGNABLE_PERMISSIONS,
-            'tasks'           => $tasks->findForProject((int) $project->getId(), self::PROJECT_PAGE_TASKS),
-            'statuses'        => $lookups->statuses(),
-            'canEdit'         => $canEdit,
-        ]);
+        return $this->renderProjectPage($project, $tasks);
     }
 
     #[Route('/{id}/edit', name: 'app_project_edit', requirements: ['id' => '\d+'], methods: ['GET', 'POST'])]
@@ -112,19 +116,29 @@ final class ProjectController extends AbstractWorkController
         $values = $this->projects->valuesFrom($project);
         $errors = [];
 
+        $taskRows = $this->taskGrid->existingRows($project);
+
         if ($request->isMethod('POST')) {
             $this->assertCsrf($request, 'project_form');
             $values = $request->request->all();
+            $taskRows = $this->taskGrid->parse($values['taskRows'] ?? []);
             $result = $this->projects->update($project, $values, $this->viewer());
             if ($result->isSaved()) {
-                $this->addFlash('success', 'Project updated.');
+                // The project is saved first; its task rows are then saved all together or not at all.
+                $grid = $this->taskGrid->save($project, $taskRows, $this->viewer());
+                if ($grid['errors'] === []) {
+                    $this->addFlash('success', 'Project updated.'.($grid['created'] + $grid['updated'] > 0
+                        ? sprintf(' Tasks: %d added, %d updated.', $grid['created'], $grid['updated']) : ''));
 
-                return $this->redirectToRoute('app_project_view', ['id' => $project->getId()]);
+                    return $this->redirectToRoute('app_project_view', ['id' => $project->getId()]);
+                }
+                $errors = ['The project was saved, but its tasks were not:', ...$grid['errors']];
+            } else {
+                $errors = $result->errors;
             }
-            $errors = $result->errors;
         }
 
-        return $this->renderForm($project, $values, $errors);
+        return $this->renderForm($project, $values, $errors, $taskRows);
     }
 
     #[Route('/{id}/remove', name: 'app_project_remove', requirements: ['id' => '\d+'], methods: ['POST'])]
@@ -174,7 +188,48 @@ final class ProjectController extends AbstractWorkController
      * @param array<string, mixed> $values
      * @param list<string>         $errors
      */
-    private function renderForm(?Project $project, array $values, array $errors): Response
+    /** The project page: details, every one of its tasks (tasks are added on the edit page, ADR-083) and its staff. */
+    private function renderProjectPage(Project $project, TaskRepository $tasks): Response
+    {
+        $canEdit = $this->isGranted(WorkVoter::PROJECT_EDIT, $project);
+        if ($canEdit) {
+            // A Client Manager granted after the project was made becomes staff the next time anyone looks.
+            $this->staff->ensureAutomaticStaff($project, $this->viewer());
+        }
+
+        return $this->render('project/view.html.twig', [
+            'project'         => $project,
+            'archivedReasons' => $this->projects->archivedReasons($project),
+            'staff'           => $this->staff->staffOf($project),
+            'selectableUsers' => $canEdit ? $this->staff->selectableUsers($project) : [],
+            'permissions'     => ProjectStaffService::ASSIGNABLE_PERMISSIONS,
+            'tasks'           => $tasks->findForProject((int) $project->getId()),
+            'statuses'        => $this->lookups->statuses(),
+            'canEdit'         => $canEdit,
+        ]);
+    }
+
+    /** @return array<string, mixed> what templates/project/_task_grid.html.twig needs besides its rows */
+    private function gridContext(?Project $project): array
+    {
+        return [
+            // A new project has no staff yet to grant fee access: the fee columns follow the create-task form's rule.
+            'gridFees'  => $project !== null ? $this->taskGrid->canSetFees($this->viewer(), $project) : $this->access->canSetFeesForAnyProject($this->viewer()),
+            'gridBlank' => $this->taskGrid->blankRow($this->viewer()),
+            'grid'      => [
+                'types'       => $this->lookups->activeTypes(),
+                'people'      => $this->lookups->activePeople(),
+                'statuses'    => $this->lookups->assignableStatuses(),
+                'currencies'  => $this->lookups->currencies(),
+                'allTypes'    => $this->lookups->types(),
+                'allPeople'   => $this->lookups->people(),
+                'allStatuses' => $this->lookups->statuses(),
+            ],
+        ];
+    }
+
+    /** @param list<array<string, mixed>> $taskRows */
+    private function renderForm(?Project $project, array $values, array $errors, array $taskRows = []): Response
     {
         // Only the clients this user may file projects under; an existing project's own client stays listed.
         $clients = array_values(array_filter(
@@ -187,6 +242,9 @@ final class ProjectController extends AbstractWorkController
             'values'  => $values,
             'clients' => $clients,
             'errors'  => $errors,
+            'taskRows' => $taskRows,
+            'gridLocked' => $project !== null ? $this->taskGrid->lockedTaskIds($taskRows, $this->viewer()) : [],
+            ...$this->gridContext($project),
         ], new Response(status: $errors === [] ? 200 : 422));
     }
 }

@@ -47,7 +47,7 @@
                 <td class="token-expiry">{{ token.expiresAt ? token.expiresAt|date('Y-m-d H:i:s') : 'Never' }}</td>
                 <td class="token-last-used">{{ token.lastUsedAt ? token.lastUsedAt|date('Y-m-d H:i:s') : 'Never' }}</td>
                 <td>{{ token.createdAt|date('Y-m-d H:i:s') }}</td>
-                <td>
+                <td class="actions">
                     <form method="post" action="{{ path('app_account_tokens_revoke', {id: token.id}) }}" style="display:inline">
                         <input type="hidden" name="_token" value="{{ csrf_token('token_revoke_' ~ token.id) }}">
                         <button type="submit" class="btn danger token-revoke-btn">Revoke</button>

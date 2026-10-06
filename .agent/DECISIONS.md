@@ -2421,3 +2421,28 @@ primary (save, submit, filter, sign in), success (add, create, approve, unlock),
 danger (delete, remove, cancel, revoke, terminate, disable), secondary (back, cancel link, reset filters),
 info (view, email, tasks, show, resend), dark (download, impersonate), light (print, move). Plain <button>s were given
 `btn <colour>` with their old classes kept (tests and the old CSS hooks still find them).
+
+## ADR-083: Project tasks grid on the project page and edit form; new tasks are always regular (owner request, 2026-10-07)
+
+**Decision.** After work-platform's project task rows (ProjectTaskDraftService): a grid of Task Name, Task Type,
+Contractor, Due Date, Task Status, Status Detail and, for someone who may set fees, Currency and Payout (Reviewer,
+Billable Time and Billable Date are not on the grid: a task keeps its values; a new task's reviewer is its creator), with "+ Add Row" (the "Apply 1st row to all" buttons were dropped at the owner's request).
+- /project/{id}/edit lists the project's tasks as rows plus new ones, saved with the project. /project/{id} only
+  lists every task of the project (newest first); tasks are added on the edit page.
+- /project/new has an "Add Tasks" grid (3 empty rows, + Add Row): its rows are checked before the project is
+  created, then created as the project's tasks, so a refused row never leaves a project without its tasks.
+- Rows are written through TaskService (same access, status and fee rules as the task form). Approved/paid tasks and
+  tasks the viewer may not update are read-only. A new row needs name, type, contractor (and payout where fees can be
+  set); empty new rows are ignored; unchanged existing rows are not written. All rows are saved in one
+  transaction, all or none.
+- Not ported: work-platform's "Get Task From Grid" (custom grids are not in this app).
+- The New Task form no longer offers Add Task / Add Budget: every task is a regular task.
+
+## ADR-084: No authorization queue (owner request, 2026-10-07)
+
+**Decision.** Every task is regular work as soon as it is filed, by anyone allowed to file it (admin, client manager,
+project staff incl. contractors). Removed: the Authorization Queue and Task Created By Manager pages and routes,
+TaskService::decideAuthorization, WorkAccess::filesDirectly/canReviewTask, the New Task form's "Why it is needed" field,
+TaskReadStatus and its table. A task's creator may still correct it while it is Pending. Migration
+`Version20261009140000` releases tasks still waiting in the queue into normal work and drops `task_read_status`;
+previously denied requests stay out of the lists (the lists keep showing `authorized` = normal work only).

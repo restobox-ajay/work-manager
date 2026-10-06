@@ -82,7 +82,7 @@ class TaskRepository extends ServiceEntityRepository
     }
 
     /** @return Task[] the live tasks of one project, newest first (project page) */
-    public function findForProject(int $projectId, int $limit): array
+    public function findForProject(int $projectId): array
     {
         return $this->createQueryBuilder('t')
             ->addSelect('a')
@@ -91,7 +91,6 @@ class TaskRepository extends ServiceEntityRepository
             ->andWhere('t.isDeleted = 0 AND t.isActive = 1')
             ->setParameter('projectId', $projectId)
             ->orderBy('t.createdAt', 'DESC')
-            ->setMaxResults($limit)
             ->getQuery()
             ->getResult();
     }
@@ -359,22 +358,12 @@ class TaskRepository extends ServiceEntityRepository
     }
 
     /**
-     * The authorization queue (work-platform's TaskRepository::buildAuthorizationQueueQuery()). Task::AUTHORIZED_YES
-     * (0) means "in the queue" — Yii2's inverted naming, kept because the column holds exactly those values.
-     *  - queue = 'pending': queued, not yet decided (no status, Pending or Modify), not paid
-     *  - queue = 'decided': every task that has a decision recorded, queued or not
-     *  - queue = 'none' : normal work only (what the task lists show)
+     * queue = 'none': normal work only (`authorized` = Task::AUTHORIZED_NO). Tasks are never queued any more (ADR-084);
+     * this still keeps the denied requests from the old authorization queue out of every list.
      */
     private function applyQueueCriteria(QueryBuilder $qb, array $criteria): void
     {
         match ($criteria['queue'] ?? null) {
-            'pending' => $qb->andWhere('t.authorized = :queued AND t.taskStatusId <> :paidStatus')
-                ->andWhere("t.authorizedStatus IS NULL OR t.authorizedStatus = '' OR t.authorizedStatus IN (:open)")
-                ->setParameter('queued', Task::AUTHORIZED_YES)
-                ->setParameter('paidStatus', TaskStatus::PAID_ID)
-                ->setParameter('open', [Task::AUTHORIZED_STATUS_PENDING, Task::AUTHORIZED_STATUS_MODIFY]),
-            'decided' => $qb->andWhere('t.authorizedStatus IN (:decided)')
-                ->setParameter('decided', [Task::AUTHORIZED_STATUS_APPROVE, Task::AUTHORIZED_STATUS_DENY, Task::AUTHORIZED_STATUS_MODIFY]),
             'none'    => $qb->andWhere('t.authorized = :notQueued')->setParameter('notQueued', Task::AUTHORIZED_NO),
             default   => null,
         };

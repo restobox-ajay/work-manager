@@ -4202,3 +4202,5 @@ ADR-079 (2026-10-07): invoice Amount editable, Quantity/Rate optional, Total dis
 ADR-080 (2026-10-07): client company name (Billed To on invoices); currency in invoice Items; list Download/Email buttons. Migration Version20261009130000. Not committed.
 ADR-081/082 (2026-10-07): invoice list year/month filters + month/year grouping with totals, no paging when filtered;
 all buttons in Bootstrap 5 colours by action. Not committed.
+ADR-083 (2026-10-07): project tasks grid (edit form + Add Tasks on the project page); Add Task/Add Budget choice removed. Browser-checked.
+ADR-084 (2026-10-07): authorization queue removed (pages, review, read marks); queued tasks released by migration Version20261009140000.

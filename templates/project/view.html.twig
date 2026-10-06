@@ -40,8 +40,8 @@
     </dl>
 </div>
 
-<div class="table-card">
-    <div class="table-header"><h2>Tasks</h2><span class="grow"></span><span class="muted small">Newest {{ tasks|length }}</span></div>
+<div class="table-card" id="tasks">
+    <div class="table-header"><h2>Tasks</h2><span class="grow"></span><span class="muted small">{{ tasks|length }} task{{ tasks|length == 1 ? '' : 's' }}, newest first</span></div>
     <div class="tscroll">
         <table class="t">
             <thead><tr><th>Task</th><th>Contractor</th><th>Status</th><th>Due</th><th>Created</th></tr></thead>

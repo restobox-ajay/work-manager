@@ -7,22 +7,21 @@ namespace App\Controller;
 use App\Entity\Task;
 use App\Security\Voter\WorkVoter;
 use App\Security\Work\WorkAccess;
-use App\Service\Client\ClientService;
 use App\Service\Project\ProjectService;
 use App\Service\Task\TaskInput;
 use App\Service\Task\TaskLookups;
 use App\Service\Task\TaskReportService;
 use App\Service\Task\TaskService;
 use App\Service\Validation\InputValue;
-use Symfony\Bridge\Doctrine\Attribute\MapEntity;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 /**
- * The rest of work-platform's Tasks menu (ADR-072): Quick Add, Task By Date, Task Created By Manager, Authorization
- * Queue and Task Priority. Queries and rules: TaskReportService / WorkAccess; writes: TaskService.
+ * The rest of work-platform's Tasks menu (ADR-072): Quick Add, Task By Date and Task Priority. (Task Created By
+ * Manager and the Authorization Queue are gone with the queue itself, ADR-084.) Queries and rules: TaskReportService /
+ * WorkAccess; writes: TaskService.
  */
 #[Route('/task')]
 final class TaskReportController extends AbstractWorkController
@@ -120,84 +119,6 @@ final class TaskReportController extends AbstractWorkController
             'endDate'   => $to->format('Y-m-d'),
             'fee'       => $fee,
         ]);
-    }
-
-    /** Task Created By Manager: tasks others filed that wait for authorization, unread ones by default. */
-    #[Route('/manager', name: 'app_task_manager', methods: ['GET'])]
-    #[IsGranted(WorkVoter::WORK_MANAGE)]
-    public function createdByOthers(Request $request): Response
-    {
-        $viewer = $this->viewer();
-        $readParam = $request->query->get('read', 'no');
-        $read = match ($readParam) {
-            'yes'   => true,
-            'all'   => null,
-            default => false,
-        };
-        $createdBy = InputValue::int($request->query->get('createdBy'));
-        $result = $this->reports->createdByOthers($viewer, $createdBy, $read);
-
-        return $this->render('task/manager.html.twig', $this->lookupMaps() + [
-            'tasks'     => $result['tasks'],
-            'read'      => $result['read'],
-            'readParam' => $read === null ? 'all' : ($read ? 'yes' : 'no'),
-            'createdBy' => $createdBy,
-        ]);
-    }
-
-    #[Route('/{id}/read', name: 'app_task_read', requirements: ['id' => '\d+'], methods: ['POST'])]
-    #[IsGranted(WorkVoter::TASK_VIEW, 'task')]
-    public function markRead(#[MapEntity(id: 'id')] Task $task, Request $request): Response
-    {
-        $this->assertCsrf($request, 'task_read_'.$task->getId());
-        $this->reports->setRead($this->viewer(), $task, $request->request->getBoolean('read'));
-
-        return $this->redirectToRoute('app_task_manager', ['read' => $request->request->getString('back', 'no')]);
-    }
-
-    /** Authorization Queue: queued tasks and budget requests, and (?show=decided) every decision made. */
-    #[Route('/queue', name: 'app_task_queue', methods: ['GET'])]
-    public function queue(Request $request, ClientService $clients): Response
-    {
-        $viewer = $this->viewer();
-        $show = $request->query->get('show') === 'decided' ? 'decided' : 'pending';
-        $clientId = InputValue::int($request->query->get('clientId'));
-        $q = InputValue::text($request->query->get('q'));
-        $tasks = $this->reports->queue($viewer, $show, $clientId, $q);
-
-        $canReview = [];
-        foreach ($tasks as $task) {
-            $canReview[(int) $task->getId()] = $show === 'pending' && $this->access->canReviewTask($viewer, $task);
-        }
-
-        return $this->render('task/queue.html.twig', $this->lookupMaps() + [
-            'tasks'     => $tasks,
-            'canReview' => $canReview,
-            'show'      => $show,
-            'clientId'  => $clientId,
-            'q'         => $q,
-            'clients'   => $clients->selectable($viewer),
-        ]);
-    }
-
-    #[Route('/{id}/authorization', name: 'app_task_authorization', requirements: ['id' => '\d+'], methods: ['POST'])]
-    public function decide(#[MapEntity(id: 'id')] Task $task, Request $request, TaskService $tasks): Response
-    {
-        $this->assertCsrf($request, 'task_authorization_'.$task->getId());
-        $decision = $request->request->getString('decision');
-        if (!in_array($decision, [Task::AUTHORIZED_STATUS_APPROVE, Task::AUTHORIZED_STATUS_DENY], true)
-            || $task->getAuthorized() !== Task::AUTHORIZED_YES
-            || !$this->access->canReviewTask($this->viewer(), $task)
-        ) {
-            $this->addFlash('error', 'That task could not be updated.');
-
-            return $this->redirectToRoute('app_task_queue');
-        }
-
-        $tasks->decideAuthorization($task, $decision, $this->viewer());
-        $this->addFlash('success', $decision === Task::AUTHORIZED_STATUS_APPROVE ? 'Approved: the task is now normal work.' : 'Denied.');
-
-        return $this->redirectToRoute('app_task_queue');
     }
 
     /** Task Priority: one person's pending and review work, in their priority order. */

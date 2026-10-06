@@ -16,7 +16,7 @@
 
 {{ ui.errors(errors) }}
 
-<form class="card mx-form" method="post" style="max-width:760px">
+<form class="card mx-form" method="post" style="max-width:none">
     <input type="hidden" name="_token" value="{{ csrf_token('project_form') }}">
     <div class="form-grid">
         <div class="field">
@@ -51,6 +51,10 @@
             <textarea id="f-description" name="description" rows="5">{{ values.description ?? '' }}</textarea>
         </div>
     </div>
+    {# Tasks, saved with the project (ADR-083): on a new project, the tasks to create with it; on an existing one, its
+       tasks plus any added here. #}
+    <div class="section-label" id="tasks" style="margin-top:16px">{{ project ? 'Tasks' : 'Add Tasks' }}</div>
+    {% include 'project/_task_grid.html.twig' with {rows: taskRows, locked: gridLocked, fees: gridFees, grid: grid, blankRow: gridBlank} only %}
     <div class="form-actions" style="margin-top:16px">
         <a class="btn secondary" href="{{ back }}">Cancel</a>
         <button class="btn primary" type="submit">{{ project ? 'Save' : 'Create project' }}</button>

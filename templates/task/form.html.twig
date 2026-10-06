@@ -25,17 +25,6 @@
 <form class="card mx-form" method="post" style="max-width:980px">
     <input type="hidden" name="_token" value="{{ csrf_token('task_form') }}">
     <div class="form-grid three">
-        {% if not task %}
-            {# work-platform's request type: a budget request (and any task filed by a Contractor) waits in the
-               authorization queue for a reviewer. #}
-            <div class="field span-all">
-                <span class="pills" role="radiogroup" aria-label="Request type">
-                    {% for type in ['Add Task', 'Add Budget'] %}
-                        <label class="check"><input type="radio" name="requestType" value="{{ type }}" {{ input.requestType == type ? 'checked' }}> {{ type }}</label>
-                    {% endfor %}
-                </span>
-            </div>
-        {% endif %}
         <div class="field span-all">
             <label for="f-name">Task name <span class="req">*</span></label>
             <textarea id="f-name" name="name" rows="2" required maxlength="5000" style="min-height:0">{{ input.name }}</textarea>
@@ -100,12 +89,6 @@
         {% endif %}
 
         <div class="section-label">Details</div>
-        {% if not task %}
-            <div class="field span-all">
-                <label for="f-why">Why it is needed <small>(for the reviewer, when it goes to the authorization queue)</small></label>
-                <textarea id="f-why" name="authorizedDescription" rows="2" style="min-height:0">{{ input.authorizedDescription }}</textarea>
-            </div>
-        {% endif %}
         <div class="field span-all">
             <label for="f-description">Description</label>
             <textarea id="f-description" name="description" rows="6">{{ input.description }}</textarea>

@@ -93,12 +93,11 @@ final class TaskController extends AbstractWorkController
 
         if ($request->isMethod('POST')) {
             $this->assertCsrf($request, 'task_form');
-            $input->overlay($this->posted($request) + array_intersect_key($request->request->all(), ['requestType' => 1, 'authorizedDescription' => 1]));
+            // Every new task is a regular task: no Add Task / Add Budget choice and no authorization queue (ADR-083/084).
+            $input->overlay($this->posted($request));
             $result = $this->tasks->create($input, $this->viewer());
             if ($result->isSaved()) {
-                $this->addFlash('success', $result->record->getAuthorized() === Task::AUTHORIZED_YES
-                    ? 'Request sent: it waits in the authorization queue until a reviewer approves it.'
-                    : 'Task created.');
+                $this->addFlash('success', 'Task created.');
 
                 return $this->redirectToRoute('app_task_view', ['id' => $result->record->getId()]);
             }

@@ -1,0 +1,77 @@
+{#
+    The tasks grid (ADR-083), after work-platform's project task rows: one row per task. Used in the project edit form
+    (the project's tasks + new rows, saved with the project) and on the project page (new rows only).
+    Expects: rows, locked (task id => read-only), fees (show the fee columns), grid (types, people, statuses,
+    currencies, allTypes, allPeople, allStatuses).
+    New rows are added and removed in the browser (public/js/project-task-grid.js); the server only sees the rows.
+#}
+{% macro select(name, value, options, all, required, blank, cls) %}
+    <select name="{{ name }}" class="{{ cls }}" {{ required ? 'required' }}>
+        {% if blank is not same as(false) %}<option value="">{{ blank }}</option>{% endif %}
+        {% for id, label in options %}<option value="{{ id }}" {{ value is not empty and value == id ? 'selected' }}>{{ label }}</option>{% endfor %}
+        {% if value is not empty and options[value] is not defined %}<option value="{{ value }}" selected>{{ all[value] ?? ('#' ~ value) }}</option>{% endif %}
+    </select>
+{% endmacro %}
+
+{% macro row(index, row, isLocked, fees, grid) %}
+    {% import _self as g %}
+    {% set n = 'taskRows[' ~ index ~ ']' %}
+    <tr class="ptg-row{{ isLocked ? ' locked' }}">
+        {% if isLocked %}
+            <td><input type="hidden" name="{{ n }}[existingTaskId]" value="{{ row.existingTaskId }}">
+                <a href="{{ path('app_task_view', {id: row.existingTaskId}) }}">#{{ row.existingTaskId }}</a> {{ row.name }}</td>
+            <td>{{ grid.allTypes[row.taskTypeId] ?? '—' }}</td>
+            <td>{{ grid.allPeople[row.assigneeId] ?? '—' }}</td>
+            <td class="nowrap">{{ row.dueDate ?: '—' }}</td>
+            <td>{{ grid.allStatuses[row.taskStatusId] ?? '—' }}</td>
+            <td>{{ row.statusDetail ?: '—' }}</td>
+            {% if fees %}<td>{{ grid.currencies[row.currencyId] ?? '—' }}</td><td class="num">{{ row.totalAmount ?: '—' }}</td>{% endif %}
+            <td><span class="badge plain" title="Approved or paid tasks, and tasks you may not edit, are read-only here">Locked</span></td>
+        {% else %}
+            <td>
+                {% if row.existingTaskId %}<input type="hidden" name="{{ n }}[existingTaskId]" value="{{ row.existingTaskId }}">{% endif %}
+                <input type="text" name="{{ n }}[name]" value="{{ row.name }}" maxlength="5000" aria-label="Task name" placeholder="Task name" style="min-width:160px">
+            </td>
+            <td>{{ g.select(n ~ '[taskTypeId]', row.taskTypeId, grid.types, grid.allTypes, false, '', 'ptg-taskTypeId') }}</td>
+            <td>{{ g.select(n ~ '[assigneeId]', row.assigneeId, grid.people, grid.allPeople, false, '', 'ptg-assigneeId') }}</td>
+            <td><input type="date" name="{{ n }}[dueDate]" value="{{ row.dueDate }}" class="ptg-dueDate" aria-label="Due date"></td>
+            <td>{{ g.select(n ~ '[taskStatusId]', row.taskStatusId, grid.statuses, grid.allStatuses, false, false, 'ptg-taskStatusId') }}</td>
+            <td><input type="text" name="{{ n }}[statusDetail]" value="{{ row.statusDetail }}" class="ptg-statusDetail" aria-label="Status detail"></td>
+            {% if fees %}
+                <td>{{ g.select(n ~ '[currencyId]', row.currencyId, grid.currencies, grid.currencies, false, false, 'ptg-currencyId') }}</td>
+                <td><input type="text" inputmode="decimal" name="{{ n }}[totalAmount]" value="{{ row.totalAmount }}" aria-label="Payout" style="width:100px"></td>
+            {% endif %}
+            <td>{% if not row.existingTaskId %}<button type="button" class="btn danger xs" data-ptg-remove aria-label="Remove row">✕</button>{% endif %}</td>
+        {% endif %}
+    </tr>
+{% endmacro %}
+
+{% import _self as g %}
+<div class="tscroll ptg" data-ptg>
+    <table class="t ptg-table">
+        <thead>
+            <tr>
+                <th>Task Name</th>
+                <th>Task Type</th>
+                <th>Contractor</th>
+                <th>Due Date</th>
+                <th>Task Status</th>
+                <th>Status Detail</th>
+                {% if fees %}
+                    <th>Currency</th>
+                    <th>Payout</th>
+                {% endif %}
+                <th></th>
+            </tr>
+        </thead>
+        <tbody data-ptg-rows>
+            {% for row in rows %}{{ g.row(loop.index0, row, row.existingTaskId and (locked[row.existingTaskId] ?? false), fees, grid) }}{% endfor %}
+        </tbody>
+    </table>
+    <template data-ptg-template>{{ g.row('__i__', blankRow, false, fees, grid) }}</template>
+</div>
+<div class="btn-row" style="margin-top:8px">
+    <button type="button" class="btn success sm" data-ptg-add>+ Add Row</button>
+    <span class="muted small">A row needs a name, task type and contractor{{ fees ? ' and payout' }}; empty new rows are ignored. Approved and paid tasks are locked.</span>
+</div>
+<script src="{{ versioned('/js/project-task-grid.js') }}" defer></script>

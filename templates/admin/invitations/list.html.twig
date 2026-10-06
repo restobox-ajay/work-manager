@@ -13,7 +13,7 @@
     <div class="flash-error">{{ message }}</div>
 {% endfor %}
 
-<a href="{{ path('app_admin_users_invite') }}">New Invitation</a>
+<a class="btn success" href="{{ path('app_admin_users_invite') }}">+ New Invitation</a>
 
 <table>
     <thead>
@@ -32,7 +32,7 @@
             <td class="invitation-status">
                 {% if invitation.isUsed %}Used{% elseif invitation.isExpired %}Expired{% else %}Pending{% endif %}
             </td>
-            <td>
+            <td class="actions">
                 <form method="post" action="{{ path('app_admin_users_invitations_resend', {id: invitation.id}) }}" style="display:inline">
                     <input type="hidden" name="_token" value="{{ csrf_token('admin_invite_resend_' ~ invitation.id) }}">
                     <button type="submit" class="btn info resend-btn">Resend</button>

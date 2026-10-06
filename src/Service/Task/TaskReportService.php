@@ -5,18 +5,14 @@ declare(strict_types=1);
 namespace App\Service\Task;
 
 use App\Entity\Task;
-use App\Entity\TaskReadStatus;
 use App\Entity\User;
 use App\Repository\TaskPriorityOrderRepository;
-use App\Repository\TaskReadStatusRepository;
 use App\Repository\TaskRepository;
 use App\Repository\UserRepository;
 use App\Security\Work\WorkAccess;
-use Doctrine\ORM\EntityManagerInterface;
 
 /**
- * The other task pages of work-platform's Tasks menu (ADR-072): Tasks By Contractor, Task By Date, Task Created By
- * Manager, Authorization Queue and Task Priority. Each is the task list query with different criteria, scoped by
+ * The other task pages of work-platform's Tasks menu (ADR-072): Tasks By Contractor, Task By Date and Task Priority. Each is the task list query with different criteria, scoped by
  * WorkAccess exactly as the main list is.
  */
 final class TaskReportService
@@ -27,16 +23,11 @@ final class TaskReportService
         'reviewerPending'   => 'Reviewer (Pending)',
     ];
 
-    /** work-platform listed the newest 50 on the manager page. */
-    private const MANAGER_PAGE_LIMIT = 50;
-
     public function __construct(
         private readonly TaskRepository $tasks,
-        private readonly TaskReadStatusRepository $readStatuses,
         private readonly TaskPriorityOrderRepository $priorityOrders,
         private readonly UserRepository $users,
         private readonly WorkAccess $access,
-        private readonly EntityManagerInterface $em,
     ) {
     }
 
@@ -89,56 +80,6 @@ final class TaskReportService
     }
 
     /**
-     * Tasks someone else filed that wait in the authorization queue (work-platform's "Task Created By Manager"),
-     * newest first, with whether the viewer has marked each read.
-     *
-     * @param bool|null $read null = both
-     *
-     * @return array{tasks: Task[], read: array<int, bool>}
-     */
-    public function createdByOthers(User $viewer, ?int $createdBy, ?bool $read): array
-    {
-        $viewerId = (int) $viewer->getId();
-        $criteria = [
-            'visibility'   => $this->access->taskVisibility($viewer),
-            'queue'        => 'pending',
-            'notCreatedBy' => $viewerId,
-            'createdBy'    => $createdBy,
-        ];
-        $tasks = $this->tasks->findAllMatching($criteria, limit: self::MANAGER_PAGE_LIMIT);
-        $readByTask = $this->readMap($viewerId, $tasks);
-
-        if ($read !== null) {
-            $tasks = array_values(array_filter($tasks, static fn (Task $task) => ($readByTask[(int) $task->getId()] ?? false) === $read));
-        }
-
-        return ['tasks' => $tasks, 'read' => $readByTask];
-    }
-
-    public function setRead(User $viewer, Task $task, bool $read): void
-    {
-        $this->readStatuses->ensureRowsExist((int) $viewer->getId(), [(int) $task->getId()]);
-        $row = $this->readStatuses->findOneForUserAndTask((int) $viewer->getId(), (int) $task->getId());
-        $row?->setIsRead($read ? TaskReadStatus::READ_YES : TaskReadStatus::READ_NO)->setUpdatedAt(time());
-        $this->em->flush();
-    }
-
-    /**
-     * The authorization queue: 'pending' = waiting for a decision, 'decided' = every decision made.
-     *
-     * @return Task[]
-     */
-    public function queue(User $viewer, string $which, ?int $clientId, ?string $term): array
-    {
-        return $this->tasks->findAllMatching([
-            'visibility' => $this->access->taskVisibility($viewer),
-            'queue'      => $which === 'decided' ? 'decided' : 'pending',
-            'clientId'   => $clientId,
-            'term'       => $term,
-        ]);
-    }
-
-    /**
      * The three priority tabs for one person.
      *
      * @return array<string, array{label: string, tasks: Task[]}>
@@ -187,21 +128,5 @@ final class TaskReportService
     public function reorder(int $targetUserId, array $orderedTaskIds, ?int $taskId, ?string $move): void
     {
         $this->priorityOrders->reorder($targetUserId, $orderedTaskIds, $taskId, $move);
-    }
-
-    /**
-     * @param Task[] $tasks
-     *
-     * @return array<int, bool>
-     */
-    private function readMap(int $viewerId, array $tasks): array
-    {
-        $ids = array_map(static fn (Task $task) => (int) $task->getId(), $tasks);
-        $read = [];
-        foreach ($this->readStatuses->findForUserAndTasks($viewerId, $ids) as $taskId => $row) {
-            $read[(int) $taskId] = $row->isRead();
-        }
-
-        return $read;
     }
 }
