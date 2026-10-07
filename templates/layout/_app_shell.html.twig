@@ -127,14 +127,14 @@
     ]) %}
 {% endif %}
 
-{# Your own security and account settings sit last, at the bottom of the menu. #}
-{% set items = items|merge([
-    { label: 'Security', icon: 'shield', children: securityLinks },
+{# Your own account and security settings live in the top-right account menu, not the sidebar. #}
+{% set accountMenu = [
     { label: 'My Account', icon: 'user', children: accountLinks },
-]) %}
+    { label: 'Security', icon: 'shield', children: securityLinks },
+] %}
 
 {# Breadcrumb, as in the mockup ("Group › Page"): taken from the menu entry for the current page. #}
-{% set currentGroup = items|filter(item => item.children is defined and item.children|filter(child => child.current)|length > 0)|first %}
+{% set currentGroup = items|merge(accountMenu)|filter(item => item.children is defined and item.children|filter(child => child.current)|length > 0)|first %}
 {% set currentLink = items|filter(item => item.children is not defined and item.current)|first %}
 {% if currentGroup %}
     {% set crumb = currentGroup.label ~ ' › ' ~ (currentGroup.children|filter(child => child.current)|first).label %}
@@ -158,7 +158,7 @@
     </button>
 </aside>
 <div class="frame">
-    {% include 'layout/_content_header.html.twig' with { crumb: crumb } %}
+    {% include 'layout/_content_header.html.twig' with { crumb: crumb, accountMenu: accountMenu } %}
     <main id="main-content" class="content page-body">{{ pageBody }}</main>
     <footer class="footer">&copy; {{ 'now'|date('Y') }} {{ app_name }}</footer>
 </div>

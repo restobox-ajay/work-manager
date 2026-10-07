@@ -801,3 +801,41 @@ a.kpi{text-decoration:none;color:inherit}a.kpi:hover{border-color:var(--primary,
 .vault-help li{margin:4px 0}
 .vault-help .v-warn{background:var(--warning-soft);border:1px solid #faebcc;color:#8a6d3b;border-radius:8px;padding:10px 14px;margin:10px 0 0;font-size:.85rem}
 @media print{.sidebar,.topbar,.ph-actions,.nav-toggle{display:none!important}.vault-help .card{break-inside:avoid;box-shadow:none}}
+
+/* ── Account menu: your own account and security pages, grouped under headings ── */
+.account-dropdown {
+    min-width: 220px;
+    max-height: calc(100vh - 80px);
+    overflow-y: auto;
+}
+
+.account-dropdown .dropdown-heading {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px 2px;
+    color: var(--muted);
+    font-size: .72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+}
+
+.account-dropdown .dropdown-heading svg {
+    flex: none;
+}
+
+.account-dropdown a.dropdown-sub {
+    padding-left: 34px;
+}
+
+.account-dropdown a.active {
+    background: var(--primary-soft);
+    font-weight: 600;
+}
+
+.account-dropdown .dropdown-divider {
+    margin: 6px 0;
+    border: 0;
+    border-top: 1px solid var(--line);
+}
