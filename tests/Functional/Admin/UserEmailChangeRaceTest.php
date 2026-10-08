@@ -9,6 +9,7 @@ use App\Repository\UserRepository;
 use App\Tests\Support\AuthenticationTestTrait;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\ORM\EntityRepository;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 
@@ -54,7 +55,14 @@ final class UserEmailChangeRaceTest extends WebTestCase
         // managed entity at call time, as the real repository would return it).
         $stubRepo = $this->createStub(UserRepository::class);
         $stubRepo->method('findByEmail')->willReturn(null);
-        $stubRepo->method('find')->willReturnCallback(fn (): ?User => $this->em->find(User::class, $this->moverId));
+        // find() resolves any id for real: the mover, and the acting admin (token authenticator, session refresh).
+        $stubRepo->method('find')->willReturnCallback(fn (mixed $id): ?User => $this->em->find(User::class, $id));
+        // Since ADR-068 the acting admin signs in through the same provider, which looks accounts up by email
+        // with findOneBy(); answer that from an un-stubbed repository so only the pre-check is stale.
+        $realRepo = new EntityRepository($this->em, $this->em->getClassMetadata(User::class));
+        $stubRepo->method('findOneBy')->willReturnCallback(
+            static fn (array $criteria, ?array $orderBy = null): ?User => $realRepo->findOneBy($criteria, $orderBy)
+        );
         self::getContainer()->set(UserRepository::class, $stubRepo);
     }
 
@@ -67,9 +75,8 @@ final class UserEmailChangeRaceTest extends WebTestCase
     private function cleanup(): void
     {
         try {
-            $this->conn->executeStatement("DELETE FROM admin_access_tokens WHERE admin_id IN (SELECT id FROM admin WHERE email = ?)", [self::ADMIN]);
-            $this->conn->executeStatement('DELETE FROM admin_sessions WHERE admin_id IN (SELECT id FROM admin WHERE email = ?)', [self::ADMIN]);
-            $this->conn->executeStatement('DELETE FROM admin WHERE email = ?', [self::ADMIN]);
+            $this->conn->executeStatement('DELETE FROM personal_access_tokens WHERE user_id IN (SELECT id FROM "user" WHERE email = ?)', [self::ADMIN]);
+            $this->conn->executeStatement('DELETE FROM user_sessions WHERE user_id IN (SELECT id FROM "user" WHERE email = ?)', [self::ADMIN]);
             $this->conn->executeStatement("DELETE FROM \"user\" WHERE email LIKE 'emailrace-%@example.com'");
             $this->conn->executeStatement('DELETE FROM audit_log WHERE actor = ?', [self::ADMIN]);
         } catch (\Throwable) {
@@ -79,18 +86,18 @@ final class UserEmailChangeRaceTest extends WebTestCase
     private function seedAdmin(): int
     {
         $this->conn->executeStatement(
-            'INSERT INTO admin (email, name, password, roles, status, created_at) VALUES (?, ?, ?, ?, ?, ?)',
-            [self::ADMIN, 'Race Admin', self::hashTestPassword('adminpass'), '[]', 'active', date('Y-m-d H:i:s')]
+            'INSERT INTO "user" (email, name, password, roles, status, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+            [self::ADMIN, 'Race Admin', self::hashTestPassword('adminpass'), '["ROLE_ADMIN"]', 'active', date('Y-m-d H:i:s')]
         );
 
-        return (int) $this->conn->fetchOne('SELECT id FROM admin WHERE email = ?', [self::ADMIN]);
+        return (int) $this->conn->fetchOne('SELECT id FROM "user" WHERE email = ?', [self::ADMIN]);
     }
 
     public function testApiPatchToATakenEmailReturns422NotA500(): void
     {
         $plaintext = bin2hex(random_bytes(32));
-        $this->conn->insert('admin_access_tokens', [
-            'admin_id'   => $this->seedAdmin(),
+        $this->conn->insert('personal_access_tokens', [
+            'user_id'    => $this->seedAdmin(),
             'name'       => 'Race Token',
             'token_hash' => hash('sha256', $plaintext),
             'created_at' => date('Y-m-d H:i:s'),

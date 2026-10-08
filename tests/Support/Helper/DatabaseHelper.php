@@ -6,7 +6,6 @@ namespace App\Tests\Support\Helper;
 
 use App\Bundle\Auth2fa\Repository\TwoFactorSettingsRepository;
 use App\Bundle\AuthMagicLink\Entity\MagicLinkToken;
-use App\Entity\Admin;
 use App\Entity\Config;
 use App\Entity\Invitation;
 use App\Entity\PasswordResetToken;
@@ -32,10 +31,6 @@ use SymfonyCasts\Bundle\VerifyEmail\VerifyEmailHelperInterface;
 class DatabaseHelper extends Module
 {
     private const TABLES_TO_KEEP = ['doctrine_migration_versions'];
-
-    /** Host/port the live acceptance server listens on (see codeception.yml). */
-    private const SERVER_HOST = '127.0.0.1';
-    private const SERVER_PORT = 8899;
 
     private ?Kernel $kernel = null;
     private ?EntityManagerInterface $em = null;
@@ -120,55 +115,29 @@ class DatabaseHelper extends Module
     }
 
     /**
+     * Create an admin. Since ADR-068 an admin is a User holding an admin role (ROLE_ADMIN unless overridden);
+     * it signs in through the one /login form.
+     *
      * @param array{name?: string, roles?: array<int, string>} $overrides
      */
     public function createAdmin(string $email, string $password = 'password123', array $overrides = []): int
     {
-        $em = $this->entityManager();
-
-        $admin = new Admin();
-        $admin->setEmail($email);
-        $admin->setName($overrides['name'] ?? 'Test Admin');
-        $admin->setPassword($this->hash($password));
-        $admin->setRoles($overrides['roles'] ?? ['ROLE_ADMIN']);
-
-        $em->persist($admin);
-        $em->flush();
-
-        $id = $admin->getId();
-        $em->clear();
-        $this->releaseConnection();
-
-        return (int) $id;
+        return $this->createUser($email, $password, [
+            'name'  => $overrides['name'] ?? 'Test Admin',
+            'roles' => $overrides['roles'] ?? ['ROLE_ADMIN'],
+        ]);
     }
 
     /**
-     * Persist an active ROLE_TECH_SUPPORT admin with TOTP already enabled.
+     * Persist an active ROLE_TECH_SUPPORT account with TOTP already enabled.
      *
      * That role carries a mandatory-2FA floor (ADR-050), so an unenrolled one is bounced to
-     * /admin/2fa/setup and can never reach the database console — enrolling here lets a scenario
+     * /account/2fa/setup and can never reach the database console — enrolling here lets a scenario
      * drive the console itself rather than the enrolment flow.
      */
     public function createTechSupportAdminWith2fa(string $email, string $password, string $secret): int
     {
-        $em = $this->entityManager();
-
-        $admin = new Admin();
-        $admin->setEmail($email);
-        $admin->setName('Tech Support');
-        $admin->setPassword($this->hash($password));
-        $admin->setRoles(['ROLE_TECH_SUPPORT']);
-        $admin->setTotpSecret($secret);
-        $admin->setIsTotpEnabled(true);
-
-        $em->persist($admin);
-        $em->flush();
-
-        $id = $admin->getId();
-        $em->clear();
-        $this->releaseConnection();
-
-        return (int) $id;
+        return $this->createUserWith2fa($email, $password, $secret, ['ROLE_TECH_SUPPORT'], 'Tech Support');
     }
 
     /**
@@ -177,15 +146,23 @@ class DatabaseHelper extends Module
      * stepping through the setup flow first. Mirrors createUserWith2fa() in the
      * functional 2FA tests.
      */
-    public function createUserWith2fa(string $email, string $password, string $secret): int
-    {
+    /**
+     * @param array<int, string> $roles
+     */
+    public function createUserWith2fa(
+        string $email,
+        string $password,
+        string $secret,
+        array $roles = [],
+        string $name = 'Test User',
+    ): int {
         $em = $this->entityManager();
 
         $user = new User();
         $user->setEmail($email);
-        $user->setName('Test User');
+        $user->setName($name);
         $user->setPassword($this->hash($password));
-        $user->setRoles([]);
+        $user->setRoles($roles);
         $user->setStatus('active');
         $user->setIsVerified(true);
 
@@ -485,28 +462,6 @@ class DatabaseHelper extends Module
         $connection = $this->entityManager()->getConnection();
         $connection->insert('personal_access_tokens', [
             'user_id'    => $userId,
-            'name'       => $name,
-            'token_hash' => hash('sha256', $plainToken),
-            'created_at' => (new \DateTimeImmutable())->format('Y-m-d H:i:s'),
-        ]);
-        $this->releaseConnection();
-
-        return $plainToken;
-    }
-
-    /**
-     * Create an active admin access token for an Admin and return its plaintext Bearer
-     * credential (for the admin REST API, /admin-api). Only the SHA-256 hash is stored.
-     * The admin_api firewall authenticates Admin entities via these tokens, so the admin
-     * API can only ever be driven by a real Admin — never a User, whatever roles it holds.
-     */
-    public function createAdminAccessToken(int $adminId, string $name = 'Admin API Token'): string
-    {
-        $plainToken = bin2hex(random_bytes(32));
-
-        $connection = $this->entityManager()->getConnection();
-        $connection->insert('admin_access_tokens', [
-            'admin_id'   => $adminId,
             'name'       => $name,
             'token_hash' => hash('sha256', $plainToken),
             'created_at' => (new \DateTimeImmutable())->format('Y-m-d H:i:s'),
@@ -893,9 +848,12 @@ class DatabaseHelper extends Module
     {
         /** @var RouterInterface $router */
         $router = $this->container()->get('router');
+        // Read from PhpBrowser's url (codeception.yml, or a `-o` override) so the signature always names the
+        // server the scenario actually talks to.
+        $serverUrl = parse_url((string) $this->getModule('PhpBrowser')->_getConfig('url'));
         $context = $router->getContext();
-        $context->setHost(self::SERVER_HOST);
-        $context->setHttpPort(self::SERVER_PORT);
+        $context->setHost($serverUrl['host'] ?? '127.0.0.1');
+        $context->setHttpPort($serverUrl['port'] ?? 80);
         $context->setScheme('http');
 
         $components = $helper->generateSignature(

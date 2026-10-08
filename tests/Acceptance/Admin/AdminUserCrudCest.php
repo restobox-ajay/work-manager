@@ -17,23 +17,27 @@ use App\Tests\Support\AcceptanceTester;
  */
 class AdminUserCrudCest
 {
-    // AC1: admin login → /admin/dashboard.
+    // AC1: admin login → the dashboard, with the admin area reachable.
     public function adminLoginReachesDashboard(AcceptanceTester $I): void
     {
         $I->createAdmin('admin@example.com', 'password123');
 
         $I->loginAsAdmin('admin@example.com', 'password123');
 
-        $I->seeCurrentUrlEquals('/admin/dashboard');
+        // One login for everyone (ADR-068): an admin lands on the shared dashboard's manager view and
+        // can then reach the admin area.
+        $I->seeCurrentUrlEquals('/dashboard');
+        $I->see('Dashboard', 'h1');
+        $I->amOnPage('/admin/dashboard');
         $I->see('Admin Dashboard', 'h1');
     }
 
-    // AC2: an unauthenticated request to an admin route is redirected to /admin/login.
+    // AC2: an unauthenticated request to an admin route is redirected to /login.
     public function unauthenticatedAdminAreaRedirectsToLogin(AcceptanceTester $I): void
     {
         $I->amOnPage('/admin/users');
 
-        $I->seeCurrentUrlEquals('/admin/login');
+        $I->seeCurrentUrlEquals('/login');
     }
 
     // AC3: /admin/users shows a paginated user list (page size 10).

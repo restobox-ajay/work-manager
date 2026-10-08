@@ -13,7 +13,8 @@ use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 /**
  * Issue #9: the "Allow Impersonation" toggle (impersonate.enabled, default on) must actually switch impersonation
  * off — for admins impersonating users AND superadmins impersonating admins — and hide the buttons. It used to be
- * saved and never read.
+ * saved and never read. Since ADR-068 both are the same flow (POST /admin/users/{id}/impersonate-start swaps the
+ * token at once), so there is no queued handoff left for the toggle to catch later.
  */
 final class ImpersonationToggleTest extends WebTestCase
 {
@@ -42,7 +43,6 @@ final class ImpersonationToggleTest extends WebTestCase
         $this->conn->executeStatement("DELETE FROM config WHERE config_key = 'impersonate.enabled'");
         $this->conn->executeStatement("DELETE FROM user_sessions WHERE user_id IN (SELECT id FROM \"user\" WHERE email LIKE 'imptoggle-%')");
         $this->conn->executeStatement("DELETE FROM \"user\" WHERE email LIKE 'imptoggle-%'");
-        $this->conn->executeStatement("DELETE FROM admin WHERE email LIKE 'imptoggle-%'");
         $this->conn->executeStatement("DELETE FROM audit_log WHERE action LIKE 'admin.impersonate%' AND actor LIKE 'imptoggle-%'");
         $this->em->clear();
     }
@@ -64,8 +64,8 @@ final class ImpersonationToggleTest extends WebTestCase
 
     public function testWithTheToggleOffAnAdminCannotImpersonateAUser(): void
     {
-        $user = $this->createTestUser('imptoggle-user@example.com');
-        $this->createTestAdmin('imptoggle-admin@example.com');
+        $user = $this->createTestUser('imptoggle-user@example.com', 'Toggle User');
+        $this->createTestAdmin('imptoggle-admin@example.com', 'Toggle Admin');
         $this->disableImpersonation();
         $this->loginAsAdmin('imptoggle-admin@example.com');
 
@@ -75,48 +75,35 @@ final class ImpersonationToggleTest extends WebTestCase
         $token = $this->plantCsrf('admin_user_impersonate_' . $user->getId());
         $this->client->request('POST', sprintf('/admin/users/%d/impersonate-start', $user->getId()), ['_token' => $token]);
         self::assertResponseRedirects('/admin/users');
-        self::assertNull($this->client->getRequest()->getSession()->get('_impersonation_request'), 'no impersonation is queued');
+        self::assertNull($this->client->getRequest()->getSession()->get('_impersonating_as'), 'no impersonation started');
         self::assertSame(0, (int) $this->conn->fetchOne("SELECT COUNT(*) FROM audit_log WHERE action = 'admin.impersonate_start' AND actor = 'imptoggle-admin@example.com'"));
 
         $this->client->request('GET', '/dashboard');
-        self::assertResponseRedirects('/login', null, 'the browser is not signed in as the user');
-    }
-
-    public function testATogglesOffRefusesAnImpersonationThatWasAlreadyQueued(): void
-    {
-        $user = $this->createTestUser('imptoggle-user@example.com');
-        $this->createTestAdmin('imptoggle-admin@example.com');
-        $this->loginAsAdmin('imptoggle-admin@example.com');
-
-        // Queued while the toggle was still on...
-        $session = $this->client->getRequest()->getSession();
-        $session->set('_impersonation_request', ['userId' => $user->getId(), 'adminEmail' => 'imptoggle-admin@example.com']);
-        $session->save();
-        // ...then switched off before it was consumed.
-        $this->disableImpersonation();
-
-        $this->client->request('GET', '/impersonate/start');
-        self::assertResponseRedirects('/admin/login');
-        $this->client->request('GET', '/dashboard');
-        self::assertResponseRedirects('/login');
+        self::assertStringContainsString('Welcome, Toggle Admin', (string) $this->client->getResponse()->getContent(), 'the browser is still the admin, not the user');
+        self::assertSelectorNotExists('.impersonation-banner');
     }
 
     public function testWithTheToggleOffASuperadminCannotImpersonateAnAdmin(): void
     {
-        $target = $this->createTestAdmin('imptoggle-target@example.com');
-        $this->createTestAdmin('imptoggle-super@example.com', roles: ['ROLE_SUPER_ADMIN']);
+        $target = $this->createTestAdmin('imptoggle-target@example.com', 'Toggle Target');
+        $this->createTestAdmin('imptoggle-super@example.com', 'Toggle Super', roles: ['ROLE_SUPER_ADMIN']);
         $this->disableImpersonation();
         $this->loginAsAdmin('imptoggle-super@example.com');
 
-        $this->client->request('GET', '/admin/superadmin/admins');
-        self::assertSelectorNotExists(sprintf('form[action="/admin/superadmin/admins/%d/impersonate"]', $target->getId()), 'the button is hidden');
+        $this->client->request('GET', '/admin/users');
+        self::assertResponseIsSuccessful();
+        self::assertSelectorNotExists(sprintf('form[action="/admin/users/%d/impersonate-start"]', $target->getId()), 'the button is hidden');
 
-        $token = $this->plantCsrf('admin_impersonate_admin_' . $target->getId());
-        $this->client->request('POST', sprintf('/admin/superadmin/admins/%d/impersonate', $target->getId()), ['_token' => $token]);
-        self::assertResponseRedirects('/admin/superadmin/admins');
+        $token = $this->plantCsrf('admin_user_impersonate_' . $target->getId());
+        $this->client->request('POST', sprintf('/admin/users/%d/impersonate-start', $target->getId()), ['_token' => $token]);
+        self::assertResponseRedirects('/admin/users');
+        self::assertNull($this->client->getRequest()->getSession()->get('_impersonating_as'), 'no impersonation started');
         $this->client->followRedirect();
-        self::assertSelectorNotExists('.admin-impersonation-banner');
-        self::assertSelectorTextContains('h1', 'Admin Accounts', 'still the superadmin, not the target');
+        self::assertSelectorNotExists('.impersonation-banner');
+
+        $this->client->request('GET', '/dashboard');
+        $content = (string) $this->client->getResponse()->getContent();
+        self::assertStringContainsString('Welcome, Toggle Super', $content, 'still the superadmin, not the target');
     }
 
     public function testWithTheToggleOnTheButtonsAreThere(): void

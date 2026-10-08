@@ -77,7 +77,7 @@ final class AdminConfigAuditCest
         $I->loginAsAdmin('admin@example.com', 'adminpass');
 
         $I->amOnPage('/admin/audit-log');
-        $I->see('Audit Log');
+        $I->see('Activity Log');
         $I->seeElement('.entry-action');
         $I->seeElement('nav[aria-label="Pagination"]');
         $I->click('Next');
@@ -104,12 +104,15 @@ final class AdminConfigAuditCest
         $I->dontSee('filler@example.com');
     }
 
-    public function nonAdminAccessToAuditLogRedirects(AcceptanceTester $I): void
+    // ADR-068: a signed-in account without ROLE_ADMIN is on the same firewall, so it is refused (403),
+    // not bounced to a separate admin login.
+    public function nonAdminAccessToAuditLogIsForbidden(AcceptanceTester $I): void
     {
         $I->createUser('user@example.com', 'password');
         $I->loginAsUser('user@example.com', 'password');
 
         $I->amOnPage('/admin/audit-log');
-        $I->seeCurrentUrlEquals('/admin/login');
+        $I->seeResponseCodeIs(403);
+        $I->dontSee('Activity Log', 'h1');
     }
 }

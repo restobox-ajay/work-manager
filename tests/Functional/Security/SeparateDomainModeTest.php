@@ -10,25 +10,18 @@ use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 
 /**
- * FEATURE-091: Optional separate-domain mode (ADMIN_DOMAIN / APP_DOMAIN).
+ * FEATURE-091, narrowed by ADR-068: the separate admin domain (ADMIN_DOMAIN) and its admin firewall are gone,
+ * so the only host-scoped firewall left is the interactive `user` firewall, which matches APP_DOMAIN. The
+ * management screens under /admin/* are served by that same firewall and share its one login (/login).
  *
- * The firewalls are host-scoped from env vars: the admin / admin-api firewalls
- * match ADMIN_DOMAIN, the user firewall matches APP_DOMAIN. When the vars are
- * empty (the single-domain default in .env) every firewall matches every host,
- * so there is no behavior change. When they are set to distinct hosts the admin
- * surface is only served on the admin host and the user surface on the app host.
+ * The observable HTTP signal is the entry point that handles an unauthenticated protected request: the
+ * user firewall redirects to /login.
  *
- * The observable HTTP signal is *which firewall's entry point* handles an
- * unauthenticated protected request: the admin firewall redirects to
- * /admin/login, the user firewall to /login.
- *
- * Firewall `host` is resolved from env at runtime, so overriding $_SERVER before
- * booting a fresh kernel exercises separate-domain mode without a second
- * env file.
+ * Firewall `host` is resolved from env at runtime, so overriding $_SERVER before booting a fresh kernel
+ * exercises a non-default APP_DOMAIN without a second env file.
  */
 final class SeparateDomainModeTest extends WebTestCase
 {
-    private const ADMIN_HOST = 'admin.example.test';
     private const APP_HOST = 'app.example.test';
     private const EMAIL = 'separate-domain@example.com';
     private const PASSWORD = 'testpassword';
@@ -70,44 +63,24 @@ final class SeparateDomainModeTest extends WebTestCase
     }
 
     /**
-     * AC1 (no regression): with the default test env (ADMIN_DOMAIN=APP_DOMAIN=
-     * localhost) the admin firewall serves /admin/* on the default host and an
-     * unauthenticated request is redirected to /admin/login.
+     * AC1 (no regression): with the default test env (APP_DOMAIN=localhost) the management area is served by
+     * the one user firewall, so an unauthenticated /admin request is sent to the one login page.
      */
-    public function testSingleDomainAdminProtectedRouteRedirectsToAdminLogin(): void
+    public function testAdminAreaOnTheDefaultHostRedirectsToTheOneLogin(): void
     {
         $client = static::createClient();
         $client->request('GET', '/admin/dashboard');
 
         self::assertResponseRedirects();
-        self::assertSame('/admin/login', $this->redirectLocation($client));
+        self::assertSame('/login', $this->redirectLocation($client));
     }
 
     /**
-     * AC2: in separate-domain mode, the admin firewall matches the admin host —
-     * /admin/dashboard there is served by the admin firewall (redirect to
-     * /admin/login).
+     * AC2: with APP_DOMAIN set to a non-default host, /admin/dashboard on that host is guarded by the user
+     * firewall, whose entry point redirects to /login (there is no /admin/login any more).
      */
-    public function testSeparateDomainAdminHostServesAdminFirewall(): void
+    public function testAdminAreaOnTheAppHostIsGuardedByTheUserFirewall(): void
     {
-        $this->setEnv('ADMIN_DOMAIN', self::ADMIN_HOST);
-        $this->setEnv('APP_DOMAIN', self::APP_HOST);
-
-        $client = static::createClient();
-        $client->request('GET', 'http://' . self::ADMIN_HOST . '/admin/dashboard');
-
-        self::assertResponseRedirects();
-        self::assertSame('/admin/login', $this->redirectLocation($client));
-    }
-
-    /**
-     * AC2: the admin firewall does NOT match the app host. /admin/dashboard
-     * requested on the app host falls through to the user firewall, whose entry
-     * point redirects to /login (not /admin/login).
-     */
-    public function testSeparateDomainAppHostDoesNotServeAdminFirewall(): void
-    {
-        $this->setEnv('ADMIN_DOMAIN', self::ADMIN_HOST);
         $this->setEnv('APP_DOMAIN', self::APP_HOST);
 
         $client = static::createClient();
@@ -123,9 +96,8 @@ final class SeparateDomainModeTest extends WebTestCase
      * AC2: the user firewall matches the app host — a protected user route there
      * is served by the user firewall (redirect to /login).
      */
-    public function testSeparateDomainAppHostServesUserFirewall(): void
+    public function testAppHostServesUserFirewall(): void
     {
-        $this->setEnv('ADMIN_DOMAIN', self::ADMIN_HOST);
         $this->setEnv('APP_DOMAIN', self::APP_HOST);
 
         $client = static::createClient();
@@ -138,8 +110,7 @@ final class SeparateDomainModeTest extends WebTestCase
     /**
      * AC3 (session cookie): with SESSION_COOKIE_DOMAIN empty (the default) the
      * compiled session cookie has no Domain attribute, so it is scoped to the
-     * exact host that set it — admin-host and app-host sessions cannot bleed
-     * across.
+     * exact host that set it.
      */
     public function testSessionCookieDomainIsHostScopedByDefault(): void
     {

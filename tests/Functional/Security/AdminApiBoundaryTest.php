@@ -4,24 +4,26 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Security;
 
-use App\Entity\User;
+use App\Tests\Support\AuthenticationTestTrait;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 
 /**
- * The /admin-api firewall authenticates Admin entities ONLY (admin_api firewall ->
- * app_admins provider -> AdminTokenAuthenticator -> admin_access_tokens / admin table).
- *
- * This proves the boundary holds even in the worst state the user table could be in:
- * a User whose roles column has been force-set to ROLE_ADMIN/ROLE_SUPER_ADMIN directly
- * at the database level (simulating a SQL injection or any bypass of User::ALLOWED_ROLES),
- * holding a *valid* user personal access token, STILL cannot reach the admin API — because
- * the admin API never reads the user table or user PATs.
+ * The /admin-api boundary under ADR-068: /api and /admin-api share the stateless `api` firewall and the same
+ * personal access tokens, and what a token may do is decided by its OWNER'S role. A plain user's valid token
+ * authenticates (it works on /api) but is refused on /admin-api with a JSON 403; the same kind of token owned
+ * by an admin is accepted. A role string outside the ladder, injected straight into the roles column, grants
+ * no admin-API access.
  */
 final class AdminApiBoundaryTest extends WebTestCase
 {
+    use AuthenticationTestTrait;
+
+    private const USER_EMAIL  = 'boundary@example.com';
+    private const ADMIN_EMAIL = 'boundary-admin@example.com';
+
     private KernelBrowser $client;
     private Connection $conn;
     private EntityManagerInterface $em;
@@ -42,33 +44,16 @@ final class AdminApiBoundaryTest extends WebTestCase
 
     private function cleanup(): void
     {
-        try {
-            $this->conn->executeStatement('DELETE FROM personal_access_tokens');
-            $this->conn->executeStatement("DELETE FROM \"user\" WHERE email = 'boundary@example.com'");
-        } catch (\Throwable) {
-        }
+        $this->conn->executeStatement(
+            'DELETE FROM personal_access_tokens WHERE user_id IN (SELECT id FROM "user" WHERE email IN (?, ?))',
+            [self::USER_EMAIL, self::ADMIN_EMAIL]
+        );
+        $this->conn->executeStatement('DELETE FROM "user" WHERE email IN (?, ?)', [self::USER_EMAIL, self::ADMIN_EMAIL]);
     }
 
-    public function testUserWithInjectedAdminRoleAndValidPatCannotReachAdminApi(): void
+    /** Insert a valid personal access token for the account and return its plaintext. */
+    private function issueToken(int $userId): string
     {
-        // A normal user...
-        $user = new User();
-        $user->setEmail('boundary@example.com');
-        $user->setName('Boundary User');
-        $user->setPassword(password_hash('x', PASSWORD_BCRYPT, ['cost' => 4]));
-        $this->em->persist($user);
-        $this->em->flush();
-        $userId = (int) $user->getId();
-        $this->em->clear();
-
-        // ...whose roles column is force-injected with the admin namespace at the DB level,
-        // bypassing User::ALLOWED_ROLES entirely (worst case / simulated SQL injection).
-        $this->conn->executeStatement(
-            'UPDATE "user" SET roles = ? WHERE id = ?',
-            ['["ROLE_ADMIN","ROLE_SUPER_ADMIN"]', $userId]
-        );
-
-        // ...and a genuinely valid user personal access token.
         $plaintext = bin2hex(random_bytes(32));
         $this->conn->insert('personal_access_tokens', [
             'user_id'    => $userId,
@@ -77,19 +62,48 @@ final class AdminApiBoundaryTest extends WebTestCase
             'created_at' => (new \DateTimeImmutable())->format('Y-m-d H:i:s'),
         ]);
 
-        // The admin API rejects it outright: the admin_api firewall authenticates Admin
-        // entities via admin_access_tokens and never consults the user table or user PATs.
-        $this->client->request('GET', '/admin-api/users', [], [], [
-            'HTTP_AUTHORIZATION' => 'Bearer ' . $plaintext,
-        ]);
-        $this->assertResponseStatusCodeSame(401);
+        return $plaintext;
+    }
 
-        // Sanity: the same token DOES authenticate on the user-side `api` firewall — a
-        // missing /api route yields 404 (authenticated, no route), not 401. This proves the
-        // 401 above is the admin boundary rejecting the identity, not a malformed token.
-        $this->client->request('GET', '/api/__boundary_probe__', [], [], [
-            'HTTP_AUTHORIZATION' => 'Bearer ' . $plaintext,
-        ]);
+    private function get(string $path, string $token): void
+    {
+        $this->client->request('GET', $path, [], [], ['HTTP_AUTHORIZATION' => 'Bearer ' . $token]);
+    }
+
+    public function testPlainUsersValidTokenIsRefusedOnTheAdminApi(): void
+    {
+        $user  = $this->createTestUser(self::USER_EMAIL, 'Boundary User');
+        $token = $this->issueToken((int) $user->getId());
+
+        $this->get('/admin-api/users', $token);
+        $this->assertResponseStatusCodeSame(403);
+        $this->assertResponseHeaderSame('Content-Type', 'application/json');
+
+        // Sanity: the token itself is valid — on /api it authenticates, so an unknown route is a 404, not a
+        // 401. The 403 above is the role boundary, not a malformed token.
+        $this->get('/api/__boundary_probe__', $token);
         $this->assertResponseStatusCodeSame(404);
+    }
+
+    public function testRoleStringOutsideTheLadderGrantsNoAdminApiAccess(): void
+    {
+        $user = $this->createTestUser(self::USER_EMAIL, 'Boundary User');
+        $this->conn->executeStatement(
+            'UPDATE "user" SET roles = ? WHERE id = ?',
+            ['["ROLE_GOD","ROLE_ADMINISTRATOR"]', $user->getId()]
+        );
+        $token = $this->issueToken((int) $user->getId());
+
+        $this->get('/admin-api/users', $token);
+        $this->assertResponseStatusCodeSame(403);
+    }
+
+    public function testAdminsTokenIsAcceptedOnTheAdminApi(): void
+    {
+        $admin = $this->createTestAdmin(self::ADMIN_EMAIL);
+        $token = $this->issueToken((int) $admin->getId());
+
+        $this->get('/admin-api/users', $token);
+        $this->assertResponseIsSuccessful();
     }
 }

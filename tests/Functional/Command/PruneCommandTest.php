@@ -52,11 +52,10 @@ final class PruneCommandTest extends KernelTestCase
 
     private function cleanUp(): void
     {
-        foreach (['password_reset_tokens', 'admin_password_reset_tokens', 'magic_link_tokens', 'invitations'] as $table) {
+        foreach (['password_reset_tokens', 'magic_link_tokens', 'invitations'] as $table) {
             $this->conn->executeStatement("DELETE FROM {$table} WHERE email LIKE :p", ['p' => self::PREFIX . '%']);
         }
         $this->conn->executeStatement('DELETE FROM user_sessions WHERE session_id LIKE :p', ['p' => self::PREFIX . '%']);
-        $this->conn->executeStatement('DELETE FROM admin_sessions WHERE session_id LIKE :p', ['p' => self::PREFIX . '%']);
         $this->conn->executeStatement('DELETE FROM sessions WHERE sess_id LIKE :p', ['p' => self::PREFIX . '%']);
         $this->conn->executeStatement('DELETE FROM login_history WHERE fingerprint = :f', ['f' => self::PREFIX . 'fp']);
         $this->conn->executeStatement('DELETE FROM webhook_delivery WHERE event_type = :e', ['e' => self::PREFIX . 'evt']);
@@ -146,20 +145,6 @@ final class PruneCommandTest extends KernelTestCase
         return (bool) $this->conn->fetchOne('SELECT COUNT(*) FROM user_sessions WHERE session_id = ?', [self::PREFIX . $suffix]);
     }
 
-    private function insertAdminSession(string $suffix): void
-    {
-        $now = (new \DateTimeImmutable())->format('Y-m-d H:i:s');
-        $this->conn->executeStatement(
-            'INSERT INTO admin_sessions (session_id, admin_id, ip, user_agent, created_at, last_active_at) VALUES (?, ?, ?, ?, ?, ?)',
-            [self::PREFIX . $suffix, 4242, '127.0.0.1', 'phpunit', $now, $now]
-        );
-    }
-
-    private function adminSessionExists(string $suffix): bool
-    {
-        return (bool) $this->conn->fetchOne('SELECT COUNT(*) FROM admin_sessions WHERE session_id = ?', [self::PREFIX . $suffix]);
-    }
-
     private function insertInvitation(string $suffix, \DateTimeImmutable $expiresAt, ?\DateTimeImmutable $usedAt): void
     {
         $this->conn->executeStatement(
@@ -224,7 +209,7 @@ final class PruneCommandTest extends KernelTestCase
 
     public function testExpiredOrUsedTokensPrunedValidSurvive(): void
     {
-        foreach (['password_reset_tokens', 'admin_password_reset_tokens', 'magic_link_tokens'] as $table) {
+        foreach (['password_reset_tokens', 'magic_link_tokens'] as $table) {
             $this->seedTokenTable($table);
             $this->assertSame(3, $this->countRows($table), "seed for {$table}");
         }
@@ -232,7 +217,7 @@ final class PruneCommandTest extends KernelTestCase
         $exit = $this->tester()->execute([]);
         $this->assertSame(0, $exit);
 
-        foreach (['password_reset_tokens', 'admin_password_reset_tokens', 'magic_link_tokens'] as $table) {
+        foreach (['password_reset_tokens', 'magic_link_tokens'] as $table) {
             $this->assertSame(1, $this->countRows($table), "after prune {$table}");
             $remaining = (string) $this->conn->fetchOne("SELECT email FROM {$table} WHERE email LIKE ?", [self::PREFIX . '%']);
             $this->assertSame(self::PREFIX . 'valid@example.com', $remaining);
@@ -257,35 +242,6 @@ final class PruneCommandTest extends KernelTestCase
         $this->assertTrue($this->userSessionExists('live'), 'live session survives');
         $this->assertFalse($this->userSessionExists('expired'), 'expired session pruned');
         $this->assertFalse($this->userSessionExists('orphan'), 'orphan session pruned');
-    }
-
-    // FEATURE-148 / ADR-049: the admin-side mirror of testDeadUserSessionsPrunedLiveSurvive.
-    public function testDeadAdminSessionsPrunedLiveSurvive(): void
-    {
-        $now = (new \DateTimeImmutable())->getTimestamp();
-
-        $this->insertAdminSession('a-live');
-        $this->insertSessionRow('a-live', $now, $now + 3600);           // expires in an hour -> survives
-
-        $this->insertAdminSession('a-expired');
-        $this->insertSessionRow('a-expired', $now - 14400, $now - 3600); // row still present, expired an hour ago -> pruned
-
-        $this->insertAdminSession('a-orphan');                   // no sessions row -> pruned
-
-        $tester = $this->tester();
-        $exit = $tester->execute(['--only' => ['admin_sessions']]);
-        $this->assertSame(0, $exit);
-        $this->assertStringContainsString('admin_sessions: 2', $tester->getDisplay());
-
-        $this->assertTrue($this->adminSessionExists('a-live'), 'live admin session survives');
-        $this->assertFalse($this->adminSessionExists('a-expired'), 'expired admin session pruned');
-        $this->assertFalse($this->adminSessionExists('a-orphan'), 'orphan admin session pruned');
-
-        // Idempotent: a second run has nothing left to prune for this pruner.
-        $second = $this->tester();
-        $second->execute(['--only' => ['admin_sessions']]);
-        $this->assertStringContainsString('admin_sessions: 0', $second->getDisplay());
-        $this->assertTrue($this->adminSessionExists('a-live'), 'live admin session survives the second run');
     }
 
     // Issue #30: expired rows of the PdoSessionHandler `sessions` table itself. Nothing else guarantees they are
@@ -335,13 +291,13 @@ final class PruneCommandTest extends KernelTestCase
         $display = $tester->getDisplay();
 
         $this->assertStringContainsString('password_reset_tokens: 2', $display);
-        $this->assertStringContainsString('admin_password_reset_tokens: 0', $display);
         $this->assertStringContainsString('magic_link_tokens: 0', $display);
         $this->assertStringContainsString('user_sessions: 0', $display);
-        $this->assertStringContainsString('admin_sessions: 0', $display);
         $this->assertStringContainsString('invitations: 0', $display);
         $this->assertStringContainsString('webhook_delivery: 0', $display);
-        $this->assertMatchesRegularExpression('/(?<![_a-z])sessions: 0/', $display); // not user_/admin_sessions
+        $this->assertMatchesRegularExpression('/(?<![_a-z])sessions: 0/', $display); // not user_sessions
+        // ADR-068 dropped the admin realm's tables; no pruner may still target them.
+        $this->assertStringNotContainsString('admin_', $display);
     }
 
     public function testIdempotentSecondRunReportsZero(): void

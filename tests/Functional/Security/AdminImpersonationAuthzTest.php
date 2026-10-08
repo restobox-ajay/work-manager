@@ -4,20 +4,22 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Security;
 
-use App\Entity\Admin;
+use App\Entity\User;
+use App\Tests\Support\AuthenticationTestTrait;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 
 /**
- * FEATURE-133 / review C23 — admin-impersonation authorization:
- *  (1) impersonation must run the same AdminChecker a real admin login runs, so an inactive
- *      admin cannot be impersonated into a live admin session;
- *  (2) demoting a superadmin must drop ROLE_SUPER_ADMIN from their live session on the next
- *      request (Admin::isEqualTo now compares roles).
+ * FEATURE-133 / review C23, re-based on ADR-068 — impersonation authorization:
+ *  (1) impersonation runs the same UserChecker a real login runs, so an inactive admin cannot be impersonated
+ *      into a live session, and the refusal is shown to the impersonator;
+ *  (2) demoting an account must take its old privileges away from its live session on the next request.
  */
 final class AdminImpersonationAuthzTest extends WebTestCase
 {
+    use AuthenticationTestTrait;
+
     private KernelBrowser $client;
     private EntityManagerInterface $em;
 
@@ -36,95 +38,49 @@ final class AdminImpersonationAuthzTest extends WebTestCase
 
     private function cleanup(): void
     {
-        try {
-            $conn = $this->em->getConnection();
-            $conn->executeStatement("DELETE FROM admin WHERE email LIKE 'imp_authz_test_%'");
-            $this->em->clear();
-        } catch (\Throwable) {
-        }
-    }
-
-    private function createAdmin(string $email, array $roles = [], string $status = 'active'): Admin
-    {
-        $admin = new Admin();
-        $admin->setEmail($email);
-        $admin->setName('Test Admin ' . $email);
-        $admin->setPassword(password_hash('adminpass', PASSWORD_BCRYPT, ['cost' => 4]));
-        $admin->setRoles($roles);
-        $admin->setStatus($status);
-        $this->em->persist($admin);
-        $this->em->flush();
+        $this->em->getConnection()->executeStatement("DELETE FROM \"user\" WHERE email LIKE 'imp_authz_test_%'");
         $this->em->clear();
-
-        return $this->em->getRepository(Admin::class)->findOneBy(['email' => $email]);
     }
 
-    private function login(string $email): void
-    {
-        $this->client->request('GET', '/admin/login');
-        $this->client->submitForm('Sign in', [
-            'email'    => $email,
-            'password' => 'adminpass',
-        ]);
-        $this->client->followRedirect();
-    }
-
-    // AC1/AC2/AC4: impersonating an inactive admin is rejected (AdminChecker runs), no live
-    // impersonation session is created.
+    // AC1/AC2/AC4: impersonating an inactive admin is rejected (UserChecker runs); no impersonation starts.
     public function testImpersonatingInactiveAdminIsRejected(): void
     {
-        $superadmin = $this->createAdmin('imp_authz_test_super@example.com', ['ROLE_SUPER_ADMIN']);
-        $inactive   = $this->createAdmin('imp_authz_test_inactive@example.com', [], 'inactive');
+        $this->createTestAdmin('imp_authz_test_super@example.com', roles: ['ROLE_SUPER_ADMIN']);
+        $inactive = $this->createTestAdmin('imp_authz_test_inactive@example.com', status: 'inactive');
 
-        $this->login($superadmin->getEmail());
-
-        $crawler = $this->client->request('GET', '/admin/superadmin/admins');
-        $form    = $crawler
-            ->filter('form[action="/admin/superadmin/admins/' . $inactive->getId() . '/impersonate"]')
-            ->form();
+        $this->loginAsAdmin('imp_authz_test_super@example.com');
+        $crawler = $this->client->request('GET', '/admin/users');
+        $form = $crawler->filter(sprintf('form[action="/admin/users/%d/impersonate-start"]', $inactive->getId()))->form();
         $this->client->submit($form);
 
-        // Rejected fail-closed: bounced back to the admin list, NOT to the impersonated
-        // /admin/dashboard (the success target).
-        $this->assertResponseRedirects('/admin/superadmin/admins');
-
+        // Rejected fail-closed: bounced back to the Users list, not to the success target (/dashboard).
+        $this->assertResponseRedirects('/admin/users');
         $this->client->followRedirect();
-        // Still the superadmin: the ROLE_SUPER_ADMIN-only management page is reachable, so no
-        // switch to the inactive target happened.
         $this->assertResponseIsSuccessful();
+
         $content = (string) $this->client->getResponse()->getContent();
-        $this->assertStringNotContainsString('admin-impersonation-banner', $content);
-        $this->assertStringContainsString('cannot be impersonated', $content);
+        $this->assertStringNotContainsString('impersonation-banner', $content);
+        $this->assertStringContainsString('cannot be impersonated', $content, 'the refusal must be shown to the impersonator');
     }
 
-    // AC3/AC5: demoting a superadmin with a live session removes ROLE_SUPER_ADMIN on the next
-    // request (Admin::isEqualTo compares roles -> ContextListener deauthenticates the stale token).
-    public function testDemotingSuperadminDropsRoleInLiveSession(): void
+    // AC3/AC5: demoting an account with a live session takes the higher role away on its next request.
+    public function testDemotingTechSupportDropsTheRoleInTheLiveSession(): void
     {
-        // Two active superadmins so the anti-lockout guard does not block the demotion, and so
-        // the demoted one still has a live session to test.
-        $this->createAdmin('imp_authz_test_superA@example.com', ['ROLE_SUPER_ADMIN']);
-        $victim = $this->createAdmin('imp_authz_test_superB@example.com', ['ROLE_SUPER_ADMIN']);
-        $victimId = $victim->getId();
+        $this->loginAsEnrolledTechSupport('imp_authz_test_tech@example.com');
+        $this->client->request('GET', '/admin/db');
+        $this->assertResponseIsSuccessful('sanity: tech support reaches the tech-support-only console');
 
-        // The victim has a live superadmin session.
-        $this->login('imp_authz_test_superB@example.com');
-        $this->client->request('GET', '/admin/superadmin/admins');
-        $this->assertResponseIsSuccessful();
-
-        // Superadmin A demotes the victim to ROLE_ADMIN (persisted). Simulated via the entity
-        // manager to keep a single live session under test; the isEqualTo mechanism is identical
-        // regardless of which superadmin performed the edit.
-        $fresh = $this->em->getRepository(Admin::class)->find($victimId);
-        $fresh->setRoles(['ROLE_ADMIN']);
+        // Demoted to super admin (persisted) while the session is live.
+        $tech = $this->em->getRepository(User::class)->findOneBy(['email' => 'imp_authz_test_tech@example.com']);
+        $tech->setRoles(['ROLE_SUPER_ADMIN']);
         $this->em->flush();
         $this->em->clear();
 
-        // Next request on the victim's live session: the stale ROLE_SUPER_ADMIN token no longer
-        // matches the refreshed (now ROLE_ADMIN) user, so the token is deauthenticated and the
-        // ROLE_SUPER_ADMIN-only page is no longer authorized.
-        $this->client->request('GET', '/admin/superadmin/admins');
-        $this->assertResponseRedirects();
-        $this->assertStringContainsString('/admin/login', (string) $this->client->getResponse()->headers->get('Location'));
+        // The live session must no longer carry ROLE_TECH_SUPPORT: the console is refused (403) or the stale
+        // session is signed out (redirect to /login) — never served.
+        $this->client->request('GET', '/admin/db');
+        $status = $this->client->getResponse()->getStatusCode();
+        $this->assertNotSame(200, $status, 'a demoted account must not keep its old role in a live session');
+        $this->assertContains($status, [302, 403]);
     }
 }

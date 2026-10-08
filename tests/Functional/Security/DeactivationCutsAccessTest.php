@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Security;
 
-use App\Entity\Admin;
 use App\Entity\User;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
@@ -14,7 +13,8 @@ use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 /**
  * FEATURE-098 (review C3): deactivation and "logout everywhere" must actually cut access —
  * the remember-me cookie must stop re-authenticating, and a deactivated user's/admin's tokens
- * must be rejected on the stateless API firewalls.
+ * must be rejected on the stateless API firewall. Since ADR-068 an admin is a User with ROLE_ADMIN whose
+ * personal access token reaches /admin-api.
  */
 final class DeactivationCutsAccessTest extends WebTestCase
 {
@@ -41,8 +41,6 @@ final class DeactivationCutsAccessTest extends WebTestCase
     {
         try {
             $this->conn->executeStatement('DELETE FROM personal_access_tokens');
-            $this->conn->executeStatement('DELETE FROM admin_access_tokens');
-            $this->conn->executeStatement("DELETE FROM admin WHERE email LIKE 'deactadmin%@example.com'");
             $this->conn->executeStatement("DELETE FROM \"user\" WHERE email LIKE 'deact%@example.com'");
             $this->conn->executeStatement('DELETE FROM audit_log');
             $this->conn->executeStatement('DELETE FROM login_history');
@@ -59,7 +57,8 @@ final class DeactivationCutsAccessTest extends WebTestCase
         }
     }
 
-    private function createUser(string $email, string $status = 'active'): int
+    /** @param list<string> $roles */
+    private function createUser(string $email, string $status = 'active', array $roles = []): int
     {
         $user = new User();
         $user->setEmail($email);
@@ -67,6 +66,7 @@ final class DeactivationCutsAccessTest extends WebTestCase
         $user->setPassword(password_hash(self::PASSWORD, PASSWORD_BCRYPT, ['cost' => 4]));
         $user->setStatus($status);
         $user->setIsVerified(true);
+        $user->setRoles($roles);
         $this->em->persist($user);
         $this->em->flush();
         $this->em->clear();
@@ -89,30 +89,13 @@ final class DeactivationCutsAccessTest extends WebTestCase
 
     private function createAdmin(string $email, string $status = 'active'): int
     {
-        $admin = new Admin();
-        $admin->setEmail($email);
-        $admin->setName('Deact Admin');
-        $admin->setPassword(password_hash(self::PASSWORD, PASSWORD_BCRYPT, ['cost' => 4]));
-        $admin->setRoles(['ROLE_ADMIN']);
-        $admin->setStatus($status);
-        $this->em->persist($admin);
-        $this->em->flush();
-        $this->em->clear();
-
-        return (int) $this->conn->fetchOne('SELECT id FROM admin WHERE email = ?', [$email]);
+        return $this->createUser($email, $status, ['ROLE_ADMIN']);
     }
 
+    /** An admin's API token is an ordinary personal access token (ADR-068). */
     private function seedAdminToken(int $adminId): string
     {
-        $plaintext = bin2hex(random_bytes(32));
-        $this->conn->insert('admin_access_tokens', [
-            'admin_id'   => $adminId,
-            'name'       => 'Deact Admin Token',
-            'token_hash' => hash('sha256', $plaintext),
-            'created_at' => (new \DateTimeImmutable())->format('Y-m-d H:i:s'),
-        ]);
-
-        return $plaintext;
+        return $this->seedUserPat($adminId);
     }
 
     private function bearer(string $token): array
@@ -148,7 +131,7 @@ final class DeactivationCutsAccessTest extends WebTestCase
         $this->client->request('GET', '/admin-api/users', [], [], $this->bearer($token));
         $this->assertResponseStatusCodeSame(200);
 
-        $this->conn->executeStatement('UPDATE admin SET status = ? WHERE id = ?', ['inactive', $adminId]);
+        $this->conn->executeStatement('UPDATE "user" SET status = ? WHERE id = ?', ['inactive', $adminId]);
 
         $this->client->request('GET', '/admin-api/users', [], [], $this->bearer($token));
         $this->assertResponseStatusCodeSame(401, 'A deactivated admin token must be rejected on /admin-api');

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Admin;
 
-use App\Entity\Admin;
+use App\Entity\User;
 use App\Tests\Support\AuthenticationTestTrait;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
@@ -35,7 +35,7 @@ final class SuperadminRoleTest extends WebTestCase
     private function cleanUp(): void
     {
         foreach (['superadmin-f13@example.com', 'regularadmin-f13@example.com'] as $email) {
-            $admin = $this->em->getRepository(Admin::class)->findOneBy(['email' => $email]);
+            $admin = $this->em->getRepository(User::class)->findOneBy(['email' => $email]);
             if ($admin) {
                 $this->em->remove($admin);
                 $this->em->flush();
@@ -47,17 +47,16 @@ final class SuperadminRoleTest extends WebTestCase
     {
         $hasher = self::getContainer()->get(UserPasswordHasherInterface::class);
 
-        $superAdmin = new Admin();
+        $superAdmin = (new User())->setRoles(['ROLE_ADMIN']);
         $superAdmin->setEmail('superadmin-f13@example.com');
         $superAdmin->setName('Super Admin F13');
         $superAdmin->setRoles(['ROLE_SUPER_ADMIN']);
         $superAdmin->setPassword($hasher->hashPassword($superAdmin, 'superpassword'));
         $this->em->persist($superAdmin);
 
-        $regularAdmin = new Admin();
+        $regularAdmin = (new User())->setRoles(['ROLE_ADMIN']);
         $regularAdmin->setEmail('regularadmin-f13@example.com');
         $regularAdmin->setName('Regular Admin F13');
-        $regularAdmin->setRoles([]);
         $regularAdmin->setPassword($hasher->hashPassword($regularAdmin, 'adminpassword'));
         $this->em->persist($regularAdmin);
 
@@ -75,26 +74,10 @@ final class SuperadminRoleTest extends WebTestCase
         $this->assertResponseIsSuccessful();
     }
 
-    public function testSuperAdminCanAccessSuperAdminOnlyRoute(): void
-    {
-        $this->loginAsAdmin('superadmin-f13@example.com', 'superpassword', false);
-        $this->client->request('GET', '/admin/superadmin');
-        $this->assertResponseIsSuccessful();
-    }
-
-    public function testRegularAdminCannotAccessSuperAdminOnlyRouteAndGets403(): void
-    {
-        $this->loginAsAdmin('regularadmin-f13@example.com', 'adminpassword', false);
-        $this->assertResponseStatusCodeSame(302);
-
-        $this->client->request('GET', '/admin/superadmin');
-        $this->assertResponseStatusCodeSame(403);
-    }
-
     public function testRoleHierarchySuperAdminInheritsAdminPrivileges(): void
     {
         // Superadmin entity has ROLE_SUPER_ADMIN in roles
-        $superAdmin = $this->em->getRepository(Admin::class)->findOneBy(['email' => 'superadmin-f13@example.com']);
+        $superAdmin = $this->em->getRepository(User::class)->findOneBy(['email' => 'superadmin-f13@example.com']);
         $this->assertNotNull($superAdmin);
         $this->assertContains('ROLE_SUPER_ADMIN', $superAdmin->getRoles());
 

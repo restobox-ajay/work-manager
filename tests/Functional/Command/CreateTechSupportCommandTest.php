@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Command;
 
-use App\Repository\AdminRepository;
+use App\Repository\UserRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
@@ -17,13 +17,13 @@ use Symfony\Component\Console\Tester\CommandTester;
 final class CreateTechSupportCommandTest extends KernelTestCase
 {
     private EntityManagerInterface $em;
-    private AdminRepository $adminRepo;
+    private UserRepository $userRepo;
 
     protected function setUp(): void
     {
         self::bootKernel();
         $this->em = self::getContainer()->get(EntityManagerInterface::class);
-        $this->adminRepo = self::getContainer()->get(AdminRepository::class);
+        $this->userRepo = self::getContainer()->get(UserRepository::class);
         $this->cleanUp();
     }
 
@@ -35,7 +35,7 @@ final class CreateTechSupportCommandTest extends KernelTestCase
 
     private function cleanUp(): void
     {
-        $admin = $this->adminRepo->findByEmail('cmd-techsupport@example.com');
+        $admin = $this->userRepo->findByEmail('cmd-techsupport@example.com');
         if ($admin) {
             $this->em->remove($admin);
             $this->em->flush();
@@ -56,10 +56,10 @@ final class CreateTechSupportCommandTest extends KernelTestCase
         $exit = $tester->execute(['--email' => 'cmd-techsupport@example.com']);
 
         self::assertSame(0, $exit);
-        self::assertStringContainsString('Tech-support admin created.', $tester->getDisplay());
+        self::assertStringContainsString('Tech-support account created successfully.', $tester->getDisplay());
         self::assertStringContainsString('Auto-generated password:', $tester->getDisplay());
 
-        $admin = $this->adminRepo->findByEmail('cmd-techsupport@example.com');
+        $admin = $this->userRepo->findByEmail('cmd-techsupport@example.com');
         self::assertNotNull($admin);
         self::assertContains('ROLE_TECH_SUPPORT', $admin->getRoles());
         self::assertTrue($admin->isActive());

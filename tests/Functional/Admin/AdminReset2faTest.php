@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Admin;
 
-use App\Entity\Admin;
 use App\Entity\User;
 use App\Tests\Support\AuthenticationTestTrait;
 use App\Tests\Support\TwoFactorTestTrait;
@@ -27,14 +26,13 @@ final class AdminReset2faTest extends WebTestCase
 
         $this->cleanup();
 
-        $admin = new Admin();
+        $admin = (new User())->setRoles(['ROLE_ADMIN']);
         $admin->setEmail('reset2fa-admin@example.com');
         $admin->setName('Reset2fa Admin');
         $admin->setPassword(self::hashTestPassword('adminpass'));
-        $admin->setRoles([]);
         $this->em->persist($admin);
 
-        $superAdmin = new Admin();
+        $superAdmin = (new User())->setRoles(['ROLE_ADMIN']);
         $superAdmin->setEmail('reset2fa-superadmin@example.com');
         $superAdmin->setName('Reset2fa SuperAdmin');
         $superAdmin->setPassword(self::hashTestPassword('superpass'));
@@ -59,7 +57,7 @@ final class AdminReset2faTest extends WebTestCase
             $conn->executeStatement("DELETE FROM \"user\" WHERE email LIKE 'reset2fa-%@example.com'");
             $conn->executeStatement("DELETE FROM config WHERE config_key = '2fa.enforcement'");
             foreach (['reset2fa-admin@example.com', 'reset2fa-superadmin@example.com'] as $email) {
-                $admin = $this->em->getRepository(Admin::class)->findOneBy(['email' => $email]);
+                $admin = $this->em->getRepository(User::class)->findOneBy(['email' => $email]);
                 if ($admin) {
                     $this->em->remove($admin);
                     $this->em->flush();
@@ -90,7 +88,7 @@ final class AdminReset2faTest extends WebTestCase
 
     private function loginAsSuperAdmin(): void
     {
-        $this->client->request('GET', '/admin/login');
+        $this->client->request('GET', '/login');
         $this->client->submitForm('Sign in', [
             'email'    => 'reset2fa-superadmin@example.com',
             'password' => 'superpass',
@@ -142,16 +140,17 @@ final class AdminReset2faTest extends WebTestCase
         $user = $this->createUser('reset2fa-enforce@example.com', [], true);
         $id   = $user->getId();
 
-        // Set enforcement to required
-        $this->em->getConnection()->executeStatement(
-            "REPLACE INTO config (config_key, config_value) VALUES ('2fa.enforcement', 'required')"
-        );
-
         $this->loginAsAdmin('reset2fa-admin@example.com');
         $this->submitReset2faForm($id);
         $this->assertResponseRedirects('/admin/users');
 
-        // Log in as the user on the user firewall (same client; firewalls use separate session keys)
+        // Set enforcement to required only now: since ADR-068 it binds the (unenrolled) admin too.
+        $this->em->getConnection()->executeStatement(
+            "REPLACE INTO config (config_key, config_value) VALUES ('2fa.enforcement', 'required')"
+        );
+
+        // Log in as the user in their own browser (one firewall since ADR-068)
+        $this->client->getCookieJar()->clear();
         $this->client->request('GET', '/login');
         $this->client->submitForm('Sign in', [
             'email'    => 'reset2fa-enforce@example.com',

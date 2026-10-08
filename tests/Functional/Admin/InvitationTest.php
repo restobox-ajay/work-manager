@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Admin;
 
-use App\Entity\Admin;
+use App\Entity\User;
 use App\Tests\Support\AuthenticationTestTrait;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
@@ -45,7 +45,7 @@ final class InvitationTest extends WebTestCase
             $this->em->getConnection()->executeStatement(
                 "DELETE FROM config WHERE config_key = 'registration.mode'"
             );
-            $admin = $this->em->getRepository(Admin::class)->findOneBy(['email' => 'invite-admin@example.com']);
+            $admin = $this->em->getRepository(User::class)->findOneBy(['email' => 'invite-admin@example.com']);
             if ($admin) {
                 $this->em->remove($admin);
                 $this->em->flush();

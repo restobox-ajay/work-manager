@@ -9,10 +9,6 @@ use App\Service\ConfigService;
 use App\Session\ConfigAwarePdoSessionHandler;
 use App\Session\SessionTtlResolver;
 use PHPUnit\Framework\TestCase;
-use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\HttpFoundation\RequestStack;
-use Symfony\Component\HttpFoundation\Session\Session;
-use Symfony\Component\HttpFoundation\Session\Storage\MockArraySessionStorage;
 
 /**
  * ADR-051 end-to-end: proves the resolved TTL actually reaches the `sessions` row, against the real
@@ -37,7 +33,7 @@ final class ConfigAwarePdoSessionHandlerTest extends TestCase
     }
 
     /** @param array<string,string> $config */
-    private function handler(array $config, bool $longSession): ConfigAwarePdoSessionHandler
+    private function handler(array $config): ConfigAwarePdoSessionHandler
     {
         $configService = new class ($config) extends ConfigService {
             /** @param array<string,string> $values */
@@ -49,20 +45,9 @@ final class ConfigAwarePdoSessionHandlerTest extends TestCase
             }
         };
 
-        $request = Request::create('/admin/dashboard');
-        $session = new Session(new MockArraySessionStorage());
-        $session->start();
-        if ($longSession) {
-            $session->set(SessionTtlResolver::LONG_SESSION_KEY, true);
-        }
-        $request->setSession($session);
-
-        $stack = new RequestStack();
-        $stack->push($request);
-
         return new ConfigAwarePdoSessionHandler(
             $this->pdo,
-            new SessionTtlResolver($configService, $stack),
+            new SessionTtlResolver($configService),
             ['db_table' => 'sessions', 'lock_mode' => 0],
         );
     }
@@ -81,34 +66,22 @@ final class ConfigAwarePdoSessionHandlerTest extends TestCase
         return (int) $stmt->fetchColumn();
     }
 
-    public function testBaselineSessionGetsTheIdleWindow(): void
+    public function testDefaultSessionGetsTheIdleWindow(): void
     {
         $before = time();
-        $expiry = $this->writeAndReadExpiry($this->handler([], false), 'baseline');
+        $expiry = $this->writeAndReadExpiry($this->handler([]), 'baseline');
 
         // 3 hours, not PHP's 24-minute default.
         self::assertGreaterThanOrEqual($before + (180 * 60), $expiry);
         self::assertLessThanOrEqual(time() + (180 * 60) + 5, $expiry);
     }
 
-    public function testRememberedSessionGetsTheLongWindow(): void
+    public function testConfiguredIdleLifetimeIsHonoured(): void
     {
         $before = time();
-        $expiry = $this->writeAndReadExpiry($this->handler([], true), 'remembered');
+        $expiry = $this->writeAndReadExpiry($this->handler(['session.idle_lifetime_minutes' => '45']), 'configured');
 
-        self::assertGreaterThanOrEqual($before + (21 * 86400), $expiry);
-        self::assertLessThanOrEqual(time() + (21 * 86400) + 5, $expiry);
-    }
-
-    public function testConfiguredLifetimeIsHonoured(): void
-    {
-        $before = time();
-        $expiry = $this->writeAndReadExpiry(
-            $this->handler(['session.remember_me_lifetime_days' => '2'], true),
-            'configured',
-        );
-
-        self::assertGreaterThanOrEqual($before + (2 * 86400), $expiry);
-        self::assertLessThanOrEqual(time() + (2 * 86400) + 5, $expiry);
+        self::assertGreaterThanOrEqual($before + (45 * 60), $expiry);
+        self::assertLessThanOrEqual(time() + (45 * 60) + 5, $expiry);
     }
 }

@@ -131,7 +131,7 @@ final class SecurityBundleCest
         $I->seeUserNotLocked($userId);
 
         // End the admin session, then the previously-locked user logs in successfully.
-        $I->amOnPage('/admin/logout');
+        $I->amOnPage('/logout');
         $I->loginAsUser('unlockme@example.com', 'password123');
         $I->seeCurrentUrlEquals('/dashboard');
     }

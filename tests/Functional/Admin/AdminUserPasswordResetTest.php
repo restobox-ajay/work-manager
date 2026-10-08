@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Admin;
 
-use App\Entity\Admin;
 use App\Entity\PasswordResetToken;
 use App\Entity\User;
 use App\Tests\Support\AuthenticationTestTrait;
@@ -26,11 +25,10 @@ final class AdminUserPasswordResetTest extends WebTestCase
 
         $this->cleanup();
 
-        $admin = new Admin();
+        $admin = (new User())->setRoles(['ROLE_ADMIN']);
         $admin->setEmail('pwreset-admin@example.com');
         $admin->setName('Reset Admin');
         $admin->setPassword(self::hashTestPassword('adminpass'));
-        $admin->setRoles([]);
         $this->em->persist($admin);
 
         $this->em->flush();
@@ -49,8 +47,8 @@ final class AdminUserPasswordResetTest extends WebTestCase
             $conn = $this->em->getConnection();
             $conn->executeStatement("DELETE FROM \"user\" WHERE email LIKE 'pwreset-%@example.com'");
             $conn->executeStatement("DELETE FROM password_reset_tokens WHERE email LIKE 'pwreset-%@example.com'");
-            $conn->executeStatement("DELETE FROM audit_log WHERE actor = 'pwreset-admin@example.com'");
-            $admin = $this->em->getRepository(Admin::class)->findOneBy(['email' => 'pwreset-admin@example.com']);
+            $conn->executeStatement("DELETE FROM audit_log WHERE actor LIKE 'pwreset-%@example.com'");
+            $admin = $this->em->getRepository(User::class)->findOneBy(['email' => 'pwreset-admin@example.com']);
             if ($admin) {
                 $this->em->remove($admin);
                 $this->em->flush();
@@ -124,5 +122,28 @@ final class AdminUserPasswordResetTest extends WebTestCase
         );
 
         $this->assertSame($before + 1, $after, 'An audit log entry with action=admin.user_password_reset and actor_type=admin should be created.');
+    }
+
+    // ADR-068: the superadmin "reset this admin's password" action is now the same Users action, gated by
+    // AccountManagementPolicy: a super admin may send it to an admin; a plain admin gets the hidden-account 404.
+    public function testSuperAdminSendsAResetLinkToAnAdminButAPlainAdminCannot(): void
+    {
+        $target = $this->createTestUser('pwreset-target-admin@example.com', 'Target Admin', 'userpass', roles: ['ROLE_ADMIN']);
+        $this->createTestUser('pwreset-super@example.com', 'Super', 'adminpass', roles: ['ROLE_SUPER_ADMIN']);
+
+        $this->loginAsAdmin('pwreset-admin@example.com');
+        $this->client->request('POST', '/admin/users/' . $target->getId() . '/password-reset', ['_token' => 'irrelevant']);
+        $this->assertResponseStatusCodeSame(404);
+
+        $this->client->getCookieJar()->clear();
+        $this->loginAsAdmin('pwreset-super@example.com');
+        $this->submitPasswordResetForm((int) $target->getId());
+        $this->assertResponseRedirects('/admin/users');
+
+        $this->em->clear();
+        $this->assertNotNull(
+            $this->em->getRepository(PasswordResetToken::class)->findOneBy(['email' => 'pwreset-target-admin@example.com']),
+            'the admin receives a reset token',
+        );
     }
 }

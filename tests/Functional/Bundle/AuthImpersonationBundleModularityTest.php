@@ -6,11 +6,12 @@ namespace App\Tests\Functional\Bundle;
 
 use App\Bundle\AuthImpersonation\AuthImpersonationBundle;
 use App\Bundle\AuthImpersonation\Config\ImpersonateConfigPage;
-use App\Bundle\AuthImpersonation\Security\ImpersonationAuthenticator;
+use App\Bundle\AuthImpersonation\Service\ImpersonationManager;
 use App\Config\ConfigPageRegistry;
 use App\Kernel;
-use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
+use Symfony\Component\Routing\Exception\ResourceNotFoundException;
+use Symfony\Component\Routing\RequestContext;
 
 /**
  * The REAL modularity guarantee for auth-impersonate-bundle (FEATURE-142 AC3): with the bundle
@@ -23,10 +24,10 @@ use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
  */
 final class AuthImpersonationBundleModularityTest extends WebTestCase
 {
+    // ADR-068: one firewall, one flow — start from the Users page, exit from anywhere.
     private const IMPERSONATE_ROUTES = [
-        'app_impersonate_start',
+        'app_admin_users_impersonate_start',
         'app_impersonate_exit',
-        'app_admin_impersonate_admin_exit',
     ];
 
     public function testImpersonateRoutesServicesAndConfigPageExistWhenBundleRegistered(): void
@@ -40,8 +41,8 @@ final class AuthImpersonationBundleModularityTest extends WebTestCase
         }
 
         self::assertTrue(
-            $container->has(ImpersonationAuthenticator::class),
-            'The impersonation authenticator service must exist when the bundle is registered.'
+            $container->has(ImpersonationManager::class),
+            'The impersonation manager service must exist when the bundle is registered.'
         );
 
         // Behavioural proof that the admin /config sub-page is registered via
@@ -72,8 +73,8 @@ final class AuthImpersonationBundleModularityTest extends WebTestCase
             }
 
             self::assertFalse(
-                $container->has(ImpersonationAuthenticator::class),
-                'The impersonation authenticator service must be absent when the bundle is not registered.'
+                $container->has(ImpersonationManager::class),
+                'The impersonation manager service must be absent when the bundle is not registered.'
             );
 
             // The config sub-page provider is gone: with the bundle unregistered its
@@ -89,11 +90,19 @@ final class AuthImpersonationBundleModularityTest extends WebTestCase
                 'The impersonate config sub-page provider must be absent when the bundle is not registered.'
             );
 
-            // The route is gone, so the request falls through to a genuine 404 (the user firewall's
-            // access_control permits ^/impersonate/start$ as PUBLIC_ACCESS, then routing 404s).
-            $browser = new KernelBrowser($kernel);
-            $browser->request('GET', '/impersonate/start');
-            self::assertSame(404, $browser->getResponse()->getStatusCode());
+            // The paths themselves no longer route (a genuine 404, not a 405/403 from a route that is still there).
+            // Asserted on the matcher: both paths sit behind sign-in, so an anonymous request would only show the
+            // login redirect, never the routing outcome.
+            $router = $container->get('router');
+            foreach (['/admin/users/1/impersonate-start', '/impersonate/exit'] as $path) {
+                $router->setContext(new RequestContext(method: 'POST'));
+                try {
+                    $router->match($path);
+                    self::fail("$path must not route when auth-impersonate-bundle is not registered.");
+                } catch (ResourceNotFoundException) {
+                    $this->addToAssertionCount(1);
+                }
+            }
         } finally {
             $kernel->shutdown();
         }

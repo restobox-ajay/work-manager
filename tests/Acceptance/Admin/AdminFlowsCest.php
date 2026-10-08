@@ -19,7 +19,11 @@ class AdminFlowsCest
 
         $I->loginAsAdmin('admin@example.com', 'password123');
 
-        $I->seeCurrentUrlEquals('/admin/dashboard');
+        // One login for everyone (ADR-068): an admin lands on the shared dashboard's manager view and
+        // can then reach the admin area.
+        $I->seeCurrentUrlEquals('/dashboard');
+        $I->see('Dashboard', 'h1');
+        $I->amOnPage('/admin/dashboard');
         $I->see('Admin Dashboard', 'h1');
     }
 
@@ -27,7 +31,7 @@ class AdminFlowsCest
     {
         $I->amOnPage('/admin/users');
 
-        $I->seeCurrentUrlEquals('/admin/login');
+        $I->seeCurrentUrlEquals('/login');
     }
 
     public function adminCanCreateUserAndItAppearsInList(AcceptanceTester $I): void
@@ -116,7 +120,7 @@ class AdminFlowsCest
         $I->amOnPage('/admin/audit-log');
 
         $I->seeResponseCodeIs(200);
-        $I->see('Audit Log', 'h1');
+        $I->see('Activity Log', 'h1');
     }
 
     public function adminCanSendInvitation(AcceptanceTester $I): void

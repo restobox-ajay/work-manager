@@ -12,9 +12,9 @@ use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 
 /**
- * The admin "API Docs" page and the OpenAPI document it renders (ADR-060). Open to EVERY admin class —
- * any admin role can be issued an admin API token — and to nobody else; the spec is served through the
- * gated route, not as a static file, so the API description is not public.
+ * The admin "API Docs" page and the OpenAPI document it renders (ADR-060). Open to EVERY admin class and to
+ * nobody else; the spec is served through the gated route, not as a static file, so the API description is not
+ * public. Since ADR-068 there is one login (/login) and the admin API uses the users' personal access tokens.
  */
 final class ApiDocsPageTest extends WebTestCase
 {
@@ -39,10 +39,8 @@ final class ApiDocsPageTest extends WebTestCase
     private function cleanup(): void
     {
         $conn = $this->em->getConnection();
-        $conn->executeStatement("DELETE FROM admin WHERE email LIKE 'apidocs-%@example.com'");
         $conn->executeStatement("DELETE FROM \"user\" WHERE email LIKE 'apidocs-%@example.com'");
         $conn->executeStatement('DELETE FROM endpoint_rate_limits');
-        $conn->executeStatement('DELETE FROM admin_sessions');
         $this->em->clear();
     }
 
@@ -80,7 +78,7 @@ final class ApiDocsPageTest extends WebTestCase
         self::assertSelectorExists('script[src="/vendor/swagger-ui/swagger-initializer.js"]');
         self::assertSelectorExists('aside.sidebar a[href="/admin/api-docs"]', 'the nav must link to the docs');
         self::assertSelectorTextContains('.warning', 'real requests');
-        self::assertStringContainsString('app:admin:create-api-token', (string) $this->client->getResponse()->getContent(), 'the page must say how to get a token');
+        self::assertSelectorExists('a[href="/account/tokens"]', 'the page must say how to get a token: the account\'s own API Tokens page');
     }
 
     #[DataProvider('adminClasses')]
@@ -154,13 +152,13 @@ final class ApiDocsPageTest extends WebTestCase
         return $ops;
     }
 
-    public function testAnonymousVisitorsAreSentToTheAdminLoginForBothRoutes(): void
+    public function testAnonymousVisitorsAreSentToTheLoginForBothRoutes(): void
     {
         $this->client->request('GET', '/admin/api-docs');
-        self::assertResponseRedirects('/admin/login');
+        self::assertResponseRedirects('/login');
 
         $this->client->request('GET', '/admin/api-docs/openapi.json');
-        self::assertResponseRedirects('/admin/login');
+        self::assertResponseRedirects('/login');
     }
 
     public function testAnOrdinaryUserCannotReadTheApiDocs(): void
@@ -168,11 +166,12 @@ final class ApiDocsPageTest extends WebTestCase
         $this->createTestUser('apidocs-user@example.com', password: 'userpass');
         $this->loginUser('apidocs-user@example.com', 'userpass', followRedirect: true);
 
+        // Signed in but without an admin role: access denied, not a login bounce.
         $this->client->request('GET', '/admin/api-docs');
-        self::assertResponseRedirects('/admin/login');
+        self::assertResponseStatusCodeSame(403);
 
         $this->client->request('GET', '/admin/api-docs/openapi.json');
-        self::assertResponseRedirects('/admin/login');
+        self::assertResponseStatusCodeSame(403);
     }
 
     public function testTheVendoredSwaggerUiIsPresentWithItsLicenceAndABootScriptThatHardCodesNoRoute(): void

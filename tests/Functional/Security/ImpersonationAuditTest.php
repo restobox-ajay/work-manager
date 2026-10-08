@@ -37,7 +37,6 @@ final class ImpersonationAuditTest extends WebTestCase
         try {
             $conn = $this->em->getConnection();
             $conn->executeStatement("DELETE FROM \"user\" WHERE email LIKE 'impaudit_%'");
-            $conn->executeStatement("DELETE FROM admin WHERE email = 'impaudit_admin@example.com'");
             $conn->executeStatement("DELETE FROM audit_log WHERE actor = 'impaudit_admin@example.com'");
             $this->em->clear();
         } catch (\Throwable) {
@@ -94,9 +93,7 @@ final class ImpersonationAuditTest extends WebTestCase
         $this->loginAsAdmin('impaudit_admin@example.com');
         $this->doImpersonate((int) $user->getId());
 
-        // Follow redirect chain to reach /dashboard as impersonated user
-        $this->client->followRedirect(); // to /impersonate/start → authenticator runs → /dashboard
-        $this->client->followRedirect(); // to /dashboard
+        $this->client->followRedirect(); // to /dashboard, now acting as the impersonated user
 
         $conn        = $this->em->getConnection();
         $countBefore = (int) $conn->fetchOne(
@@ -132,21 +129,16 @@ final class ImpersonationAuditTest extends WebTestCase
         $this->loginAsAdmin('impaudit_admin@example.com');
         $this->doImpersonate((int) $user->getId());
 
-        // Re-login as admin to access the audit log (impersonation switches to user firewall).
-        // Log out the admin firewall first so GET /admin/login isn't bounced by the
-        // already-authenticated redirect.
-        $this->client->request('GET', '/admin/logout');
-        $this->client->request('GET', '/admin/login');
-        $this->client->submitForm('Sign in', [
-            'email'    => 'impaudit_admin@example.com',
-            'password' => 'adminpass',
-        ]);
+        // While impersonating a plain user the browser has no admin access; exiting restores the admin.
         $this->client->followRedirect();
+        $this->client->submit($this->client->getCrawler()->filter('form[action="/impersonate/exit"]')->form());
+        $this->assertResponseRedirects('/admin/users');
 
         $this->client->request('GET', '/admin/audit-log');
         $this->assertResponseIsSuccessful();
 
         $content = (string) $this->client->getResponse()->getContent();
         $this->assertStringContainsString('admin.impersonate_start', $content);
+        $this->assertStringContainsString('admin.impersonate_exit', $content);
     }
 }

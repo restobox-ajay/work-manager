@@ -62,7 +62,7 @@ final class PasswordExpiryTest extends WebTestCase
     {
         $this->conn->executeStatement("DELETE FROM password_meta WHERE user_id IN (SELECT id FROM \"user\" WHERE email = 'expirytest_target@example.com')");
         $this->conn->executeStatement("DELETE FROM \"user\" WHERE email = 'expirytest_target@example.com'");
-        $this->conn->executeStatement("DELETE FROM admin WHERE email = 'expirytest_admin@example.com'");
+        $this->conn->executeStatement("DELETE FROM \"user\" WHERE email = 'expirytest_admin@example.com'");
 
         try {
             $user = $this->em->getRepository(User::class)->findOneBy(['email' => 'expirytest@example.com']);
@@ -161,8 +161,7 @@ final class PasswordExpiryTest extends WebTestCase
         $this->loginAsAdmin('expirytest_admin@example.com');
         $crawler = $this->client->request('GET', '/admin/users');
         $this->client->submit($crawler->filter('form[action="/admin/users/' . $target->getId() . '/impersonate-start"]')->form());
-        $this->client->followRedirect(); // /impersonate/start -> /dashboard
-        $this->client->followRedirect();
+        $this->client->followRedirect(); // -> /dashboard, as the (expired) target: the skip applies to it
         $this->assertResponseIsSuccessful();
         $this->assertRouteSame('app_dashboard');
         $this->assertSelectorExists('.impersonation-banner');

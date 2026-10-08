@@ -4,39 +4,30 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Security;
 
-use App\Entity\Admin;
-use App\Entity\User;
 use App\Tests\Support\AuthenticationTestTrait;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
-use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 /**
- * FEATURE-092 — audit of the remaining ROLE_ADMIN / ROLE_SUPER_ADMIN usages.
+ * FEATURE-092, re-based on ADR-068 — the role boundary of the one `user` firewall.
  *
- * After FEATURE-081 admin authorization is entity-based: the `admin` (^/admin)
- * and `admin_api` (^/admin-api) firewalls authenticate Admin entities; the
- * `user` firewall authenticates User entities. These tests lock in the
- * invariants the audit (.agent/ROLE_AUDIT_092.md) confirmed, complementing
- * AdminApiBoundaryTest (which already covers the /admin-api boundary):
+ * Since ADR-068 an admin is a User holding ROLE_ADMIN (or above), so the boundary is the role ladder
+ * (ROLE_USER < ROLE_ADMIN < ROLE_SUPER_ADMIN < ROLE_TECH_SUPPORT) rather than a separate entity/firewall:
  *
- *   - The web ^/admin boundary does NOT grant access off a *User's* role string,
- *     even when the user's roles column is force-injected with admin roles.
- *   - The sidebar nav is keyed off the authenticated entity (instanceof), not a
- *     role string, so a user never sees the admin nav.
- *   - is_granted('ROLE_SUPER_ADMIN') in _admin_nav reflects the authenticated
- *     Admin's actual identity (regular admin vs superadmin).
+ *   - a plain user cannot reach the ^/admin area and is not shown the admin menu;
+ *   - a role string outside the ladder (e.g. one injected straight into the roles column) grants nothing;
+ *   - an admin sees the admin menu but not the tech-support-only tools (DB console, Htaccess Lock),
+ *     which are refused to them; tech support sees and reaches them.
  */
 final class RoleBoundaryAuditTest extends WebTestCase
 {
     use AuthenticationTestTrait;
 
-    private const USER_EMAIL        = 'audit092_user@example.com';
-    private const ADMIN_EMAIL       = 'audit092_admin@example.com';
-    private const SUPERADMIN_EMAIL  = 'audit092_superadmin@example.com';
-    private const PASSWORD          = 'testpassword';
+    private const USER_EMAIL  = 'audit092_user@example.com';
+    private const ADMIN_EMAIL = 'audit092_admin@example.com';
+    private const TECH_EMAIL  = 'audit092_tech@example.com';
 
     private KernelBrowser $client;
     private EntityManagerInterface $em;
@@ -58,154 +49,89 @@ final class RoleBoundaryAuditTest extends WebTestCase
 
     private function cleanup(): void
     {
-        try {
-            $this->conn->executeStatement(
-                'DELETE FROM "user" WHERE email = ?',
-                [self::USER_EMAIL]
-            );
-            $this->conn->executeStatement(
-                'DELETE FROM admin WHERE email IN (?, ?)',
-                [self::ADMIN_EMAIL, self::SUPERADMIN_EMAIL]
-            );
-        } catch (\Throwable) {
-        }
-    }
-
-    /**
-     * Create a User, then force-inject admin roles directly at the DB level,
-     * bypassing User::setRoles()'s allowlist (worst case / simulated injection).
-     */
-    private function createUserWithInjectedAdminRoles(): void
-    {
-        $hasher = self::getContainer()->get(UserPasswordHasherInterface::class);
-
-        $user = new User();
-        $user->setEmail(self::USER_EMAIL);
-        $user->setName('Audit User');
-        $user->setPassword($hasher->hashPassword($user, self::PASSWORD));
-        $this->em->persist($user);
-        $this->em->flush();
-        $id = (int) $user->getId();
-        $this->em->clear();
-
         $this->conn->executeStatement(
-            'UPDATE "user" SET roles = ? WHERE id = ?',
-            ['["ROLE_ADMIN","ROLE_SUPER_ADMIN"]', $id]
+            'DELETE FROM "user" WHERE email IN (?, ?, ?)',
+            [self::USER_EMAIL, self::ADMIN_EMAIL, self::TECH_EMAIL]
         );
     }
 
-    private function createAdmin(string $email, array $roles): void
+    public function testPlainUserCannotReachTheAdminArea(): void
     {
-        $hasher = self::getContainer()->get(UserPasswordHasherInterface::class);
+        $this->createTestUser(self::USER_EMAIL);
+        $this->loginUser(self::USER_EMAIL);
 
-        $admin = new Admin();
-        $admin->setEmail($email);
-        $admin->setName('Audit Admin');
-        $admin->setRoles($roles);
-        $admin->setPassword($hasher->hashPassword($admin, self::PASSWORD));
-        $this->em->persist($admin);
-        $this->em->flush();
-        $this->em->clear();
-    }
+        $this->client->request('GET', '/dashboard');
+        $this->assertResponseIsSuccessful('sanity: the user is signed in');
 
-    private function loginAdmin(string $email): void
-    {
-        $this->client->request('GET', '/admin/login');
-        $this->client->submitForm('Sign in', [
-            'email'    => $email,
-            'password' => self::PASSWORD,
-        ]);
+        $this->client->request('GET', '/admin/dashboard');
+        $this->assertResponseStatusCodeSame(403);
+        $this->client->request('GET', '/admin/users');
+        $this->assertResponseStatusCodeSame(403);
     }
 
     /**
-     * AC2/AC3: a User authenticated on the user firewall — even with DB-injected
-     * admin roles — cannot reach the web admin area. The ^/admin access_control
-     * is enforced inside the admin firewall, whose token is empty here; the
-     * user's role string does not apply across the firewall boundary.
+     * A role string outside the ladder — written straight into the roles column, bypassing
+     * User::setRoles()'s allowlist (worst case / simulated injection) — is not in role_hierarchy and grants
+     * nothing.
      */
-    public function testUserWithInjectedAdminRoleCannotAccessAdminWeb(): void
+    public function testRoleStringOutsideTheLadderGrantsNoAdminAccess(): void
     {
-        $this->createUserWithInjectedAdminRoles();
+        $user = $this->createTestUser(self::USER_EMAIL);
+        $this->conn->executeStatement(
+            'UPDATE "user" SET roles = ? WHERE id = ?',
+            ['["ROLE_GOD","ROLE_ADMINISTRATOR","ROLE_ALLOWED_TO_SWITCH"]', $user->getId()]
+        );
         $this->loginUser(self::USER_EMAIL);
 
-        // Sanity: the user IS authenticated on the user firewall.
+        $this->client->request('GET', '/admin/dashboard');
+        $this->assertResponseStatusCodeSame(403);
+    }
+
+    public function testPlainUserSeesTheAccountMenuButNotTheAdminMenu(): void
+    {
+        $this->createTestUser(self::USER_EMAIL);
+        $this->loginUser(self::USER_EMAIL);
+
         $this->client->request('GET', '/dashboard');
         $this->assertResponseIsSuccessful();
 
-        // ...but the admin firewall does not recognize that identity.
-        $this->client->request('GET', '/admin/dashboard');
-        $this->assertResponseStatusCodeSame(302);
-        $this->assertResponseRedirects();
-        $this->assertStringContainsString(
-            '/admin/login',
-            (string) $this->client->getResponse()->headers->get('Location')
-        );
-
-        // Same for an admin user-management route.
-        $this->client->request('GET', '/admin/users');
-        $this->assertResponseStatusCodeSame(302);
-        $this->assertStringContainsString(
-            '/admin/login',
-            (string) $this->client->getResponse()->headers->get('Location')
-        );
-    }
-
-    /**
-     * AC3: the sidebar follows the authenticated entity, not a role string. A
-     * user with injected admin roles, on a user page, sees the USER nav and not
-     * the admin nav.
-     */
-    public function testUserWithInjectedAdminRoleSeesUserNavNotAdminNav(): void
-    {
-        $this->createUserWithInjectedAdminRoles();
-        $this->loginUser(self::USER_EMAIL);
-
-        $crawler = $this->client->request('GET', '/dashboard');
-        $this->assertResponseIsSuccessful();
-
-        $html = $this->client->getResponse()->getContent() ?: '';
-
-        // Admin nav markers must be absent.
-        $this->assertStringNotContainsString('Admin Panel', $html);
         $this->assertSelectorNotExists('a[href="/admin/config"]');
         $this->assertSelectorNotExists('a[href="/admin/audit-log"]');
-
-        // User nav markers must be present (proves the user nav rendered).
-        $this->assertSelectorExists('a[href="/account/tokens"]');
+        $this->assertSelectorNotExists('a[href="/admin/users"]');
+        // The account menu rendered, so the absences above are real.
+        $this->assertSelectorExists('a[href="/account/settings"]');
     }
 
-    /**
-     * A regular Admin (ROLE_ADMIN only) sees the admin nav but NOT the
-     * superadmin-only section — proves is_granted('ROLE_SUPER_ADMIN') in
-     * _admin_nav reflects the Admin's real identity (negative case).
-     */
-    public function testRegularAdminSeesNoSuperadminNavLink(): void
+    public function testAdminSeesTheAdminMenuButNotTheTechSupportTools(): void
     {
-        $this->createAdmin(self::ADMIN_EMAIL, []);
-        $this->loginAdmin(self::ADMIN_EMAIL);
+        $this->createTestAdmin(self::ADMIN_EMAIL);
+        $this->loginAsAdmin(self::ADMIN_EMAIL);
 
         $this->client->request('GET', '/admin/dashboard');
         $this->assertResponseIsSuccessful();
 
-        // Admin nav rendered...
         $this->assertSelectorExists('a[href="/admin/config"]');
-        // ...but the superadmin-only link is absent.
-        $this->assertSelectorNotExists('a[href="/admin/superadmin/admins"]');
+        $this->assertSelectorExists('a[href="/admin/users"]');
+        $this->assertSelectorNotExists('a[href="/admin/db"]');
+        $this->assertSelectorNotExists('a[href="/admin/htaccess-lock"]');
+
+        $this->client->request('GET', '/admin/db');
+        $this->assertResponseStatusCodeSame(403);
+        $this->client->request('GET', '/admin/htaccess-lock');
+        $this->assertResponseStatusCodeSame(403);
     }
 
-    /**
-     * A superadmin (ROLE_SUPER_ADMIN) sees the superadmin-only nav section —
-     * proves is_granted('ROLE_SUPER_ADMIN') in _admin_nav reflects the Admin's
-     * real identity (positive case).
-     */
-    public function testSuperadminSeesSuperadminNavLink(): void
+    public function testTechSupportSeesAndReachesTheTechSupportTools(): void
     {
-        $this->createAdmin(self::SUPERADMIN_EMAIL, ['ROLE_SUPER_ADMIN']);
-        $this->loginAdmin(self::SUPERADMIN_EMAIL);
+        $this->loginAsEnrolledTechSupport(self::TECH_EMAIL);
 
         $this->client->request('GET', '/admin/dashboard');
         $this->assertResponseIsSuccessful();
 
-        $this->assertSelectorExists('a[href="/admin/superadmin/admins"]');
+        $this->assertSelectorExists('a[href="/admin/db"]');
+        $this->assertSelectorExists('a[href="/admin/htaccess-lock"]');
+
+        $this->client->request('GET', '/admin/db');
+        $this->assertResponseIsSuccessful();
     }
 }

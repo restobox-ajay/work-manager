@@ -88,18 +88,21 @@ final class ImpersonationCest
         $I->click('.impersonate-btn');
         $I->seeCurrentUrlEquals('/dashboard');
 
-        // Submit the banner's exit form; phpBrowser follows the redirect to the admin dashboard.
+        // Submit the banner's exit form; phpBrowser follows the redirect back to the user list the
+        // admin started from.
         $I->click('.exit-impersonation-btn');
-        $I->seeCurrentUrlEquals('/admin/dashboard');
+        $I->seeCurrentUrlEquals('/admin/users');
         $I->dontSeeElement('.impersonation-banner');
 
         // The admin-only user list is reachable again -> the admin session is restored.
         $I->amOnPage('/admin/users');
         $I->seeResponseCodeIs(200);
 
-        // ...and the browser is no longer signed in as the impersonated user (issue #64).
+        // ...and the browser is no longer signed in as the impersonated user (issue #64): one firewall
+        // since ADR-068, so /dashboard now greets the admin, not the target.
         $I->amOnPage('/dashboard');
-        $I->seeCurrentUrlEquals('/login');
+        $I->see('Welcome, Test Admin.');
+        $I->dontSee('My work', 'h1');
     }
 
 
@@ -114,9 +117,9 @@ final class ImpersonationCest
         $I->click('.impersonate-btn');
         $I->seeCurrentUrlEquals('/dashboard');
 
-        // Exit returns to the admin firewall, which restores access to the audit log.
+        // Exit restores the admin's own token, which restores access to the audit log.
         $I->click('.exit-impersonation-btn');
-        $I->seeCurrentUrlEquals('/admin/dashboard');
+        $I->seeCurrentUrlEquals('/admin/users');
 
         $I->amOnPage('/admin/audit-log');
         $I->seeResponseCodeIs(200);

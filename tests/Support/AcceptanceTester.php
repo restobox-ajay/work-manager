@@ -41,25 +41,10 @@ class AcceptanceTester extends \Codeception\Actor
     }
 
     /**
-     * Simulate "coming back later": drop the session cookie, keeping any long-lived cookies (notably
-     * the opt-in ADMIN_LAST_EMAIL prefill cookie from ADR-051). The session cookie is PHPSESSID here
-     * because the acceptance stack runs the real native session storage, not the mock file storage
-     * the functional suite uses.
-     */
-    public function resetCookieJarKeepingRememberedEmail(): void
-    {
-        $this->resetCookie('PHPSESSID');
-    }
-
-    /**
-     * Submit the admin login form with the given credentials.
+     * Sign an admin in. Since ADR-068 admins are users with an admin role and use the one /login form.
      */
     public function loginAsAdmin(string $email, string $password = 'password123'): void
     {
-        $this->amOnPage('/admin/login');
-        $this->submitForm('form', [
-            'email' => $email,
-            'password' => $password,
-        ]);
+        $this->loginAsUser($email, $password);
     }
 }

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Registration;
 
-use App\Entity\Admin;
 use App\Service\ConfigService;
 use App\Tests\Support\AuthenticationTestTrait;
 use Doctrine\ORM\EntityManagerInterface;
@@ -48,14 +47,11 @@ final class RegistrationModeTest extends WebTestCase
 
     private function removeTestAdmin(): void
     {
-        try {
-            $admin = $this->em->getRepository(Admin::class)->findOneBy(['email' => 'modetest-admin@example.com']);
-            if ($admin) {
-                $this->em->remove($admin);
-                $this->em->flush();
-                $this->em->clear();
-            }
-        } catch (\Throwable) {}
+        $this->em->getConnection()->executeStatement(
+            'DELETE FROM "user" WHERE email = ?',
+            ['modetest-admin@example.com']
+        );
+        $this->em->clear();
     }
 
     private function setMode(string $mode): void

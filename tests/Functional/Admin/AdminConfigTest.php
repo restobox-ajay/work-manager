@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Admin;
 
-use App\Entity\Admin;
+use App\Entity\User;
 use App\Service\ConfigService;
 use App\Tests\Support\AuthenticationTestTrait;
 use Doctrine\ORM\EntityManagerInterface;
@@ -41,7 +41,7 @@ final class AdminConfigTest extends WebTestCase
     private function removeTestAdmin(): void
     {
         try {
-            $admin = $this->em->getRepository(Admin::class)->findOneBy(['email' => 'configtest@example.com']);
+            $admin = $this->em->getRepository(User::class)->findOneBy(['email' => 'configtest@example.com']);
             if ($admin) {
                 $this->em->remove($admin);
                 $this->em->flush();
@@ -101,7 +101,7 @@ final class AdminConfigTest extends WebTestCase
             ->filter('[data-slug="general"] input[name="_token"]')->attr('value');
         $this->client->request('POST', '/admin/config/general', [
             '_token' => $configToken,
-            'fields' => ['registration.mode' => 'invitation-only'],
+            'fields' => ['registration.mode' => 'open'],
         ]);
         $this->assertResponseRedirects('/admin/config');
 
@@ -109,7 +109,7 @@ final class AdminConfigTest extends WebTestCase
             'SELECT config_value FROM config WHERE config_key = ?',
             ['registration.mode']
         );
-        $this->assertSame('invitation-only', $row);
+        $this->assertSame('open', $row);
     }
 
     // Security (H1): a config save POST without a valid CSRF token is rejected, and
@@ -118,7 +118,7 @@ final class AdminConfigTest extends WebTestCase
     {
         $this->loginAsAdmin('configtest@example.com', 'configpassword');
         $this->client->request('POST', '/admin/config/general', [
-            'fields' => ['registration.mode' => 'invitation-only'],
+            'fields' => ['registration.mode' => 'open'],
         ]);
         $this->assertResponseStatusCodeSame(403);
 
@@ -126,16 +126,16 @@ final class AdminConfigTest extends WebTestCase
             'SELECT config_value FROM config WHERE config_key = ?',
             ['registration.mode']
         );
-        $this->assertNotSame('invitation-only', $row);
+        $this->assertNotSame('open', $row);
     }
 
-    // AC5: Unauthenticated access to /admin/config redirects to /admin/login
-    public function testUnauthenticatedAccessRedirectsToAdminLogin(): void
+    // AC5: Unauthenticated access to /admin/config redirects to /login
+    public function testUnauthenticatedAccessRedirectsToLogin(): void
     {
         $this->client->request('GET', '/admin/config');
         $this->assertResponseStatusCodeSame(302);
         $this->assertStringContainsString(
-            '/admin/login',
+            '/login',
             (string) $this->client->getResponse()->headers->get('Location')
         );
     }
@@ -161,14 +161,16 @@ final class AdminConfigTest extends WebTestCase
         $this->loginAsAdmin('configtest@example.com', 'configpassword');
         $this->em->getConnection()->executeStatement("DELETE FROM audit_log WHERE action = 'admin.config_update'");
 
-        $this->saveConfigPage('general', ['registration.mode' => 'invitation-only']);
+        // ADR-095: invitation-only is the default, so opening sign-up is the change.
+        $this->saveConfigPage('general', ['registration.mode' => 'open']);
 
         $rows = $this->configAuditRows();
         $this->assertCount(1, $rows, 'one row per save');
         $this->assertSame('configtest@example.com', $rows[0]['actor']);
         $this->assertStringContainsString('page=general', (string) $rows[0]['context']);
         $this->assertStringContainsString('registration.mode', (string) $rows[0]['context']);
-        $this->assertStringContainsString('invitation-only', (string) $rows[0]['context'], 'non-secret values are recorded');
+        $this->assertStringContainsString('invitation-only', (string) $rows[0]['context'], 'the old value is recorded');
+        $this->assertStringContainsString('open', (string) $rows[0]['context'], 'the new value is recorded');
     }
 
     public function testFreeTextValuesSuchAsWebhookUrlsAreNotWrittenToTheAuditLog(): void

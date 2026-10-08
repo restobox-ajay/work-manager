@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Admin;
 
-use App\Entity\Admin;
+use App\Entity\User;
 use App\Tests\Support\AuthenticationTestTrait;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
@@ -39,7 +39,7 @@ final class ConfigValidationTest extends WebTestCase
     private function removeTestAdmin(): void
     {
         try {
-            $admin = $this->em->getRepository(Admin::class)->findOneBy(['email' => 'configvalidation@example.com']);
+            $admin = $this->em->getRepository(User::class)->findOneBy(['email' => 'configvalidation@example.com']);
             if ($admin) {
                 $this->em->remove($admin);
                 $this->em->flush();

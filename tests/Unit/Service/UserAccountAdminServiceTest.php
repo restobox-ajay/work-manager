@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Service;
 
 use App\Entity\User;
+use App\Repository\DbConsoleSessionRepository;
 use App\Repository\UserRepository;
 use App\Repository\UserSessionRepository;
+use App\Security\AccountManagementPolicy;
 use App\Security\IpWhitelistManagerInterface;
 use App\Security\PasswordPolicyManagerInterface;
 use App\Security\RecoveryTokenInvalidator;
@@ -74,7 +76,20 @@ final class UserAccountAdminServiceTest extends TestCase
             $this->auditLogger,
             $this->sessionRepository,
             $this->tokenRevoker,
+            new AccountManagementPolicy(),
+            $this->createStub(DbConsoleSessionRepository::class),
         );
+    }
+
+    /** The acting account (ADR-068: an admin is a User holding an admin role). */
+    private static function actor(string $role = 'ROLE_ADMIN'): User
+    {
+        $actor = new User();
+        $actor->setEmail('admin@example.com');
+        $actor->setName('Acting Admin');
+        $actor->setRoles([$role]);
+
+        return $actor;
     }
 
     public function testCreateValidatesPersistsHashesStampsTimeAndSeedsHistory(): void
@@ -116,7 +131,7 @@ final class UserAccountAdminServiceTest extends TestCase
             'password' => 'password123',
             'role'     => 'ROLE_USER',
             'status'   => 'active',
-        ], 'admin@example.com', '10.0.0.1');
+        ], self::actor(), '10.0.0.1');
 
         $this->assertTrue($result->isSuccess());
         $this->assertInstanceOf(User::class, $result->user);
@@ -127,7 +142,7 @@ final class UserAccountAdminServiceTest extends TestCase
         $this->assertSame('active', $result->user->getStatus());
         // The change-time stamp now lives in the auth-password-policy-bundle satellite (password_meta),
         // recorded via recordPasswordChange() asserted above — no longer a column on User (FEATURE-145).
-        // Roles stay fixed to ROLE_USER (ADR-024).
+        // The requested role is applied (ADR-068); a plain admin may grant ROLE_USER.
         $this->assertSame(['ROLE_USER'], $result->user->getRoles());
     }
 
@@ -151,7 +166,7 @@ final class UserAccountAdminServiceTest extends TestCase
             'password' => 'short',
             'role'     => 'ROLE_USER',
             'status'   => 'active',
-        ], 'admin@example.com', '10.0.0.1');
+        ], self::actor(), '10.0.0.1');
 
         $this->assertFalse($result->isSuccess());
         $this->assertNull($result->user);
@@ -172,7 +187,7 @@ final class UserAccountAdminServiceTest extends TestCase
             'email'    => 'dup@example.com',
             'name'     => 'Dup',
             'password' => 'password123',
-        ], 'admin@example.com', '10.0.0.1');
+        ], self::actor(), '10.0.0.1');
 
         $this->assertFalse($result->isSuccess());
         $this->assertSame('This email address is already registered.', $result->errors['email']);
@@ -192,13 +207,13 @@ final class UserAccountAdminServiceTest extends TestCase
             'name'     => 'Bad Status',
             'password' => 'password123',
             'status'   => 'banished',
-        ], 'admin@example.com', '10.0.0.1');
+        ], self::actor(), '10.0.0.1');
 
         $this->assertFalse($result->isSuccess());
         $this->assertArrayHasKey('status', $result->errors);
     }
 
-    public function testUpdateRejectsUnknownRoleAndStatusWithoutAuditing(): void
+    public function testUpdateRejectsAnOutOfReachRoleAndUnknownStatusWithoutAuditing(): void
     {
         $em = $this->createMock(EntityManagerInterface::class);
         $em->expects($this->never())->method('wrapInTransaction');
@@ -215,7 +230,7 @@ final class UserAccountAdminServiceTest extends TestCase
         $result = $this->service()->update($user, [
             'role'   => 'ROLE_SUPER_ADMIN',
             'status' => 'nonsense',
-        ], 'admin@example.com', '10.0.0.1');
+        ], self::actor(), '10.0.0.1');
 
         $this->assertFalse($result->isSuccess());
         $this->assertArrayHasKey('role', $result->errors);
@@ -248,7 +263,7 @@ final class UserAccountAdminServiceTest extends TestCase
         $result = $this->service()->update($user, [
             'email' => 'renamed@example.com',
             'name'  => 'New Name',
-        ], 'admin@example.com', '10.0.0.1');
+        ], self::actor(), '10.0.0.1');
 
         $this->assertTrue($result->isSuccess());
         $this->assertSame('renamed@example.com', $user->getEmail());
@@ -280,7 +295,7 @@ final class UserAccountAdminServiceTest extends TestCase
             'email'       => 'ips@example.com',
             'name'        => 'IPs User',
             'allowed_ips' => '203.0.113.4, 198.51.100.0/24',
-        ], 'admin@example.com', '10.0.0.1');
+        ], self::actor(), '10.0.0.1');
 
         $this->assertTrue($result->isSuccess());
     }
@@ -309,8 +324,56 @@ final class UserAccountAdminServiceTest extends TestCase
             'email'       => 'ips@example.com',
             'name'        => 'IPs User',
             'allowed_ips' => '   ',
-        ], 'admin@example.com', '10.0.0.1');
+        ], self::actor(), '10.0.0.1');
 
         $this->assertTrue($result->isSuccess());
+    }
+
+    public function testUpdateRejectsAnUnknownRole(): void
+    {
+        $user = new User();
+        $user->setEmail('u@example.com');
+        $user->setName('U');
+
+        $result = $this->service()->update($user, ['role' => 'ROLE_GOD'], self::actor('ROLE_TECH_SUPPORT'), '10.0.0.1');
+
+        $this->assertFalse($result->isSuccess());
+        $this->assertSame('Invalid role.', $result->errors['role']);
+    }
+
+    public function testASuperAdminMayPromoteAUserToAdmin(): void
+    {
+        $em = $this->createStub(EntityManagerInterface::class);
+        $em->method('wrapInTransaction')->willReturnCallback(static fn (callable $cb) => $cb());
+        $this->em = $em;
+
+        $user = new User();
+        $user->setEmail('promote@example.com');
+        $user->setName('Promote');
+
+        $result = $this->service()->update($user, ['role' => 'ROLE_ADMIN'], self::actor('ROLE_SUPER_ADMIN'), '10.0.0.1');
+
+        $this->assertTrue($result->isSuccess());
+        $this->assertContains('ROLE_ADMIN', $user->getRoles());
+    }
+
+    public function testTheLastActiveSuperAdminCannotBeDemoted(): void
+    {
+        $this->userRepository->method('countActiveWithRole')->willReturn(1);
+
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->expects($this->never())->method('wrapInTransaction');
+        $this->em = $em;
+
+        $super = new User();
+        $super->setEmail('last-super@example.com');
+        $super->setName('Last Super');
+        $super->setRoles(['ROLE_SUPER_ADMIN']);
+
+        $result = $this->service()->update($super, ['role' => 'ROLE_ADMIN'], self::actor('ROLE_TECH_SUPPORT'), '10.0.0.1');
+
+        $this->assertFalse($result->isSuccess());
+        $this->assertArrayHasKey('role', $result->errors);
+        $this->assertContains('ROLE_SUPER_ADMIN', $super->getRoles());
     }
 }

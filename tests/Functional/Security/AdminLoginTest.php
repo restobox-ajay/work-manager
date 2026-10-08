@@ -4,14 +4,22 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Security;
 
-use App\Entity\Admin;
-use App\Entity\User;
+use App\Tests\Support\AuthenticationTestTrait;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 
+/**
+ * ADR-068: admins sign in through the one login page (/login) like every account; the separate /admin/login
+ * is gone. The generic login behaviour (form, bad password, already-signed-in bounce) is UserLoginTest's; this
+ * pins what is admin-specific.
+ */
 final class AdminLoginTest extends WebTestCase
 {
+    use AuthenticationTestTrait;
+
+    private const EMAIL = 'adminlogintest@example.com';
+
     private KernelBrowser $client;
     private EntityManagerInterface $em;
 
@@ -21,14 +29,7 @@ final class AdminLoginTest extends WebTestCase
         $this->em = self::getContainer()->get(EntityManagerInterface::class);
 
         $this->removeTestAdmin();
-
-        $admin = new Admin();
-        $admin->setEmail('adminlogintest@example.com');
-        $admin->setName('Admin Login Test');
-        $admin->setPassword(password_hash('adminpassword', PASSWORD_BCRYPT, ['cost' => 4]));
-        $this->em->persist($admin);
-        $this->em->flush();
-        $this->em->clear();
+        $this->createTestAdmin(self::EMAIL, 'Admin Login Test', 'adminpassword');
     }
 
     protected function tearDown(): void
@@ -39,106 +40,37 @@ final class AdminLoginTest extends WebTestCase
 
     private function removeTestAdmin(): void
     {
-        try {
-            $admin = $this->em->getRepository(Admin::class)->findOneBy(['email' => 'adminlogintest@example.com']);
-            if ($admin) {
-                $this->em->remove($admin);
-                $this->em->flush();
-                $this->em->clear();
-            }
-        } catch (\Throwable) {
-            // Ignore cleanup errors — next setUp will re-try
-        }
+        $this->em->getConnection()->executeStatement('DELETE FROM "user" WHERE email = ?', [self::EMAIL]);
+        $this->em->clear();
     }
 
-    public function testAdminLoginFormRenders(): void
+    public function testTheSeparateAdminLoginPageIsGone(): void
     {
         $this->client->request('GET', '/admin/login');
 
-        $this->assertResponseIsSuccessful();
-        $this->assertSelectorExists('input[name="email"]');
-        $this->assertSelectorExists('input[name="password"]');
+        $this->assertResponseStatusCodeSame(404);
     }
 
-    public function testValidAdminLoginAuthenticatesAndRedirectsToDashboard(): void
+    public function testAdminSignsInThroughTheOneLoginAndReachesTheAdminArea(): void
     {
-        $this->client->request('GET', '/admin/login');
+        $this->client->request('GET', '/login');
         $this->client->submitForm('Sign in', [
-            'email' => 'adminlogintest@example.com',
+            'email' => self::EMAIL,
             'password' => 'adminpassword',
         ]);
 
-        $this->assertResponseStatusCodeSame(302);
-        $this->assertStringContainsString('/admin/dashboard', (string) $this->client->getResponse()->headers->get('Location'));
-    }
-
-    public function testAlreadyAuthenticatedAdminVisitingLoginIsRedirectedToDashboard(): void
-    {
-        $this->client->request('GET', '/admin/login');
-        $this->client->submitForm('Sign in', [
-            'email' => 'adminlogintest@example.com',
-            'password' => 'adminpassword',
-        ]);
-        $this->client->followRedirect(); // land on /admin/dashboard
-
-        // Visiting /admin/login again while signed in bounces to the dashboard, not the form.
-        $this->client->request('GET', '/admin/login');
-        $this->assertResponseRedirects('/admin/dashboard');
-    }
-
-    public function testInvalidAdminLoginShowsError(): void
-    {
-        $this->client->request('GET', '/admin/login');
-        $this->client->submitForm('Sign in', [
-            'email' => 'adminlogintest@example.com',
-            'password' => 'wrongpassword',
-        ]);
-
-        $this->assertResponseStatusCodeSame(302);
+        $this->assertResponseRedirects('/dashboard');
         $this->client->followRedirect();
         $this->assertResponseIsSuccessful();
-        $this->assertSelectorExists('.error');
+
+        $this->client->request('GET', '/admin/dashboard');
+        $this->assertResponseIsSuccessful();
     }
 
-    public function testUnauthenticatedAccessToAdminRouteRedirectsToAdminLogin(): void
+    public function testUnauthenticatedAccessToAdminRouteRedirectsToTheOneLogin(): void
     {
         $this->client->request('GET', '/admin/dashboard');
 
-        $this->assertResponseStatusCodeSame(302);
-        $this->assertStringContainsString('/admin/login', (string) $this->client->getResponse()->headers->get('Location'));
-    }
-
-    public function testAdminSessionIsIndependentFromUserSession(): void
-    {
-        $user = new User();
-        $user->setEmail('separationtest@example.com');
-        $user->setName('Separation Test');
-        $user->setPassword(password_hash('userpassword', PASSWORD_BCRYPT, ['cost' => 4]));
-        $this->em->persist($user);
-        $this->em->flush();
-        $this->em->clear();
-
-        try {
-            // Log in as regular user (user firewall)
-            $this->client->request('GET', '/login');
-            $this->client->submitForm('Sign in', [
-                'email' => 'separationtest@example.com',
-                'password' => 'userpassword',
-            ]);
-            $this->assertResponseStatusCodeSame(302);
-            $this->client->followRedirect(); // Land on /dashboard as user
-
-            // User session must NOT grant access to admin routes
-            $this->client->request('GET', '/admin/dashboard');
-            $this->assertResponseStatusCodeSame(302);
-            $this->assertStringContainsString('/admin/login', (string) $this->client->getResponse()->headers->get('Location'));
-        } finally {
-            $u = $this->em->getRepository(User::class)->findOneBy(['email' => 'separationtest@example.com']);
-            if ($u) {
-                $this->em->remove($u);
-                $this->em->flush();
-                $this->em->clear();
-            }
-        }
+        $this->assertResponseRedirects('/login');
     }
 }

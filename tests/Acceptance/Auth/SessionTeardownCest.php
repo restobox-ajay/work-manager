@@ -35,7 +35,7 @@ use App\Tests\Support\AcceptanceTester;
  * are covered functionally by DeactivationCutsAccessTest.
  *
  * deactivate() is reachable only via the admin JSON API (POST /admin-api/users/{id}/deactivate), driven
- * here with a Bearer admin token (ApiHelper — stateless, does not touch the user's session cookie).
+ * here with an admin's Bearer personal access token (ApiHelper — stateless, does not touch the user's session cookie).
  * delete() is a web admin-panel action, driven by a second cookie-jarred browser (haveFriend) so the
  * admin login does not clobber the user's session.
  */
@@ -56,7 +56,7 @@ final class SessionTeardownCest
     {
         $userId  = $I->createUser('live-deact@example.com', 'password123');
         $adminId = $I->createAdmin('admin@example.com', 'adminpass');
-        $adminToken = $I->createAdminAccessToken($adminId);
+        $adminToken = $I->createPersonalAccessToken($adminId);
 
         // The user logs in: a real session + user_sessions row now exist, and /dashboard renders.
         $I->loginAsUser('live-deact@example.com', 'password123');

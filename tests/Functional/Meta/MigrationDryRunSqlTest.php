@@ -48,11 +48,13 @@ final class MigrationDryRunSqlTest extends TestCase
             [1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
             $pipes,
             $projectRoot,
-            [
+            // The inherited environment plus overrides, not a bare PATH-only one: on Windows a child without
+            // SystemRoot cannot initialise Winsock, so every TCP connect (MySQL) fails with error 2002.
+            array_merge(getenv(), [
                 'APP_ENV'      => 'dev',
                 'DATABASE_URL' => $this->source->url,
                 'PATH'         => getenv('PATH') ?: '/usr/bin:/bin',
-            ],
+            ]),
         );
         self::assertIsResource($process);
         $output = stream_get_contents($pipes[1]) . stream_get_contents($pipes[2]);

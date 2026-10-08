@@ -51,10 +51,10 @@ final class UserAdminAuditTargetTest extends WebTestCase
             $this->conn->executeStatement("DELETE FROM password_reset_tokens WHERE email LIKE 'audtarget-%@example.com'");
             $this->conn->executeStatement("DELETE FROM user_sessions WHERE user_id IN (SELECT id FROM \"user\" WHERE email LIKE 'audtarget-%@example.com')");
             $this->conn->executeStatement("DELETE FROM \"user\" WHERE email LIKE 'audtarget-%@example.com'");
-            $this->conn->executeStatement('DELETE FROM admin_access_tokens WHERE admin_id IN (SELECT id FROM admin WHERE email = ?)', [self::ADMIN]);
-            $this->conn->executeStatement('DELETE FROM admin_sessions WHERE admin_id IN (SELECT id FROM admin WHERE email = ?)', [self::ADMIN]);
+            $this->conn->executeStatement('DELETE FROM personal_access_tokens WHERE user_id IN (SELECT id FROM "user" WHERE email = ?)', [self::ADMIN]);
+            $this->conn->executeStatement('DELETE FROM user_sessions WHERE user_id IN (SELECT id FROM "user" WHERE email = ?)', [self::ADMIN]);
             $this->conn->executeStatement('DELETE FROM audit_log WHERE actor = ?', [self::ADMIN]);
-            $this->conn->executeStatement('DELETE FROM admin WHERE email = ?', [self::ADMIN]);
+            $this->conn->executeStatement('DELETE FROM "user" WHERE email = ?', [self::ADMIN]);
             $this->em->clear();
         } catch (\Throwable) {
         }
@@ -87,8 +87,8 @@ final class UserAdminAuditTargetTest extends WebTestCase
     private function apiToken(): string
     {
         $plaintext = bin2hex(random_bytes(32));
-        $this->conn->insert('admin_access_tokens', [
-            'admin_id'   => (int) $this->conn->fetchOne('SELECT id FROM admin WHERE email = ?', [self::ADMIN]),
+        $this->conn->insert('personal_access_tokens', [
+            'user_id'    => (int) $this->conn->fetchOne('SELECT id FROM "user" WHERE email = ?', [self::ADMIN]),
             'name'       => 'Audit Target Token',
             'token_hash' => hash('sha256', $plaintext),
             'created_at' => date('Y-m-d H:i:s'),

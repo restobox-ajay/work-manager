@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Admin;
 
-use App\Entity\Admin;
 use App\Entity\User;
 use App\Tests\Support\AuthenticationTestTrait;
 use Doctrine\ORM\EntityManagerInterface;
@@ -40,7 +39,7 @@ final class AdminUserListTest extends WebTestCase
             $this->em->getConnection()->executeStatement(
                 "DELETE FROM \"user\" WHERE email LIKE 'userlist-%@example.com'"
             );
-            $admin = $this->em->getRepository(Admin::class)->findOneBy(['email' => 'userlist-admin@example.com']);
+            $admin = $this->em->getRepository(User::class)->findOneBy(['email' => 'userlist-admin@example.com']);
             if ($admin) {
                 $this->em->remove($admin);
                 $this->em->flush();
@@ -67,23 +66,28 @@ final class AdminUserListTest extends WebTestCase
     {
         $this->createUser('ac2');
         $this->loginAsAdmin('userlist-admin@example.com');
-        $this->client->request('GET', '/admin/users');
+        $crawler = $this->client->request('GET', '/admin/users');
         $this->assertResponseIsSuccessful();
 
-        $content = $this->client->getResponse()->getContent();
-        $this->assertStringContainsString('User ac2', $content);
-        $this->assertStringContainsString('userlist-ac2@example.com', $content);
-        $this->assertStringContainsString('active', $content);
-        $this->assertStringContainsString('ROLE_USER', $content);
+        $row = $crawler->filter('tbody tr')->reduce(
+            static fn ($tr): bool => str_contains($tr->text(), 'userlist-ac2@example.com')
+        );
+        $this->assertCount(1, $row);
+        $cells = $row->filter('td');
+        $this->assertSame('User ac2', trim($cells->eq(0)->text()));
+        $this->assertSame('userlist-ac2@example.com', trim($cells->eq(1)->text()));
+        $this->assertStringContainsString('active', $cells->eq(2)->text());
+        // ADR-068: the role column shows the primary role's label.
+        $this->assertSame('User', trim($cells->eq(3)->text()));
     }
 
-    // AC3: Unauthenticated or non-admin access is redirected to /admin/login
-    public function testUnauthenticatedAccessRedirectsToAdminLogin(): void
+    // AC3: Unauthenticated or non-admin access is redirected to /login
+    public function testUnauthenticatedAccessRedirectsToLogin(): void
     {
         $this->client->request('GET', '/admin/users');
         $this->assertResponseStatusCodeSame(302);
         $this->assertStringContainsString(
-            '/admin/login',
+            '/login',
             (string) $this->client->getResponse()->headers->get('Location')
         );
     }

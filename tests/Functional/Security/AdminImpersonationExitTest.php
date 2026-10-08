@@ -4,16 +4,17 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Security;
 
-use App\Entity\Admin;
+use App\Entity\User;
 use App\Tests\Support\AuthenticationTestTrait;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
+use Symfony\Component\DomCrawler\Crawler;
 
 /**
- * FEATURE-134 (review C18): admin-impersonation EXIT must restore the original superadmin by
- * identifier (loaded via the admin user provider) — never by unserialize()ing a session blob —
- * and must fail closed if that superadmin can no longer be loaded (disabled/deleted).
+ * Review C18, re-based on ADR-068: ending an impersonation restores the impersonator by IDENTIFIER, re-loaded
+ * and re-checked from the database (ImpersonationManager::exit), and fails closed — signs the browser out —
+ * when the impersonator can no longer sign in.
  */
 final class AdminImpersonationExitTest extends WebTestCase
 {
@@ -37,89 +38,70 @@ final class AdminImpersonationExitTest extends WebTestCase
 
     private function cleanup(): void
     {
-        try {
-            $this->em->getConnection()->executeStatement("DELETE FROM admin WHERE email LIKE 'imp_exit_test_%'");
-            $this->em->clear();
-        } catch (\Throwable) {
-        }
+        $this->em->getConnection()->executeStatement("DELETE FROM \"user\" WHERE email LIKE 'imp_exit_test_%'");
+        $this->em->clear();
     }
 
-    private function createAdmin(string $email, array $roles = []): Admin
+    /** Start impersonating $target from the Users list; returns the crawler of the impersonated landing page. */
+    private function startImpersonation(User $target): Crawler
     {
-        return $this->createTestAdmin($email, 'Test Admin ' . $email, roles: $roles);
-    }
+        $crawler = $this->client->request('GET', '/admin/users');
+        $this->client->submit($crawler->filter(sprintf('form[action="/admin/users/%d/impersonate-start"]', $target->getId()))->form());
 
-    /**
-     * Start impersonation of $target and return the crawler for the page rendering the
-     * admin-impersonation exit form (the banner in base.html.twig).
-     */
-    private function startImpersonation(Admin $target): \Symfony\Component\DomCrawler\Crawler
-    {
-        $crawler = $this->client->request('GET', '/admin/superadmin/admins');
-        $form    = $crawler->filter('form[action="/admin/superadmin/admins/' . $target->getId() . '/impersonate"]')->form();
-        $this->client->submit($form);
-
-        $dashCrawler = $this->client->followRedirect(); // /admin/dashboard, banner rendered
+        $landing = $this->client->followRedirect();
         $this->assertStringContainsString(
-            'admin-impersonation-banner',
+            'impersonation-banner',
             (string) $this->client->getResponse()->getContent(),
             'Impersonation should be active after start'
         );
 
-        return $dashCrawler;
+        return $landing;
     }
 
-    // AC5: exit restores the original superadmin (identity + roles), no unserialize involved.
+    // AC5: exit restores the original super admin (identity + roles).
     public function testExitRestoresOriginalSuperadmin(): void
     {
-        $superadmin = $this->createAdmin('imp_exit_test_super@example.com', ['ROLE_SUPER_ADMIN']);
-        $target     = $this->createAdmin('imp_exit_test_target@example.com', []);
+        $this->createTestAdmin('imp_exit_test_super@example.com', roles: ['ROLE_SUPER_ADMIN']);
+        $target = $this->createTestAdmin('imp_exit_test_target@example.com');
 
-        $this->loginAsAdmin($superadmin->getEmail());
-        $dashCrawler = $this->startImpersonation($target);
+        $this->loginAsAdmin('imp_exit_test_super@example.com');
+        $landing = $this->startImpersonation($target);
 
-        // Exit via the banner form (supplies the real admin_impersonate_exit CSRF token).
-        $exitForm = $dashCrawler->filter('form[action="/admin/impersonate-admin-exit"]')->form();
-        $this->client->submit($exitForm);
-        $this->assertResponseStatusCodeSame(302);
+        // While impersonating the plain admin, the admin-only-by-super-admin edit page is out of reach.
+        $this->client->request('GET', sprintf('/admin/users/%d/edit', $target->getId()));
+        $this->assertResponseStatusCodeSame(404);
 
-        $this->client->followRedirect(); // -> /admin/superadmin/admins
-
-        // The superadmin-only page is reachable (ROLE_SUPER_ADMIN restored), not bounced to login,
-        // and the impersonation banner is gone.
+        $this->client->submit($landing->filter('form[action="/impersonate/exit"]')->form());
+        $this->assertResponseRedirects('/admin/users');
+        $this->client->followRedirect();
         $this->assertResponseIsSuccessful();
-        $content = (string) $this->client->getResponse()->getContent();
-        $this->assertStringNotContainsString('admin-impersonation-banner', $content);
+        $this->assertStringNotContainsString('impersonation-banner', (string) $this->client->getResponse()->getContent());
+
+        // ROLE_SUPER_ADMIN restored: managing an admin account works again.
+        $this->client->request('GET', sprintf('/admin/users/%d/edit', $target->getId()));
+        $this->assertResponseIsSuccessful();
     }
 
-    // AC6: if the original superadmin is disabled mid-impersonation, exit fails closed —
-    // no restored/forged admin session survives.
+    // AC6: if the original super admin is disabled mid-impersonation, exit fails closed — no restored session.
     public function testExitFailsClosedWhenOriginalSuperadminDisabled(): void
     {
-        $superadmin = $this->createAdmin('imp_exit_test_super2@example.com', ['ROLE_SUPER_ADMIN']);
-        $target     = $this->createAdmin('imp_exit_test_target2@example.com', []);
+        $this->createTestAdmin('imp_exit_test_super2@example.com', roles: ['ROLE_SUPER_ADMIN']);
+        $target = $this->createTestAdmin('imp_exit_test_target2@example.com');
 
-        $this->loginAsAdmin($superadmin->getEmail());
-        $dashCrawler = $this->startImpersonation($target);
+        $this->loginAsAdmin('imp_exit_test_super2@example.com');
+        $landing = $this->startImpersonation($target);
 
-        // Disable the original superadmin while impersonation is in progress. Clear the EM so the
-        // provider reloads the (now inactive) row rather than the stale identity-map copy.
         $this->em->getConnection()->executeStatement(
-            'UPDATE admin SET status = ? WHERE email = ?',
+            'UPDATE "user" SET status = ? WHERE email = ?',
             ['inactive', 'imp_exit_test_super2@example.com']
         );
         $this->em->clear();
 
-        $exitForm = $dashCrawler->filter('form[action="/admin/impersonate-admin-exit"]')->form();
-        $this->client->submit($exitForm);
+        $this->client->submit($landing->filter('form[action="/impersonate/exit"]')->form());
+        $this->assertResponseRedirects('/login');
 
-        // Exit fails closed: it drops the admin token and redirects to a clean admin login.
-        $this->assertResponseStatusCodeSame(302);
-        $this->assertStringContainsString('/admin/login', (string) $this->client->getResponse()->headers->get('Location'));
-
-        // No live admin session remains: a superadmin-only page bounces to login.
-        $this->client->request('GET', '/admin/superadmin/admins');
-        $this->assertResponseStatusCodeSame(302);
-        $this->assertStringContainsString('/admin/login', (string) $this->client->getResponse()->headers->get('Location'));
+        // No live session remains: neither the impersonator's nor the target's.
+        $this->client->request('GET', '/admin/users');
+        $this->assertResponseRedirects('/login');
     }
 }

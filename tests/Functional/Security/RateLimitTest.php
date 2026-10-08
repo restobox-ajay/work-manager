@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Security;
 
-use App\Entity\Admin;
 use App\Entity\User;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
@@ -121,27 +120,19 @@ final class RateLimitTest extends WebTestCase
         $this->setConfig('rate_limit.max_attempts', '2');
         $this->setConfig('rate_limit.window_seconds', '300');
 
-        $this->removeAdmin();
-        $admin = new Admin();
-        $admin->setEmail('rateadmin@example.com');
-        $admin->setName('Rate Admin');
-        $admin->setRoles(['ROLE_ADMIN']);
-        $admin->setPassword(password_hash('correctpassword', PASSWORD_BCRYPT, ['cost' => 4]));
-        $this->em->persist($admin);
-        $this->em->flush();
-        $this->em->clear();
+        $this->createAdmin();
 
         try {
             foreach (['10.2.0.1', '10.2.0.2'] as $ip) {
                 $this->client->setServerParameter('REMOTE_ADDR', $ip);
-                $this->client->request('GET', '/admin/login');
+                $this->client->request('GET', '/login');
                 $this->client->submitForm('Sign in', ['email' => "  rateadmin@example.com\t", 'password' => 'wrongpassword']);
             }
 
-            self::assertSame(2, (int) $this->conn->fetchOne("SELECT COUNT(*) FROM login_attempts WHERE realm = 'admin' AND email = 'rateadmin@example.com'"));
+            self::assertSame(2, (int) $this->conn->fetchOne("SELECT COUNT(*) FROM login_attempts WHERE email = 'rateadmin@example.com'"));
 
             $this->client->setServerParameter('REMOTE_ADDR', '10.2.0.3');
-            $this->client->request('GET', '/admin/login');
+            $this->client->request('GET', '/login');
             $this->client->submitForm('Sign in', ['email' => 'rateadmin@example.com ', 'password' => 'correctpassword']);
             $this->client->followRedirect();
 
@@ -269,22 +260,14 @@ final class RateLimitTest extends WebTestCase
         );
     }
 
-    // AC1: throttling applies to the admin firewall too (both firewalls authenticate via
-    // FormLoginAuthenticator, which the rate-limit listener hooks).
+    // AC1: throttling applies to accounts holding an admin role too. Since ADR-068 they sign in through the
+    // one /login form; they are never hard-locked (ADR-021), but the per-IP throttle still applies.
     public function testAdminLoginIsThrottled(): void
     {
         $this->setConfig('rate_limit.max_attempts', '3');
         $this->setConfig('rate_limit.window_seconds', '300');
 
-        $this->removeAdmin();
-        $admin = new Admin();
-        $admin->setEmail('rateadmin@example.com');
-        $admin->setName('Rate Admin');
-        $admin->setRoles(['ROLE_ADMIN']);
-        $admin->setPassword(password_hash('correctpassword', PASSWORD_BCRYPT, ['cost' => 4]));
-        $this->em->persist($admin);
-        $this->em->flush();
-        $this->em->clear();
+        $this->createAdmin();
 
         try {
             for ($i = 0; $i < 3; $i++) {
@@ -307,24 +290,31 @@ final class RateLimitTest extends WebTestCase
 
     private function failedAdminLogin(): void
     {
-        $this->client->request('GET', '/admin/login');
+        $this->client->request('GET', '/login');
         $this->client->submitForm('Sign in', [
             'email' => 'rateadmin@example.com',
             'password' => 'wrongpassword',
         ]);
     }
 
+    /** An admin is a User holding ROLE_ADMIN (ADR-068). */
+    private function createAdmin(): void
+    {
+        $this->removeAdmin();
+        $admin = new User();
+        $admin->setEmail('rateadmin@example.com');
+        $admin->setName('Rate Admin');
+        $admin->setRoles(['ROLE_ADMIN']);
+        $admin->setPassword(password_hash('correctpassword', PASSWORD_BCRYPT, ['cost' => 4]));
+        $this->em->persist($admin);
+        $this->em->flush();
+        $this->em->clear();
+    }
+
     private function removeAdmin(): void
     {
-        try {
-            $admin = $this->em->getRepository(Admin::class)->findOneBy(['email' => 'rateadmin@example.com']);
-            if ($admin) {
-                $this->em->remove($admin);
-                $this->em->flush();
-                $this->em->clear();
-            }
-        } catch (\Throwable) {
-        }
+        $this->conn->executeStatement("DELETE FROM \"user\" WHERE email = 'rateadmin@example.com'");
+        $this->em->clear();
     }
 
     public function testSuccessfulLoginDoesNotCountTowardFailureThreshold(): void
@@ -377,26 +367,19 @@ final class RateLimitTest extends WebTestCase
      *
      * @return iterable<string,array{string,string}>
      */
-    public static function realms(): iterable
+    public static function accountKinds(): iterable
     {
-        yield 'user login' => ['/login', 'ratetest@example.com'];
-        yield 'admin login' => ['/admin/login', 'rateadmin@example.com'];
+        // One login form since ADR-068; an admin-role account takes a different lockout path, so both are pinned.
+        yield 'user account' => ['/login', 'ratetest@example.com'];
+        yield 'admin account' => ['/login', 'rateadmin@example.com'];
     }
 
-    #[\PHPUnit\Framework\Attributes\DataProvider('realms')]
+    #[\PHPUnit\Framework\Attributes\DataProvider('accountKinds')]
     public function testAThrottledIpGetsTheSameAnswerForRealAndUnknownAccounts(string $loginPath, string $realEmail): void
     {
         $this->setConfig('rate_limit.max_attempts', '3');
         $this->setConfig('rate_limit.window_seconds', '300');
-        $this->removeAdmin();
-        $admin = new Admin();
-        $admin->setEmail('rateadmin@example.com');
-        $admin->setName('Rate Admin');
-        $admin->setRoles(['ROLE_ADMIN']);
-        $admin->setPassword(password_hash('correctpassword', PASSWORD_BCRYPT, ['cost' => 4]));
-        $this->em->persist($admin);
-        $this->em->flush();
-        $this->em->clear();
+        $this->createAdmin();
 
         try {
             $answer = function (string $email) use ($loginPath): string {

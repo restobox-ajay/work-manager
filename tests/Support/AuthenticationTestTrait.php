@@ -4,8 +4,9 @@ declare(strict_types=1);
 
 namespace App\Tests\Support;
 
-use App\Entity\Admin;
+use App\Bundle\Auth2fa\Repository\TwoFactorSettingsRepository;
 use App\Entity\User;
+use App\Service\TotpService;
 
 /**
  * Shared authentication + account-creation helpers for functional WebTestCase tests.
@@ -56,8 +57,8 @@ trait AuthenticationTestTrait
     }
 
     /**
-     * Create + persist an Admin with a cost-4 password, then clear the identity map and return the
-     * freshly-reloaded managed entity.
+     * Create an admin: since ADR-068 an admin is a User holding an admin role (ROLE_ADMIN unless $roles says
+     * otherwise), with the suite's conventional admin password.
      *
      * @param list<string> $roles
      */
@@ -67,20 +68,8 @@ trait AuthenticationTestTrait
         string $password = 'adminpass',
         string $status = 'active',
         array $roles = [],
-    ): Admin {
-        $admin = new Admin();
-        $admin->setEmail($email);
-        $admin->setName($name);
-        $admin->setPassword(self::hashTestPassword($password));
-        $admin->setStatus($status);
-        if ($roles !== []) {
-            $admin->setRoles($roles);
-        }
-        $this->em->persist($admin);
-        $this->em->flush();
-        $this->em->clear();
-
-        return $this->em->getRepository(Admin::class)->findOneBy(['email' => $email]);
+    ): User {
+        return $this->createTestUser($email, $name, $password, $status, $roles !== [] ? $roles : ['ROLE_ADMIN']);
     }
 
     /** Submit the user firewall login form. Never follows the redirect by default. */
@@ -103,23 +92,21 @@ trait AuthenticationTestTrait
     protected function loginAsEnrolledTechSupport(string $email, string $totpSecret = 'JBSWY3DPEHPK3PXP', string $password = 'adminpass'): void
     {
         $admin = $this->createTestAdmin($email, 'Enrolled Tech Support', $password, roles: ['ROLE_TECH_SUPPORT']);
-        $admin->setTotpSecret($totpSecret);
-        $admin->setIsTotpEnabled(true);
-        $this->em->flush();
+        self::getContainer()->get(TwoFactorSettingsRepository::class)->enable($admin, $totpSecret);
         $this->em->clear();
 
         $this->loginAsAdmin($email, $password, followRedirect: false);
         $this->client->request('GET', '/admin/dashboard');
-        $this->client->followRedirect(); // GET /admin/2fa/challenge (the form)
-        $code = self::getContainer()->get(\App\Service\TotpService::class)->generateCode($totpSecret);
+        $this->client->followRedirect(); // GET /2fa/challenge (the form)
+        $code = self::getContainer()->get(TotpService::class)->generateCode($totpSecret);
         $this->client->submitForm('Verify', ['_code' => $code]);
         $this->client->followRedirect();
     }
 
-    /** Submit the admin firewall login form. Follows the post-login redirect by default. */
+    /** Sign an admin in through the one login form (ADR-068). Follows the post-login redirect by default. */
     protected function loginAsAdmin(string $email, string $password = 'adminpass', bool $followRedirect = true): void
     {
-        $this->client->request('GET', '/admin/login');
+        $this->client->request('GET', '/login');
         $this->client->submitForm('Sign in', [
             'email'    => $email,
             'password' => $password,

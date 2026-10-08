@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Admin;
 
-use App\Entity\Admin;
 use App\Entity\User;
 use App\Tests\Support\AuthenticationTestTrait;
 use Doctrine\DBAL\Connection;
@@ -28,11 +27,10 @@ final class AdminUnlockTest extends WebTestCase
 
         $this->cleanup();
 
-        $admin = new Admin();
+        $admin = (new User())->setRoles(['ROLE_ADMIN']);
         $admin->setEmail('unlock-admin@example.com');
         $admin->setName('Unlock Admin');
         $admin->setPassword(self::hashTestPassword('adminpass'));
-        $admin->setRoles([]);
         $this->em->persist($admin);
 
         $user = new User();
@@ -60,7 +58,7 @@ final class AdminUnlockTest extends WebTestCase
             );
             $this->conn->executeStatement("DELETE FROM \"user\" WHERE email LIKE 'unlock-%@example.com'");
             foreach (['unlock-admin@example.com'] as $email) {
-                $admin = $this->em->getRepository(Admin::class)->findOneBy(['email' => $email]);
+                $admin = $this->em->getRepository(User::class)->findOneBy(['email' => $email]);
                 if ($admin) {
                     $this->em->remove($admin);
                     $this->em->flush();
@@ -160,7 +158,8 @@ final class AdminUnlockTest extends WebTestCase
         $this->submitUnlockForm($user->getId());
         $this->assertResponseRedirects('/admin/users');
 
-        // Now user should be able to log in
+        // Now user should be able to log in (in their own browser: one firewall since ADR-068)
+        $this->client->getCookieJar()->clear();
         $this->client->request('GET', '/login');
         $this->client->submitForm('Sign in', [
             'email'    => 'unlock-user@example.com',

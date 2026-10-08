@@ -18,21 +18,21 @@ use App\Tests\Support\AcceptanceTester;
  * arbitrary verbs, the Authorization header, and raw JSON bodies travel over the live
  * server. DatabaseHelper resets every table before each scenario.
  *
- * The token owner is an Admin entity: the admin_api firewall's AdminTokenAuthenticator
- * loads the token's owner from the admin provider (admin table), so the admin API is
- * reachable only by a real Admin — never a User, regardless of any role the user carries.
+ * Since ADR-068 the token is an ordinary personal access token on the shared `api`
+ * firewall; what it may do is decided by its owner's roles, so /admin-api needs an owner
+ * holding ROLE_ADMIN and a plain user's token is refused with 403.
  */
 class AdminApiCest
 {
     /**
-     * Seed an Admin and an active admin access token for it; return the plaintext Bearer
+     * Seed an admin (a user with ROLE_ADMIN) and a personal access token for it; return the plaintext Bearer
      * credential. Fresh per scenario (the DB is reset in _before).
      */
     private function adminBearerToken(AcceptanceTester $I): string
     {
         $adminId = $I->createAdmin('apiadmin@example.com', 'password123');
 
-        return $I->createAdminAccessToken($adminId);
+        return $I->createPersonalAccessToken($adminId);
     }
 
     // AC1: a request with no token → 401 JSON.
@@ -51,6 +51,17 @@ class AdminApiCest
 
         $I->seeApiResponseCodeIs(401);
         $I->seeApiResponseContains('"error"');
+    }
+
+    // ADR-068: a valid token whose owner lacks ROLE_ADMIN authenticates but is refused.
+    public function plainUserTokenIsForbidden(AcceptanceTester $I): void
+    {
+        $token = $I->createPersonalAccessToken($I->createUser('plain-api@example.com', 'password123'));
+
+        $I->sendApiRequest('GET', '/admin-api/users', null, $token);
+
+        $I->seeApiResponseCodeIs(403);
+        $I->seeApiResponseDoesNotContain('plain-api@example.com');
     }
 
     // AC3: GET /admin-api/users → paginated JSON list.

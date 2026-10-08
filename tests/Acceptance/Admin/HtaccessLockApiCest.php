@@ -68,7 +68,7 @@ class HtaccessLockApiCest
 
     private function techSupportToken(AcceptanceTester $I): string
     {
-        return $I->createAdminAccessToken($I->createTechSupportAdminWith2fa('ts-api@example.com', self::PASSWORD, self::SECRET));
+        return $I->createPersonalAccessToken($I->createTechSupportAdminWith2fa('ts-api@example.com', self::PASSWORD, self::SECRET));
     }
 
     public function techSupportManagesTheWhitelistAndTheLockEndToEnd(AcceptanceTester $I): void
@@ -135,7 +135,7 @@ class HtaccessLockApiCest
         $I->seeApiResponseContains('ts-api@example.com');
 
         // and the web page (same gate, same state) lists the IP the API added
-        $I->amOnPage('/admin/login');
+        $I->amOnPage('/login');
         $I->submitForm('form', ['email' => 'ts-api@example.com', 'password' => self::PASSWORD]);
         $I->amOnPage('/admin/dashboard');
         $I->submitForm('form', ['_code' => $I->generateTotpCode(self::SECRET)]);
@@ -177,7 +177,7 @@ class HtaccessLockApiCest
         ];
 
         foreach (['ROLE_ADMIN' => 'plain@example.com', 'ROLE_SUPER_ADMIN' => 'super@example.com'] as $role => $email) {
-            $token = $I->createAdminAccessToken($I->createAdmin($email, self::PASSWORD, ['roles' => [$role]]));
+            $token = $I->createPersonalAccessToken($I->createAdmin($email, self::PASSWORD, ['roles' => [$role]]));
 
             foreach ($calls as [$method, $url, $body]) {
                 $I->sendApiRequest($method, $url, $body, $token);

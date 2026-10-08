@@ -36,10 +36,11 @@ final class HtaccessLockAdaptersParityTest extends WebTestCase
         $this->reset();
         $this->loginAsEnrolledTechSupport('parity-ts@example.com');
 
-        $adminId = (int) $this->conn->fetchOne("SELECT id FROM admin WHERE email = 'parity-ts@example.com'");
+        // ADR-068: the admin API uses the same personal access tokens as every other account.
+        $userId = (int) $this->conn->fetchOne("SELECT id FROM \"user\" WHERE email = 'parity-ts@example.com'");
         $this->token = bin2hex(random_bytes(32));
-        $this->conn->insert('admin_access_tokens', [
-            'admin_id' => $adminId,
+        $this->conn->insert('personal_access_tokens', [
+            'user_id' => $userId,
             'name' => 'parity',
             'token_hash' => hash('sha256', $this->token),
             'created_at' => (new \DateTimeImmutable())->format('Y-m-d H:i:s'),
@@ -49,10 +50,9 @@ final class HtaccessLockAdaptersParityTest extends WebTestCase
     protected function tearDown(): void
     {
         $this->reset();
-        $this->conn->executeStatement('DELETE FROM admin_access_tokens');
-        $this->conn->executeStatement("DELETE FROM admin WHERE email = 'parity-ts@example.com'");
+        $this->conn->executeStatement('DELETE FROM personal_access_tokens');
+        $this->conn->executeStatement("DELETE FROM \"user\" WHERE email = 'parity-ts@example.com'");
         $this->conn->executeStatement('DELETE FROM endpoint_rate_limits');
-        $this->conn->executeStatement('DELETE FROM admin_sessions');
         parent::tearDown();
     }
 

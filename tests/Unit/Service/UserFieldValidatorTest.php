@@ -21,10 +21,12 @@ final class UserFieldValidatorTest extends TestCase
         self::assertNull($this->validator->validateRole('ROLE_USER'));
     }
 
-    public function testValidateRoleRejectsAdminRole(): void
+    public function testValidateRoleAcceptsEveryAdminTier(): void
     {
-        // A User carrying an admin role would collapse the separate-firewall boundary.
-        self::assertNotNull($this->validator->validateRole('ROLE_ADMIN'));
+        // ADR-068: admins are users with roles. WHO may grant a role is AccountManagementPolicy's call, not this one's.
+        self::assertNull($this->validator->validateRole('ROLE_ADMIN'));
+        self::assertNull($this->validator->validateRole('ROLE_SUPER_ADMIN'));
+        self::assertNull($this->validator->validateRole('ROLE_TECH_SUPPORT'));
     }
 
     public function testValidateRoleRejectsGarbage(): void

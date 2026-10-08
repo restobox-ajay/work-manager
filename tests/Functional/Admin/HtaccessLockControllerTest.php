@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Admin;
 
-use App\Entity\Admin;
+use App\Entity\User;
 use App\Htaccess\CurlLoopbackProbe;
 use App\Htaccess\HtaccessLockManager;
 use App\Service\TotpService;
@@ -56,11 +56,11 @@ final class HtaccessLockControllerTest extends WebTestCase
     private function cleanup(): void
     {
         $conn = $this->em->getConnection();
-        $conn->executeStatement("DELETE FROM admin WHERE email LIKE 'htl-%@example.com'");
+        $conn->executeStatement("DELETE FROM \"user\" WHERE email LIKE 'htl-%@example.com'");
         $conn->executeStatement("DELETE FROM config WHERE config_key LIKE 'htaccess_lock.%'");
         $conn->executeStatement("DELETE FROM audit_log WHERE action LIKE 'admin.htaccess_lock_%'");
         $conn->executeStatement('DELETE FROM endpoint_rate_limits');
-        $conn->executeStatement("DELETE FROM admin_sessions WHERE admin_id NOT IN (SELECT id FROM admin)");
+        $conn->executeStatement("DELETE FROM user_sessions WHERE user_id NOT IN (SELECT id FROM \"user\")");
 
         foreach (glob($this->dir . '/{,.}*', GLOB_BRACE) ?: [] as $file) {
             is_file($file) && @unlink($file);
@@ -144,11 +144,11 @@ final class HtaccessLockControllerTest extends WebTestCase
         self::assertSame('', $this->htaccess(), 'a superadmin must not be able to write the server config');
     }
 
-    public function testAnonymousIsSentToTheAdminLogin(): void
+    public function testAnonymousIsSentToTheLogin(): void
     {
         $this->client->request('GET', '/admin/htaccess-lock');
 
-        self::assertResponseRedirects('/admin/login');
+        self::assertResponseRedirects('/login');
     }
 
     public function testEnablingWritesTheManagedBlockAndKeepsTheRestOfTheFile(): void
@@ -318,7 +318,7 @@ final class HtaccessLockControllerTest extends WebTestCase
 
     private function cleanupAdmins(): void
     {
-        $this->em->getConnection()->executeStatement("DELETE FROM admin WHERE email LIKE 'htl-%@example.com'");
+        $this->em->getConnection()->executeStatement("DELETE FROM \"user\" WHERE email LIKE 'htl-%@example.com'");
         $this->em->clear();
     }
 }

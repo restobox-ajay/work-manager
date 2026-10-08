@@ -4,31 +4,32 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Security;
 
-use App\Entity\Admin;
+use App\Tests\Support\AuthenticationTestTrait;
+use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 
 /**
- * FEATURE-109: interactive admin logins are recorded in the dedicated admin_login_history table
- * (keyed on admin_id), and an admin can view their OWN recent logins via /admin/login-history —
- * mirroring the user side (FEATURE-107 view) while staying realm-isolated (ADR-003). An admin can
- * never see another admin's history.
+ * FEATURE-109, re-based on ADR-068: the separate admin_login_history table and /admin/login-history page are
+ * gone — an admin's interactive login is recorded in the one login_history like every account's and shown on
+ * /account/login-history. Page behaviour in general (own rows only, auth required) is LoginHistoryViewTest's.
  */
 final class AdminLoginHistoryTest extends WebTestCase
 {
-    private const EMAILS = [
-        'adminlh1@example.com',
-        'adminlh2@example.com',
-    ];
+    use AuthenticationTestTrait;
+
+    private const EMAIL = 'adminlh1@example.com';
 
     private KernelBrowser $client;
     private EntityManagerInterface $em;
+    private Connection $conn;
 
     protected function setUp(): void
     {
         $this->client = static::createClient();
         $this->em = self::getContainer()->get(EntityManagerInterface::class);
+        $this->conn = self::getContainer()->get(Connection::class);
         $this->cleanup();
     }
 
@@ -40,110 +41,35 @@ final class AdminLoginHistoryTest extends WebTestCase
 
     private function cleanup(): void
     {
-        try {
-            $conn = self::getContainer()->get('doctrine.dbal.default_connection');
-            foreach (self::EMAILS as $email) {
-                $adminId = $conn->fetchOne('SELECT id FROM admin WHERE email = ?', [$email]);
-                if ($adminId !== false) {
-                    $conn->executeStatement('DELETE FROM admin_login_history WHERE admin_id = ?', [(int) $adminId]);
-                    $conn->executeStatement('DELETE FROM admin WHERE id = ?', [(int) $adminId]);
-                }
-            }
-            $this->em->clear();
-        } catch (\Throwable) {
-        }
-    }
-
-    private function createAdmin(string $email): int
-    {
-        $admin = new Admin();
-        $admin->setEmail($email);
-        $admin->setName('Admin History Test');
-        $admin->setPassword(password_hash('adminpassword', PASSWORD_BCRYPT, ['cost' => 4]));
-        $this->em->persist($admin);
-        $this->em->flush();
-        $adminId = (int) $admin->getId();
+        $this->conn->executeStatement('DELETE FROM login_history WHERE user_id IN (SELECT id FROM "user" WHERE email = ?)', [self::EMAIL]);
+        $this->conn->executeStatement('DELETE FROM "user" WHERE email = ?', [self::EMAIL]);
         $this->em->clear();
-
-        return $adminId;
     }
 
-    private function insertHistoryRow(int $adminId, string $ip, string $ua): void
+    public function testAdminLoginIsRecordedInTheOneLoginHistoryAndShownToThem(): void
     {
-        $conn = self::getContainer()->get('doctrine.dbal.default_connection');
-        $conn->executeStatement(
-            'INSERT INTO admin_login_history (admin_id, ip, user_agent, fingerprint, created_at) VALUES (?, ?, ?, ?, ?)',
-            [$adminId, $ip, $ua, hash('sha256', $ip . $ua), (new \DateTimeImmutable())->format('Y-m-d H:i:s')],
+        $adminId = (int) $this->createTestAdmin(self::EMAIL, roles: ['ROLE_SUPER_ADMIN'])->getId();
+
+        $this->client->setServerParameter('HTTP_USER_AGENT', 'AdminHistoryAgent/1.0');
+        $this->loginAsAdmin(self::EMAIL);
+
+        self::assertSame(
+            1,
+            (int) $this->conn->fetchOne('SELECT COUNT(*) FROM login_history WHERE user_id = ?', [$adminId]),
+            'one interactive admin login = one login_history row'
         );
-    }
 
-    private function loginAs(string $email, string $userAgent): void
-    {
-        $this->client->setServerParameter('HTTP_USER_AGENT', $userAgent);
-        $this->client->request('GET', '/admin/login');
-        $this->client->submitForm('Sign in', [
-            'email'    => $email,
-            'password' => 'adminpassword',
-        ]);
-    }
-
-    private function countHistoryRows(int $adminId): int
-    {
-        $conn = self::getContainer()->get('doctrine.dbal.default_connection');
-
-        return (int) $conn->fetchOne('SELECT COUNT(*) FROM admin_login_history WHERE admin_id = ?', [$adminId]);
-    }
-
-    // AC1: an interactive admin login records exactly one admin_login_history row for that admin.
-    public function testAdminLoginCreatesHistoryRow(): void
-    {
-        $adminId = $this->createAdmin('adminlh1@example.com');
-
-        $this->loginAs('adminlh1@example.com', 'AdminHistoryAgent/1.0');
-
-        self::assertSame(1, $this->countHistoryRows($adminId));
-    }
-
-    // AC5/AC7: the recent-logins page shows the logged-in admin's own entries (ip, ua, timestamp).
-    public function testRecentLoginsPageShowsOwnEntries(): void
-    {
-        $adminId = $this->createAdmin('adminlh1@example.com');
-        $this->insertHistoryRow($adminId, '203.0.113.9', 'AdminSeededAgent/ViewTest/2.0');
-
-        $this->loginAs('adminlh1@example.com', 'AdminLoginAgent/1.0');
-        $this->client->request('GET', '/admin/login-history');
-
+        $this->client->request('GET', '/account/login-history');
         $this->assertResponseIsSuccessful();
-        $content = (string) $this->client->getResponse()->getContent();
-        $this->assertStringContainsString('203.0.113.9', $content);
-        $this->assertStringContainsString('AdminSeededAgent/ViewTest/2.0', $content);
-        $this->assertSelectorExists('.entry-time');
+        $this->assertStringContainsString('AdminHistoryAgent/1.0', (string) $this->client->getResponse()->getContent());
     }
 
-    // AC5: an admin cannot see another admin's history.
-    public function testAdminCannotSeeAnotherAdminsHistory(): void
+    public function testTheSeparateAdminLoginHistoryPageIsGone(): void
     {
-        $adminId1 = $this->createAdmin('adminlh1@example.com');
-        $adminId2 = $this->createAdmin('adminlh2@example.com');
+        $this->createTestAdmin(self::EMAIL);
+        $this->loginAsAdmin(self::EMAIL);
 
-        $this->insertHistoryRow($adminId1, '198.51.100.1', 'AgentForAdmin1/1.0');
-        $this->insertHistoryRow($adminId2, '198.51.100.2', 'AgentForAdmin2/1.0');
-
-        $this->loginAs('adminlh1@example.com', 'AdminLoginAgent/1.0');
         $this->client->request('GET', '/admin/login-history');
-
-        $this->assertResponseIsSuccessful();
-        $content = (string) $this->client->getResponse()->getContent();
-        $this->assertStringContainsString('AgentForAdmin1/1.0', $content);
-        $this->assertStringNotContainsString('AgentForAdmin2/1.0', $content);
-    }
-
-    // The page is behind the admin firewall — anonymous access redirects to the admin login.
-    public function testPageRequiresAdminAuth(): void
-    {
-        $this->client->request('GET', '/admin/login-history');
-
-        $this->assertResponseRedirects();
-        self::assertStringContainsString('/admin/login', (string) $this->client->getResponse()->headers->get('Location'));
+        $this->assertResponseStatusCodeSame(404);
     }
 }

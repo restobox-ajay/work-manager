@@ -33,10 +33,10 @@ class DatabaseConsoleCest
     /** Log in a tech-support admin and clear the mandatory 2FA gate, leaving the session verified. */
     private function loginAsTechSupport(AcceptanceTester $I): void
     {
-        $I->amOnPage('/admin/login');
+        $I->amOnPage('/login');
         $I->submitForm('form', ['email' => self::TS_EMAIL, 'password' => self::PASSWORD]);
 
-        // Enrolled admin: the first admin-panel request bounces to the 2FA challenge.
+        // Enrolled tech support: the first request after the password step bounces to the 2FA challenge.
         $I->amOnPage('/admin/dashboard');
         $I->submitForm('form', ['_code' => $I->generateTotpCode(self::SECRET)]);
     }
@@ -75,11 +75,11 @@ class DatabaseConsoleCest
 
     // ---------------------------------------------------------------- unauthenticated
 
-    public function anonymousIsSentToAdminLogin(AcceptanceTester $I): void
+    public function anonymousIsSentToLogin(AcceptanceTester $I): void
     {
         $I->amOnPage('/db-admin.php');
 
-        $I->seeCurrentUrlEquals('/admin/login');
+        $I->seeCurrentUrlEquals('/login');
         $I->dontSee(self::AUTHORISED_MARKER);
     }
 
@@ -87,14 +87,14 @@ class DatabaseConsoleCest
     {
         $I->amOnPage('/admin/db');
 
-        $I->seeCurrentUrlEquals('/admin/login');
+        $I->seeCurrentUrlEquals('/login');
     }
 
     /** Raw database access is a maintainer power; a plain admin must not have it. */
     public function plainAdminIsForbidden(AcceptanceTester $I): void
     {
         $I->createAdmin('plain-console@example.com', self::PASSWORD);
-        $I->amOnPage('/admin/login');
+        $I->amOnPage('/login');
         $I->submitForm('form', ['email' => 'plain-console@example.com', 'password' => self::PASSWORD]);
 
         $I->amOnPage('/admin/db');
@@ -116,7 +116,7 @@ class DatabaseConsoleCest
         // --- RED: a wrong token of the right shape is refused.
         $I->setCookie(ConsoleCookie::COOKIE_NAME, str_repeat('a', 64), ['path' => '/db-admin.php']);
         $I->amOnPage('/db-admin.php');
-        // A denial redirects to /admin/login, but this browser is still a signed-in admin, so the app
+        // A denial redirects to /login, but this browser is still a signed-in admin, so the app
         // bounces onward to the dashboard. The claim worth asserting is therefore not the landing URL
         // but the security property: the console did not open.
         $I->dontSeeInCurrentUrl('/db-admin.php');
@@ -125,7 +125,7 @@ class DatabaseConsoleCest
         // --- GREEN: the real token, same browser, same everything else.
         $I->setCookie(ConsoleCookie::COOKIE_NAME, $realToken, ['path' => '/db-admin.php']);
         $I->amOnPage('/db-admin.php');
-        $I->dontSeeInCurrentUrl('/admin/login');
+        $I->dontSeeInCurrentUrl('/login');
         $I->see(self::AUTHORISED_MARKER);
     }
 

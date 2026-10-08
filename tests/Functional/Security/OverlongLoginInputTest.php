@@ -43,12 +43,11 @@ final class OverlongLoginInputTest extends WebTestCase
         $this->cleanup();
         $huge = self::PREFIX . str_repeat('a', 6000) . '@example.com';
 
-        foreach (['/login', '/admin/login'] as $path) {
-            $client->request('POST', $path, ['email' => $huge, 'password' => 'x']);
-        }
+        // One login form for every account since ADR-068 (the admin login is gone).
+        $client->request('POST', '/login', ['email' => $huge, 'password' => 'x']);
 
         $actors = $this->conn()->fetchFirstColumn("SELECT actor FROM audit_log WHERE actor LIKE 'overlong-%'");
-        self::assertCount(2, $actors, 'the failures are still audited');
+        self::assertCount(1, $actors, 'the failure is still audited');
         foreach ($actors as $actor) {
             self::assertLessThanOrEqual(255, mb_strlen($actor), 'audit_log.actor is VARCHAR(255)');
         }

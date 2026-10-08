@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Security;
 
-use App\Entity\Admin;
 use App\Tests\Support\AuthenticationTestTrait;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
@@ -15,7 +14,8 @@ use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
  * Issue #23 (review C7 reopened through the email-change path): recovery tokens store only an email and are
  * resolved by email when used. Changing an account's email frees the old address, so a reset / magic link
  * still pending for it would work for whatever account is next given that address. An email change must kill
- * the outstanding tokens of the previous address — in both realms.
+ * the outstanding tokens of the previous address — for every account, admins included (ADR-068: one `user`
+ * table, one reset-token table).
  */
 final class EmailChangeRecoveryTokenTest extends WebTestCase
 {
@@ -44,30 +44,18 @@ final class EmailChangeRecoveryTokenTest extends WebTestCase
         try {
             $this->conn->executeStatement("DELETE FROM password_reset_tokens WHERE email LIKE 'emailchg-%@example.com'");
             $this->conn->executeStatement("DELETE FROM magic_link_tokens WHERE email LIKE 'emailchg-%@example.com'");
-            $this->conn->executeStatement("DELETE FROM admin_password_reset_tokens WHERE email LIKE 'emailchg-%@example.com'");
             $this->conn->executeStatement("DELETE FROM user_sessions WHERE user_id IN (SELECT id FROM \"user\" WHERE email LIKE 'emailchg-%@example.com')");
             $this->conn->executeStatement("DELETE FROM \"user\" WHERE email LIKE 'emailchg-%@example.com'");
-            $this->conn->executeStatement("DELETE FROM admin_sessions WHERE admin_id IN (SELECT id FROM admin WHERE email LIKE 'emailchg-%@example.com')");
-            $this->conn->executeStatement("DELETE FROM admin WHERE email LIKE 'emailchg-%@example.com'");
             $this->conn->executeStatement("DELETE FROM audit_log WHERE actor LIKE 'emailchg-%@example.com'");
             $this->em->clear();
         } catch (\Throwable) {
         }
     }
 
+    /** @param list<string> $roles */
     private function makeAdmin(string $email, array $roles): int
     {
-        $admin = new Admin();
-        $admin->setEmail($email);
-        $admin->setName('Email Change Admin');
-        $admin->setPassword(self::hashTestPassword('adminpass'));
-        $admin->setRoles($roles);
-        $this->em->persist($admin);
-        $this->em->flush();
-        $id = (int) $admin->getId();
-        $this->em->clear();
-
-        return $id;
+        return (int) $this->createTestAdmin($email, 'Email Change Admin', roles: $roles)->getId();
     }
 
     private function seedToken(string $table, string $email): void
@@ -121,18 +109,18 @@ final class EmailChangeRecoveryTokenTest extends WebTestCase
     {
         $this->makeAdmin('emailchg-super@example.com', ['ROLE_SUPER_ADMIN']);
         $targetId = $this->makeAdmin('emailchg-target-old@example.com', ['ROLE_ADMIN']);
-        $this->seedToken('admin_password_reset_tokens', 'emailchg-target-old@example.com');
+        $this->seedToken('password_reset_tokens', 'emailchg-target-old@example.com');
         $this->loginAsAdmin('emailchg-super@example.com');
 
-        $this->client->request('GET', '/admin/superadmin/admins/' . $targetId . '/edit');
+        $this->client->request('GET', '/admin/users/' . $targetId . '/edit');
         $this->client->submitForm('Save Changes', [
             'email'  => 'emailchg-target-new@example.com',
             'name'   => 'Target',
             'role'   => 'ROLE_ADMIN',
             'status' => 'active',
         ]);
-        self::assertResponseRedirects('/admin/superadmin/admins');
+        self::assertResponseRedirects('/admin/users');
 
-        self::assertSame(0, $this->liveTokens('admin_password_reset_tokens', 'emailchg-target-old@example.com'));
+        self::assertSame(0, $this->liveTokens('password_reset_tokens', 'emailchg-target-old@example.com'));
     }
 }

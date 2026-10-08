@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Admin;
 
-use App\Entity\Admin;
+use App\Entity\User;
 use App\Entity\DbConsoleSession;
 use App\Security\ConsoleCookie;
 use App\Service\ConfigService;
@@ -48,7 +48,7 @@ final class AdminDatabaseConsoleTest extends WebTestCase
             $this->conn->executeStatement('DELETE FROM db_console_throttle');
             $this->conn->executeStatement('DELETE FROM admin_sessions');
             $this->conn->executeStatement("DELETE FROM admin_password_reset_tokens WHERE email LIKE 'dbc_%@example.com'");
-            $this->conn->executeStatement("DELETE FROM admin WHERE email LIKE 'dbc_%@example.com'");
+            $this->conn->executeStatement("DELETE FROM \"user\" WHERE email LIKE 'dbc_%@example.com'");
             $this->conn->executeStatement('DELETE FROM audit_log');
             foreach ([ConsoleCookie::ENABLED_UNTIL_KEY, ConsoleCookie::WINDOW_MINUTES_KEY] as $k) {
                 $this->conn->executeStatement('DELETE FROM config WHERE config_key = ?', [$k]);
@@ -68,7 +68,7 @@ final class AdminDatabaseConsoleTest extends WebTestCase
      */
     private function createAdmin(string $email, array $roles): int
     {
-        $admin = new Admin();
+        $admin = (new User())->setRoles(['ROLE_ADMIN']);
         $admin->setEmail($email);
         $admin->setName('DB Console Test');
         $admin->setPassword(password_hash('adminpassword', PASSWORD_BCRYPT, ['cost' => 4]));
@@ -86,7 +86,7 @@ final class AdminDatabaseConsoleTest extends WebTestCase
     /** Log in and complete the mandatory TOTP challenge, leaving the session verified. */
     private function loginAs(string $email): void
     {
-        $this->client->request('GET', '/admin/login');
+        $this->client->request('GET', '/login');
         $this->client->submitForm('Sign in', ['email' => $email, 'password' => 'adminpassword']);
 
         $this->client->request('GET', '/admin/dashboard');
@@ -122,7 +122,7 @@ final class AdminDatabaseConsoleTest extends WebTestCase
         $this->client->request('GET', '/admin/db');
 
         self::assertResponseRedirects();
-        self::assertStringContainsString('/admin/login', (string) $this->client->getResponse()->headers->get('Location'));
+        self::assertStringContainsString('/login', (string) $this->client->getResponse()->headers->get('Location'));
     }
 
     /** Raw database access is a maintainer power: ROLE_SUPER_ADMIN is deliberately not enough. */
@@ -493,7 +493,7 @@ final class AdminDatabaseConsoleTest extends WebTestCase
 
         $this->client->request('GET', '/admin/reset-password/' . $plaintext);
         $this->client->submitForm('Reset Password', ['password' => 'a-brand-new-password-123']);
-        self::assertResponseRedirects('/admin/login');
+        self::assertResponseRedirects('/login');
 
         self::assertSame(0, $this->consolesOf($id), 'a reset after a compromise must also close the console');
     }

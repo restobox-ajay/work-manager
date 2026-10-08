@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Functional\Api;
 
 use App\Api\OpenApiSpec;
-use App\Entity\Admin;
+use App\Bundle\Auth2fa\Repository\TwoFactorSettingsRepository;
 use App\Entity\User;
 use App\Htaccess\CurlLoopbackProbe;
 use App\Htaccess\HtaccessLockRenderer;
@@ -296,10 +296,12 @@ final class OpenApiContractTest extends WebTestCase
         self::assertSame(200, $this->lastStatus, 'a user personal access token reaches /api');
         $this->call('ping', '/api/ping', token: null);
         self::assertSame(401, $this->lastStatus, 'no token, no /api');
-        // Issue #58: this assertion used to run BEFORE the admin-token call, so it checked the token-less one and
-        // an /api that accepted admin tokens would have passed (200 is a documented ping status).
+        // ADR-068: an admin is a user holding an admin role and both APIs share the PAT bundle's tokens, so an
+        // admin's token reaches /api too; the reverse direction (a plain user's token on /admin-api) is refused.
         $this->call('ping', '/api/ping', token: $this->adminToken);
-        self::assertSame(401, $this->lastStatus, 'an ADMIN token is not a user personal access token');
+        self::assertSame(200, $this->lastStatus, 'an admin token is a personal access token of a user');
+        $this->client->request('GET', '/admin-api/users', [], [], ['HTTP_AUTHORIZATION' => 'Bearer ' . $this->userToken]);
+        self::assertSame(403, $this->client->getResponse()->getStatusCode(), 'a plain user token never reaches /admin-api');
     }
 
     // ---- Htaccess Lock API (tech support only). Every call goes through the one gate (ADR-062); the file
@@ -680,19 +682,23 @@ final class OpenApiContractTest extends WebTestCase
 
     private function createAdminToken(string $email, string $role): string
     {
-        $admin = new Admin();
+        $admin = new User();
         $admin->setEmail($email);
         $admin->setName('Contract API ' . $role);
         $admin->setPassword(password_hash('password', PASSWORD_BCRYPT, ['cost' => 4]));
         $admin->setRoles([$role]);
         $this->em->persist($admin);
         $this->em->flush();
+        if ($role === 'ROLE_TECH_SUPPORT') {
+            // Tech support must use 2FA (ADR-068); a token call carries no session, so it is never challenged.
+            self::getContainer()->get(TwoFactorSettingsRepository::class)->enable($admin, 'JBSWY3DPEHPK3PXP');
+        }
         $adminId = (int) $admin->getId();
         $this->em->clear();
 
         $plaintext = bin2hex(random_bytes(32));
-        $this->conn->insert('admin_access_tokens', [
-            'admin_id' => $adminId,
+        $this->conn->insert('personal_access_tokens', [
+            'user_id' => $adminId,
             'name' => 'Contract test token ' . $role,
             'token_hash' => hash('sha256', $plaintext),
             'created_at' => (new \DateTimeImmutable())->format('Y-m-d H:i:s'),
@@ -732,8 +738,7 @@ final class OpenApiContractTest extends WebTestCase
     {
         try {
             $this->conn->executeStatement('DELETE FROM personal_access_tokens');
-            $this->conn->executeStatement('DELETE FROM admin_access_tokens');
-            $this->conn->executeStatement("DELETE FROM admin WHERE email LIKE 'contractapi%@example.com'");
+            $this->conn->executeStatement("DELETE FROM \"user\" WHERE email LIKE 'contractapi%@example.com'");
             // The spec's own example addresses are what the create/invite scenarios send.
             $this->conn->executeStatement("DELETE FROM \"user\" WHERE email LIKE 'contractapi%@example.com' OR email IN ('jane.doe@example.com')");
             $this->conn->executeStatement("DELETE FROM invitations WHERE email LIKE 'contractapi%@example.com' OR email IN ('new.hire@example.com')");

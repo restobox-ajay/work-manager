@@ -26,7 +26,7 @@ class ApiDocsCest
     private function fetchServedSpecAsTechSupport(AcceptanceTester $I): string
     {
         $I->createTechSupportAdminWith2fa(self::TS_EMAIL, 'password123', self::TS_SECRET);
-        $I->amOnPage('/admin/login');
+        $I->amOnPage('/login');
         $I->submitForm('form', ['email' => self::TS_EMAIL, 'password' => 'password123']);
         $I->amOnPage('/admin/dashboard');
         $I->submitForm('form', ['_code' => $I->generateTotpCode(self::TS_SECRET)]);
@@ -104,7 +104,7 @@ class ApiDocsCest
     {
         $I->amOnPage('/admin/api-docs/openapi.json');
 
-        $I->seeCurrentUrlEquals('/admin/login');
+        $I->seeCurrentUrlEquals('/login');
         $I->dontSee('"openapi"');
     }
 }

@@ -63,11 +63,12 @@ final class InvalidUtf8LoginInputTest extends WebTestCase
         self::assertSame(0, (int) $this->conn()->fetchOne('SELECT COUNT(*) FROM user_sessions WHERE user_id = ?', [$user->getId()]), 'no session was opened for the victim');
     }
 
-    public function testInvalidUtf8IsRefusedOnTheAdminLoginAndInTheQueryStringToo(): void
+    public function testInvalidUtf8IsRefusedOnOtherPublicFormsAndInTheQueryStringToo(): void
     {
         $client = static::createClient();
 
-        $client->request('POST', '/admin/login', ['email' => "admin@example.com\xFF", 'password' => 'x']);
+        // The refusal is request-wide, not a login-form special case (the separate admin login is gone, ADR-068).
+        $client->request('POST', '/forgot-password', ['email' => "admin@example.com\xFF"]);
         self::assertResponseStatusCodeSame(400);
 
         $client->request('GET', '/login?next=' . rawurlencode("\xFF"));

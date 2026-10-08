@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Admin;
 
-use App\Entity\Admin;
+use App\Entity\User;
 use App\Tests\Support\AuthenticationTestTrait;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\DBAL\Connection;
@@ -42,7 +42,7 @@ final class AuditLogAdminViewTest extends WebTestCase
             $this->conn->executeStatement(
                 "DELETE FROM audit_log WHERE actor LIKE 'auditview-%@example.com'"
             );
-            $admin = $this->em->getRepository(Admin::class)->findOneBy(['email' => 'auditview-admin@example.com']);
+            $admin = $this->em->getRepository(User::class)->findOneBy(['email' => 'auditview-admin@example.com']);
             if ($admin !== null) {
                 $this->em->remove($admin);
                 $this->em->flush();
@@ -146,12 +146,12 @@ final class AuditLogAdminViewTest extends WebTestCase
     }
 
     // AC3: Only admin/superadmin can access; unauthenticated redirected
-    public function testUnauthenticatedAccessRedirectsToAdminLogin(): void
+    public function testUnauthenticatedAccessRedirectsToLogin(): void
     {
         $this->client->request('GET', '/admin/audit-log');
         $this->assertResponseStatusCodeSame(302);
         $this->assertStringContainsString(
-            '/admin/login',
+            '/login',
             (string) $this->client->getResponse()->headers->get('Location')
         );
     }

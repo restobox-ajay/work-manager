@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Entity;
 
 use App\Entity\User;
+use App\Enum\Role;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
 use Symfony\Component\Security\Core\User\UserInterface;
@@ -36,6 +37,19 @@ final class UserTest extends TestCase
 
         $roles = $user->getRoles();
         $this->assertCount(1, array_keys($roles, 'ROLE_USER'));
+    }
+
+    /** ADR-068: admins are users; the account's primary role is its highest one, and hasRole() reads it directly. */
+    public function testPrimaryRoleIsTheHighestHeldRole(): void
+    {
+        $user = new User();
+        $this->assertSame(Role::User, $user->getPrimaryRole());
+
+        $user->setRoles(['ROLE_ADMIN', 'ROLE_SUPER_ADMIN']);
+        $this->assertSame(Role::SuperAdmin, $user->getPrimaryRole());
+        $this->assertTrue($user->hasRole(Role::SuperAdmin));
+        $this->assertTrue($user->hasRole(Role::User));
+        $this->assertFalse($user->hasRole(Role::TechSupport));
     }
 
     public function testEmailGetterSetter(): void

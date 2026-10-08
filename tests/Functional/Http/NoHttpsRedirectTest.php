@@ -20,12 +20,13 @@ final class NoHttpsRedirectTest extends WebTestCase
         self::assertResponseStatusCodeSame(200);
     }
 
-    public function testGetAdminLoginOverHttpReturns200(): void
+    /** The admin area has no login of its own since ADR-068: over HTTP it bounces to the one /login, still over HTTP. */
+    public function testAdminAreaOverHttpRedirectsToThePlainHttpLogin(): void
     {
         $client = static::createClient();
-        $client->request('GET', '/admin/login');
+        $client->request('GET', '/admin/dashboard');
 
-        self::assertResponseStatusCodeSame(200);
+        self::assertResponseRedirects('http://localhost/login');
     }
 
     public function testNoRequiresChannelHttpsInSecurityConfig(): void

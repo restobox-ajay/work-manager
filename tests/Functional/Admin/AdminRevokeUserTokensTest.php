@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Admin;
 
-use App\Entity\Admin;
 use App\Bundle\AuthPat\Entity\PersonalAccessToken;
 use App\Entity\User;
 use App\Tests\Support\AuthenticationTestTrait;
@@ -25,11 +24,10 @@ final class AdminRevokeUserTokensTest extends WebTestCase
         $this->em     = self::getContainer()->get(EntityManagerInterface::class);
         $this->cleanup();
 
-        $admin = new Admin();
+        $admin = (new User())->setRoles(['ROLE_ADMIN']);
         $admin->setEmail('revoketokens-admin@example.com');
         $admin->setName('Revoke Tokens Admin');
         $admin->setPassword(self::hashTestPassword('adminpass'));
-        $admin->setRoles([]);
         $this->em->persist($admin);
         $this->em->flush();
         $this->em->clear();
@@ -49,7 +47,7 @@ final class AdminRevokeUserTokensTest extends WebTestCase
             $conn->executeStatement('DELETE FROM "user" WHERE email LIKE \'revoketokens-%\'');
             $conn->executeStatement('DELETE FROM audit_log WHERE actor = \'revoketokens-admin@example.com\'');
             foreach (['revoketokens-admin@example.com'] as $email) {
-                $admin = $this->em->getRepository(Admin::class)->findOneBy(['email' => $email]);
+                $admin = $this->em->getRepository(User::class)->findOneBy(['email' => $email]);
                 if ($admin) {
                     $this->em->remove($admin);
                     $this->em->flush();

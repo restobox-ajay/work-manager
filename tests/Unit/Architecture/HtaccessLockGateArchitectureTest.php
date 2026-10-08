@@ -41,7 +41,8 @@ final class HtaccessLockGateArchitectureTest extends TestCase
             if ($file->getExtension() !== 'php') {
                 continue;
             }
-            $relative = substr($file->getPathname(), \strlen($root) + 1);
+            // Normalised to '/' so the path rules below hold on Windows too.
+            $relative = str_replace('\\', '/', substr($file->getPathname(), \strlen($root) + 1));
             if (str_starts_with($relative, 'Htaccess/') === $insideHtaccess) {
                 $found[$relative] = (string) file_get_contents($file->getPathname());
             }

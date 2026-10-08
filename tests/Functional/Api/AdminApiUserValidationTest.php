@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Api;
 
-use App\Entity\Admin;
 use App\Entity\User;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
@@ -40,8 +39,7 @@ final class AdminApiUserValidationTest extends WebTestCase
     private function cleanup(): void
     {
         try {
-            $this->conn->executeStatement('DELETE FROM admin_access_tokens');
-            $this->conn->executeStatement("DELETE FROM admin WHERE email LIKE 'apival%@example.com'");
+            $this->conn->executeStatement('DELETE FROM personal_access_tokens');
             $this->conn->executeStatement("DELETE FROM \"user\" WHERE email LIKE 'apival%@example.com'");
             $this->conn->executeStatement('DELETE FROM audit_log');
             $this->em->clear();
@@ -51,7 +49,7 @@ final class AdminApiUserValidationTest extends WebTestCase
 
     private function createAdminToken(): string
     {
-        $admin = new Admin();
+        $admin = new User();
         $admin->setEmail('apivaladmin@example.com');
         $admin->setName('API Val Admin');
         $admin->setPassword(password_hash('password', PASSWORD_BCRYPT, ['cost' => 4]));
@@ -60,11 +58,11 @@ final class AdminApiUserValidationTest extends WebTestCase
         $this->em->flush();
         $this->em->clear();
 
-        $adminId = (int) $this->conn->fetchOne("SELECT id FROM admin WHERE email = 'apivaladmin@example.com'");
+        $adminId = (int) $this->conn->fetchOne("SELECT id FROM \"user\" WHERE email = 'apivaladmin@example.com'");
 
         $plaintext = bin2hex(random_bytes(32));
-        $this->conn->insert('admin_access_tokens', [
-            'admin_id'   => $adminId,
+        $this->conn->insert('personal_access_tokens', [
+            'user_id'   => $adminId,
             'name'       => 'Admin API Token',
             'token_hash' => hash('sha256', $plaintext),
             'created_at' => (new \DateTimeImmutable())->format('Y-m-d H:i:s'),

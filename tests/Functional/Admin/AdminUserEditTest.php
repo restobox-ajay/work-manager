@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Admin;
 
-use App\Entity\Admin;
 use App\Entity\User;
 use App\Security\IpWhitelistManagerInterface;
 use App\Tests\Support\AuthenticationTestTrait;
@@ -26,7 +25,7 @@ final class AdminUserEditTest extends WebTestCase
 
         $this->cleanup();
 
-        $admin = new Admin();
+        $admin = (new User())->setRoles(['ROLE_ADMIN']);
         $admin->setEmail('useredit-admin@example.com');
         $admin->setName('Edit Admin');
         $admin->setPassword(self::hashTestPassword('adminpass'));
@@ -47,12 +46,11 @@ final class AdminUserEditTest extends WebTestCase
             $conn = $this->em->getConnection();
             $conn->executeStatement("DELETE FROM personal_access_tokens WHERE user_id IN (SELECT id FROM \"user\" WHERE email LIKE 'useredit-%@example.com')");
             $conn->executeStatement("DELETE FROM user_sessions WHERE user_id IN (SELECT id FROM \"user\" WHERE email LIKE 'useredit-%@example.com')");
-            $conn->executeStatement("DELETE FROM admin_access_tokens WHERE admin_id IN (SELECT id FROM admin WHERE email = 'useredit-admin@example.com')");
             $conn->executeStatement("DELETE FROM audit_log WHERE actor = 'useredit-admin@example.com'");
             $this->em->getConnection()->executeStatement(
                 "DELETE FROM \"user\" WHERE email LIKE 'useredit-%@example.com'"
             );
-            $admin = $this->em->getRepository(Admin::class)->findOneBy(['email' => 'useredit-admin@example.com']);
+            $admin = $this->em->getRepository(User::class)->findOneBy(['email' => 'useredit-admin@example.com']);
             if ($admin) {
                 $this->em->remove($admin);
                 $this->em->flush();
@@ -237,7 +235,7 @@ final class AdminUserEditTest extends WebTestCase
         $pat = $this->giveLiveCredentials($user);
         $adminToken = bin2hex(random_bytes(32));
         $this->em->getConnection()->executeStatement(
-            "INSERT INTO admin_access_tokens (admin_id, name, token_hash, created_at) SELECT id, 'edit test', ?, ? FROM admin WHERE email = 'useredit-admin@example.com'",
+            "INSERT INTO personal_access_tokens (user_id, name, token_hash, created_at) SELECT id, 'edit test', ?, ? FROM \"user\" WHERE email = 'useredit-admin@example.com'",
             [hash('sha256', $adminToken), (new \DateTimeImmutable())->format('Y-m-d H:i:s')],
         );
         $patch = function (string $status) use ($user, $adminToken): void {

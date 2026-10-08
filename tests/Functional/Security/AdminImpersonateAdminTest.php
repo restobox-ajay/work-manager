@@ -4,12 +4,16 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Security;
 
-use App\Entity\Admin;
 use App\Tests\Support\AuthenticationTestTrait;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 
+/**
+ * Super admin impersonates an admin. Since ADR-068 this is the same flow as impersonating a user (the Users
+ * list's Impersonate button, app_admin_users_impersonate_start); who may impersonate whom is
+ * AccountManagementPolicy: a super admin manages admins, a plain admin manages plain users only.
+ */
 final class AdminImpersonateAdminTest extends WebTestCase
 {
     use AuthenticationTestTrait;
@@ -32,75 +36,63 @@ final class AdminImpersonateAdminTest extends WebTestCase
 
     private function cleanup(): void
     {
-        try {
-            $conn = $this->em->getConnection();
-            $conn->executeStatement("DELETE FROM admin WHERE email LIKE 'impersonate_admin_test_%'");
-            $this->em->clear();
-        } catch (\Throwable) {
-        }
-    }
-
-    private function createAdmin(string $email, array $roles = []): Admin
-    {
-        $admin = new Admin();
-        $admin->setEmail($email);
-        $admin->setName('Test Admin ' . $email);
-        $admin->setPassword(password_hash('adminpass', PASSWORD_BCRYPT, ['cost' => 4]));
-        $admin->setRoles($roles);
-        $this->em->persist($admin);
-        $this->em->flush();
+        $this->em->getConnection()->executeStatement("DELETE FROM \"user\" WHERE email LIKE 'impersonate_admin_test_%'");
         $this->em->clear();
-
-        return $this->em->getRepository(Admin::class)->findOneBy(['email' => $email]);
     }
 
-
-    // AC1: Superadmin sees an 'Impersonate' option on admin account detail pages
-    public function testSuperadminSeesImpersonateOptionOnAdminPage(): void
+    private static function impersonateFormSelector(int $targetId): string
     {
-        $superadmin = $this->createAdmin('impersonate_admin_test_super@example.com', ['ROLE_SUPER_ADMIN']);
-        $target     = $this->createAdmin('impersonate_admin_test_target@example.com', []);
+        return sprintf('form[action="/admin/users/%d/impersonate-start"]', $targetId);
+    }
 
-        $this->loginAsAdmin($superadmin->getEmail());
+    // AC1: a super admin sees an Impersonate option on an admin's row.
+    public function testSuperadminSeesImpersonateOptionForAnAdmin(): void
+    {
+        $this->createTestAdmin('impersonate_admin_test_super@example.com', roles: ['ROLE_SUPER_ADMIN']);
+        $target = $this->createTestAdmin('impersonate_admin_test_target@example.com');
 
-        $this->client->request('GET', '/admin/superadmin/admins');
+        $this->loginAsAdmin('impersonate_admin_test_super@example.com');
+        $this->client->request('GET', '/admin/users');
 
         $this->assertResponseIsSuccessful();
-        $this->assertSelectorExists('form[action="/admin/superadmin/admins/' . $target->getId() . '/impersonate"]');
+        $this->assertSelectorExists(self::impersonateFormSelector((int) $target->getId()));
     }
 
-    // AC2: Superadmin can switch to act as an admin
+    // AC2: a super admin can switch to act as an admin.
     public function testSuperadminCanSwitchToActAsAdmin(): void
     {
-        $superadmin = $this->createAdmin('impersonate_admin_test_super2@example.com', ['ROLE_SUPER_ADMIN']);
-        $target     = $this->createAdmin('impersonate_admin_test_target2@example.com', []);
+        $this->createTestAdmin('impersonate_admin_test_super2@example.com', roles: ['ROLE_SUPER_ADMIN']);
+        $target = $this->createTestAdmin('impersonate_admin_test_target2@example.com');
 
-        $this->loginAsAdmin($superadmin->getEmail());
+        $this->loginAsAdmin('impersonate_admin_test_super2@example.com');
+        $crawler = $this->client->request('GET', '/admin/users');
+        $this->client->submit($crawler->filter(self::impersonateFormSelector((int) $target->getId()))->form());
 
-        // Submit impersonate form
-        $crawler = $this->client->request('GET', '/admin/superadmin/admins');
-        $form    = $crawler->filter('form[action="/admin/superadmin/admins/' . $target->getId() . '/impersonate"]')->form();
-        $this->client->submit($form);
-
-        // Follow redirect to admin dashboard
+        $this->assertResponseRedirects('/dashboard');
         $this->client->followRedirect();
-
         $this->assertResponseIsSuccessful();
 
         $content = (string) $this->client->getResponse()->getContent();
-        $this->assertStringContainsString('admin-impersonation-banner', $content);
-        $this->assertStringContainsString($target->getEmail(), $content);
+        $this->assertStringContainsString('impersonation-banner', $content);
+        $this->assertStringContainsString('Impersonating: impersonate_admin_test_target2@example.com', $content);
     }
 
-    // AC3: A regular admin does not see the impersonate option for other admin accounts
-    public function testRegularAdminCannotSeeImpersonateOption(): void
+    // AC3: a plain admin is not offered — and cannot start — impersonation of another admin: the account is
+    // hidden from them, so the start endpoint answers like an unknown id.
+    public function testRegularAdminCannotImpersonateAnotherAdmin(): void
     {
-        $regularAdmin = $this->createAdmin('impersonate_admin_test_regular@example.com', []);
+        $this->createTestAdmin('impersonate_admin_test_regular@example.com');
+        $target = $this->createTestAdmin('impersonate_admin_test_target3@example.com');
 
-        $this->loginAsAdmin($regularAdmin->getEmail());
+        $this->loginAsAdmin('impersonate_admin_test_regular@example.com');
+        $this->client->request('GET', '/admin/users');
+        $this->assertResponseIsSuccessful();
+        $this->assertSelectorNotExists(self::impersonateFormSelector((int) $target->getId()));
 
-        $this->client->request('GET', '/admin/superadmin/admins');
+        $this->client->request('POST', sprintf('/admin/users/%d/impersonate-start', $target->getId()), ['_token' => 'irrelevant']);
+        $this->assertResponseStatusCodeSame(404);
 
-        $this->assertResponseStatusCodeSame(403);
+        $this->client->request('GET', '/dashboard');
+        $this->assertStringNotContainsString('impersonation-banner', (string) $this->client->getResponse()->getContent());
     }
 }

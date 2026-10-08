@@ -29,8 +29,7 @@ use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
  * browser end up at /login after either action can't tell you which mechanism did it. These
  * tests trigger each one alone (bypassing tearDownLiveAccess via raw SQL) to prove each is
  * independently sufficient. A third test proves the negative: a plain, non-status edit —
- * including an attempted role change, which is a no-op because role is fixed to ROLE_USER
- * (ADR-024) — triggers neither.
+ * including a role field that resubmits the account's current role — triggers neither.
  */
 final class SessionInvalidationMechanismTest extends WebTestCase
 {
@@ -64,7 +63,8 @@ final class SessionInvalidationMechanismTest extends WebTestCase
         }
     }
 
-    private function createUser(string $email): int
+    /** @param list<string> $roles */
+    private function createUser(string $email, array $roles = []): int
     {
         $user = new User();
         $user->setEmail($email);
@@ -72,6 +72,7 @@ final class SessionInvalidationMechanismTest extends WebTestCase
         $user->setPassword(password_hash(self::PASSWORD, PASSWORD_BCRYPT, ['cost' => 4]));
         $user->setStatus('active');
         $user->setIsVerified(true);
+        $user->setRoles($roles);
         $this->em->persist($user);
         $this->em->flush();
         $this->em->clear();
@@ -150,21 +151,23 @@ final class SessionInvalidationMechanismTest extends WebTestCase
     }
 
     // Negative case, answering "does changing something other than status ever bounce the user":
-    // role is fixed to ROLE_USER (ADR-024) and update() never calls tearDownLiveAccess for a plain
-    // edit, so neither mechanism fires and the live session survives untouched.
+    // update() never calls tearDownLiveAccess for a plain edit (the role resubmitted unchanged), so
+    // neither mechanism fires and the live session survives untouched.
     public function testPlainEditIncludingRoleDoesNotDeauthenticateLiveSession(): void
     {
         $userId = $this->createUser('sessmech-edit@example.com');
+        $actorId = $this->createUser('sessmech-admin@example.com', ['ROLE_ADMIN']);
         $this->login('sessmech-edit@example.com');
         $sessionId = $this->sessionIdFor($userId);
 
         /** @var UserAccountAdminService $userService */
         $userService = self::getContainer()->get(UserAccountAdminService::class);
         $user = $this->em->getRepository(User::class)->find($userId);
+        $actor = $this->em->getRepository(User::class)->find($actorId);
         $result = $userService->update($user, [
             'name' => 'Renamed Session Mechanism Test User',
             'role' => 'ROLE_USER',
-        ], 'admin@example.com', '127.0.0.1');
+        ], $actor, '127.0.0.1');
 
         $this->assertTrue($result->isSuccess(), 'A no-op ROLE_USER role submission must not be rejected.');
 

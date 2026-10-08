@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Admin;
 
-use App\Entity\Admin;
 use App\Entity\User;
 use App\Tests\Support\AuthenticationTestTrait;
 use Doctrine\ORM\EntityManagerInterface;
@@ -25,14 +24,13 @@ final class AdminUserDeleteTest extends WebTestCase
 
         $this->cleanup();
 
-        $admin = new Admin();
+        $admin = (new User())->setRoles(['ROLE_ADMIN']);
         $admin->setEmail('userdelete-admin@example.com');
         $admin->setName('Delete Admin');
         $admin->setPassword(self::hashTestPassword('adminpass'));
-        $admin->setRoles([]);
         $this->em->persist($admin);
 
-        $superAdmin = new Admin();
+        $superAdmin = (new User())->setRoles(['ROLE_ADMIN']);
         $superAdmin->setEmail('userdelete-superadmin@example.com');
         $superAdmin->setName('Delete SuperAdmin');
         $superAdmin->setPassword(self::hashTestPassword('superpass'));
@@ -56,7 +54,7 @@ final class AdminUserDeleteTest extends WebTestCase
                 "DELETE FROM \"user\" WHERE email LIKE 'userdelete-%@example.com'"
             );
             foreach (['userdelete-admin@example.com', 'userdelete-superadmin@example.com'] as $email) {
-                $admin = $this->em->getRepository(Admin::class)->findOneBy(['email' => $email]);
+                $admin = $this->em->getRepository(User::class)->findOneBy(['email' => $email]);
                 if ($admin) {
                     $this->em->remove($admin);
                     $this->em->flush();

@@ -43,7 +43,6 @@ final class TwoFactorAuthTest extends WebTestCase
                 $conn->executeStatement('DELETE FROM two_factor_settings WHERE user_id = ?', [$id]);
             }
             $conn->executeStatement('DELETE FROM "user" WHERE email LIKE ?', ['2fa_%@example.com']);
-            $conn->executeStatement('DELETE FROM admin WHERE email LIKE ?', ['2fa_%@example.com']);
             $this->em->clear();
         } catch (\Throwable) {
         }
@@ -278,8 +277,7 @@ final class TwoFactorAuthTest extends WebTestCase
         $this->loginAsAdmin('2fa_impadmin@example.com');
         $crawler = $this->client->request('GET', '/admin/users');
         $this->client->submit($crawler->filter('form[action="/admin/users/' . $target->getId() . '/impersonate-start"]')->form());
-        $this->client->followRedirect(); // /impersonate/start -> /dashboard
-        $this->client->followRedirect();
+        $this->client->followRedirect(); // -> /dashboard as the enrolled target, no challenge
         $this->assertResponseIsSuccessful();
         $this->assertRouteSame('app_dashboard');
         $this->assertSelectorExists('.impersonation-banner');
@@ -308,10 +306,12 @@ final class TwoFactorAuthTest extends WebTestCase
             $this->loginAsAdmin('2fa_impadmin@example.com');
             $crawler = $this->client->request('GET', '/admin/users');
             $this->client->submit($crawler->filter('form[action="/admin/users/' . $target->getId() . '/impersonate-start"]')->form());
-            $this->client->followRedirect(); // /impersonate/start: the user checker refuses the locked target
-            $this->assertResponseRedirects('/admin/login', null, 'impersonating a locked account fails');
+            // The user checker refuses the locked target before any marker is written; the admin stays put.
+            $this->assertResponseRedirects('/admin/users', null, 'impersonating a locked account fails');
+            $this->assertNull($this->client->getRequest()->getSession()->get('_impersonating_as'), 'no marker is left behind');
 
             $this->client->request('GET', '/admin/users');
+            $this->assertResponseIsSuccessful('the admin is still signed in as themself');
             $this->assertSelectorNotExists('.impersonation-banner', 'a failed impersonation must not claim to be active');
 
             // The lock lifts; the target signs in with their own password in this same session.

@@ -161,7 +161,7 @@ final class TwoFactorCest
         $I->seeUserTotpEnabled($userId, false);
 
         // With 2FA now cleared and enforcement required, the user is forced back to setup.
-        $I->amOnPage('/admin/logout');
+        $I->amOnPage('/logout');
         $I->seedConfig('2fa.enforcement', 'required');
         $I->loginAsUser('victim@example.com', 'password123');
         $I->seeCurrentUrlEquals('/account/2fa/setup');

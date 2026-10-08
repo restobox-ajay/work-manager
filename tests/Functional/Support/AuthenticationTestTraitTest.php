@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Support;
 
-use App\Entity\Admin;
 use App\Entity\User;
 use App\Tests\Support\AuthenticationTestTrait;
 use Doctrine\ORM\EntityManagerInterface;
@@ -40,7 +39,6 @@ final class AuthenticationTestTraitTest extends WebTestCase
         try {
             $conn = $this->em->getConnection();
             $conn->executeStatement('DELETE FROM "user" WHERE email LIKE ?', ['trait-fixture-%@example.com']);
-            $conn->executeStatement('DELETE FROM admin WHERE email LIKE ?', ['trait-fixture-%@example.com']);
             $this->em->clear();
         } catch (\Throwable) {
         }
@@ -69,12 +67,13 @@ final class AuthenticationTestTraitTest extends WebTestCase
     {
         $admin = $this->createTestAdmin('trait-fixture-admin@example.com', 'Trait Admin');
 
-        $this->assertInstanceOf(Admin::class, $admin);
+        $this->assertInstanceOf(User::class, $admin);
+        $this->assertContains('ROLE_ADMIN', $admin->getRoles());
         $this->assertSame('active', $admin->getStatus());
         $this->assertTrue(password_verify('adminpass', $admin->getPassword()));
     }
 
-    public function testLoginAsAdminHelperAuthenticatesOnAdminFirewall(): void
+    public function testLoginAsAdminHelperReachesTheAdminArea(): void
     {
         $this->createTestAdmin('trait-fixture-admin@example.com', 'Trait Admin');
 
@@ -82,5 +81,15 @@ final class AuthenticationTestTraitTest extends WebTestCase
         $this->client->request('GET', '/admin/dashboard');
 
         $this->assertResponseIsSuccessful();
+    }
+
+    public function testLoginAsEnrolledTechSupportPassesTheTwoFactorChallenge(): void
+    {
+        $this->loginAsEnrolledTechSupport('trait-fixture-tech@example.com');
+
+        $this->client->request('GET', '/admin/dashboard');
+        $this->assertResponseIsSuccessful();
+        $this->client->request('GET', '/admin/db');
+        $this->assertResponseIsSuccessful('tech support (and only tech support) reaches the database console');
     }
 }

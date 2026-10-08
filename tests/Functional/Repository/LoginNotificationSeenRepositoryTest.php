@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Repository;
 
-use App\Repository\AdminLoginNotificationSeenRepository;
 use App\Repository\LoginNotificationSeenRepository;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
@@ -14,7 +13,7 @@ use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
  * Issue #33: markSeen() swallowed the UNIQUE violation of a concurrent duplicate marker AFTER flush(), but
  * Doctrine closes the EntityManager on any flush failure — so the login request carried on with a closed EM and
  * the session / login-history listeners after it threw EntityManagerClosed (500, then logged out). Recording an
- * already-recorded marker must be a no-op that leaves the EntityManager usable, in both realms.
+ * already-recorded marker must be a no-op that leaves the EntityManager usable (one account realm since ADR-068).
  */
 final class LoginNotificationSeenRepositoryTest extends KernelTestCase
 {
@@ -40,7 +39,6 @@ final class LoginNotificationSeenRepositoryTest extends KernelTestCase
     private function cleanup(): void
     {
         $this->conn->executeStatement('DELETE FROM login_notification_seen WHERE user_id = ?', [self::OWNER_ID]);
-        $this->conn->executeStatement('DELETE FROM admin_login_notification_seen WHERE admin_id = ?', [self::OWNER_ID]);
     }
 
     public function testRecordingAUserMarkerAgainLeavesTheEntityManagerOpen(): void
@@ -55,21 +53,6 @@ final class LoginNotificationSeenRepositoryTest extends KernelTestCase
         self::assertTrue($repo->hasSeen(self::OWNER_ID, 'device-a'));
         self::assertSame(1, (int) $this->conn->fetchOne(
             'SELECT COUNT(*) FROM login_notification_seen WHERE user_id = ? AND marker = ?',
-            [self::OWNER_ID, 'device-a']
-        ));
-    }
-
-    public function testRecordingAnAdminMarkerAgainLeavesTheEntityManagerOpen(): void
-    {
-        $repo = self::getContainer()->get(AdminLoginNotificationSeenRepository::class);
-
-        $repo->markSeen(self::OWNER_ID, 'device-a');
-        $repo->markSeen(self::OWNER_ID, 'device-a');
-
-        self::assertTrue($this->em->isOpen(), 'the rest of the admin login request must still be able to write');
-        self::assertTrue($repo->hasSeen(self::OWNER_ID, 'device-a'));
-        self::assertSame(1, (int) $this->conn->fetchOne(
-            'SELECT COUNT(*) FROM admin_login_notification_seen WHERE admin_id = ? AND marker = ?',
             [self::OWNER_ID, 'device-a']
         ));
     }

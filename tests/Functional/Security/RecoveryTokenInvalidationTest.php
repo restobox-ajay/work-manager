@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Security;
 
-use App\Entity\Admin;
 use App\Entity\User;
 use Doctrine\DBAL\Connection;
 use App\Tests\Support\AuthenticationTestTrait;
@@ -15,7 +14,8 @@ use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 /**
  * FEATURE-102 (review C7 / ADR-020): deactivating OR soft-deleting an account must immediately kill
  * ALL of its outstanding recovery artefacts (password-reset + magic-link tokens), and the reset
- * consumption flow must reject a token whose account is inactive — both realms (user and admin).
+ * consumption flow must reject a token whose account is inactive — for plain users and admin-role accounts alike
+ * (ADR-068: one `user` table, one reset flow, one token table).
  */
 final class RecoveryTokenInvalidationTest extends WebTestCase
 {
@@ -45,24 +45,24 @@ final class RecoveryTokenInvalidationTest extends WebTestCase
     {
         try {
             $like = self::PREFIX . '%@example.com';
-            $this->conn->executeStatement('DELETE FROM admin_access_tokens');
+            $this->conn->executeStatement('DELETE FROM personal_access_tokens WHERE user_id IN (SELECT id FROM "user" WHERE email LIKE ?)', [$like]);
             $this->conn->executeStatement('DELETE FROM password_reset_tokens WHERE email LIKE ?', [$like]);
-            $this->conn->executeStatement('DELETE FROM admin_password_reset_tokens WHERE email LIKE ?', [$like]);
             $this->conn->executeStatement('DELETE FROM magic_link_tokens WHERE email LIKE ?', [$like]);
             $this->conn->executeStatement('DELETE FROM "user" WHERE email LIKE ?', [$like]);
-            $this->conn->executeStatement('DELETE FROM admin WHERE email LIKE ?', [$like]);
             $this->em->clear();
         } catch (\Throwable) {
         }
     }
 
-    private function makeUser(string $email, string $status = 'active'): User
+    /** @param list<string> $roles */
+    private function makeUser(string $email, string $status = 'active', array $roles = []): User
     {
         $user = new User();
         $user->setEmail($email);
         $user->setName('Recovery Token User');
         $user->setPassword(password_hash('userpass', PASSWORD_BCRYPT, ['cost' => 4]));
         $user->setStatus($status);
+        $user->setRoles($roles);
         $this->em->persist($user);
         $this->em->flush();
         $id = $user->getId();
@@ -71,20 +71,10 @@ final class RecoveryTokenInvalidationTest extends WebTestCase
         return $this->em->getRepository(User::class)->find($id);
     }
 
-    private function makeAdmin(string $email, array $roles = ['ROLE_ADMIN'], string $status = 'active'): Admin
+    /** @param list<string> $roles */
+    private function makeAdmin(string $email, array $roles = ['ROLE_ADMIN'], string $status = 'active'): User
     {
-        $admin = new Admin();
-        $admin->setEmail($email);
-        $admin->setName('Recovery Token Admin');
-        $admin->setPassword(password_hash('adminpass', PASSWORD_BCRYPT, ['cost' => 4]));
-        $admin->setRoles($roles);
-        $admin->setStatus($status);
-        $this->em->persist($admin);
-        $this->em->flush();
-        $id = $admin->getId();
-        $this->em->clear();
-
-        return $this->em->getRepository(Admin::class)->find($id);
+        return $this->createTestAdmin($email, 'Recovery Token Admin', status: $status, roles: $roles);
     }
 
     /** @return string plaintext token */
@@ -109,11 +99,12 @@ final class RecoveryTokenInvalidationTest extends WebTestCase
         return $value === false ? null : ($value === null ? null : (string) $value);
     }
 
-    private function makeAdminApiToken(Admin $admin): string
+    /** An admin calls /admin-api with an ordinary personal access token (ADR-068). */
+    private function makeAdminApiToken(User $admin): string
     {
         $plaintext = bin2hex(random_bytes(32));
-        $this->conn->insert('admin_access_tokens', [
-            'admin_id'   => $admin->getId(),
+        $this->conn->insert('personal_access_tokens', [
+            'user_id'    => $admin->getId(),
             'name'       => 'Recovery Token API',
             'token_hash' => hash('sha256', $plaintext),
             'created_at' => (new \DateTimeImmutable())->format('Y-m-d H:i:s'),
@@ -213,18 +204,18 @@ final class RecoveryTokenInvalidationTest extends WebTestCase
         $this->makeAdmin(self::PREFIX . 'super@example.com', ['ROLE_SUPER_ADMIN']);
         $target = $this->makeAdmin(self::PREFIX . 'edittarget@example.com', ['ROLE_ADMIN']);
         $email  = $target->getEmail();
-        $this->seedToken('admin_password_reset_tokens', $email);
+        $this->seedToken('password_reset_tokens', $email);
 
         $this->loginAsAdmin(self::PREFIX . 'super@example.com');
 
-        $crawler = $this->client->request('GET', '/admin/superadmin/admins/' . $target->getId() . '/edit');
-        $form = $crawler->filter('form')->form();
+        $crawler = $this->client->request('GET', '/admin/users/' . $target->getId() . '/edit');
+        $form = $crawler->filter('form[action$="/edit"]')->form();
         $form['status'] = 'inactive';
         $this->client->submit($form);
-        $this->assertResponseRedirects('/admin/superadmin/admins');
+        $this->assertResponseRedirects('/admin/users');
 
         $this->assertNotNull(
-            $this->tokenUsedAt('admin_password_reset_tokens', $email),
+            $this->tokenUsedAt('password_reset_tokens', $email),
             'Deactivating an admin must mark its outstanding reset token as used'
         );
     }
@@ -235,35 +226,35 @@ final class RecoveryTokenInvalidationTest extends WebTestCase
         $this->makeAdmin(self::PREFIX . 'super2@example.com', ['ROLE_SUPER_ADMIN']);
         $target = $this->makeAdmin(self::PREFIX . 'deladmin@example.com', ['ROLE_ADMIN']);
         $email  = $target->getEmail();
-        $this->seedToken('admin_password_reset_tokens', $email);
+        $this->seedToken('password_reset_tokens', $email);
 
         $this->loginAsAdmin(self::PREFIX . 'super2@example.com');
 
-        $crawler = $this->client->request('GET', '/admin/superadmin/admins');
-        $form = $crawler->filter('form[action$="/admins/' . $target->getId() . '/delete"]')->form();
+        $crawler = $this->client->request('GET', '/admin/users');
+        $form = $crawler->filter('form[action="/admin/users/' . $target->getId() . '/delete"]')->form();
         $this->client->submit($form);
-        $this->assertResponseRedirects('/admin/superadmin/admins');
+        $this->assertResponseRedirects('/admin/users');
 
         $this->assertNotNull(
-            $this->tokenUsedAt('admin_password_reset_tokens', $email),
+            $this->tokenUsedAt('password_reset_tokens', $email),
             'Soft-deleting an admin must mark its outstanding reset token as used'
         );
     }
 
-    // AC4: the admin reset-consumption flow rejects a token whose admin account is inactive.
+    // AC4: the (one) reset-consumption flow rejects a token whose admin-role account is inactive.
     public function testAdminResetConsumptionRejectedForInactiveAdmin(): void
     {
         $admin = $this->makeAdmin(self::PREFIX . 'inactiveadmin@example.com', ['ROLE_ADMIN'], 'inactive');
         $email = $admin->getEmail();
-        $plaintext = $this->seedToken('admin_password_reset_tokens', $email);
+        $plaintext = $this->seedToken('password_reset_tokens', $email);
 
-        $originalHash = (string) $this->conn->fetchOne('SELECT password FROM admin WHERE email = ?', [$email]);
+        $originalHash = (string) $this->conn->fetchOne('SELECT password FROM "user" WHERE email = ?', [$email]);
 
-        $crawler = $this->client->request('GET', '/admin/reset-password/' . $plaintext);
+        $crawler = $this->client->request('GET', '/reset-password/' . $plaintext);
         $this->assertStringContainsString('no longer valid', $crawler->text());
 
-        $this->client->request('POST', '/admin/reset-password/' . $plaintext, ['password' => 'BrandNewPass123!']);
-        $newHash = (string) $this->conn->fetchOne('SELECT password FROM admin WHERE email = ?', [$email]);
+        $this->client->request('POST', '/reset-password/' . $plaintext, ['password' => 'BrandNewPass123!']);
+        $newHash = (string) $this->conn->fetchOne('SELECT password FROM "user" WHERE email = ?', [$email]);
 
         $this->assertSame($originalHash, $newHash, 'Inactive admin password must not change via reset');
     }

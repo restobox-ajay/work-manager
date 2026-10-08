@@ -9,7 +9,7 @@ use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 
 /**
  * FEATURE-131 (review C17): framework.trusted_hosts is pinned to the app's real hosts
- * (DEFAULT_URI host + ADMIN_DOMAIN + APP_DOMAIN, all 'localhost' in the test env). A request
+ * (DEFAULT_URI host + APP_DOMAIN; ADMIN_DOMAIN is gone since ADR-068), both 'localhost' in the test env). A request
  * carrying a spoofed/unknown Host header is rejected with 400 BEFORE any controller runs, so
  * host-header injection (password-reset link poisoning, off-origin redirects) is impossible.
  */

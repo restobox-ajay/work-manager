@@ -23,7 +23,8 @@ class UserAuthCest
         $I->loginAsUser('alice@example.com', 'password123');
 
         $I->seeCurrentUrlEquals('/dashboard');
-        $I->see('Dashboard', 'h1');
+        // A plain user's dashboard is their own work list (ADR-070).
+        $I->see('My work', 'h1');
 
         // A server-side session was established for the authenticated request.
         $I->seeCookie('PHPSESSID');
@@ -120,6 +121,7 @@ class UserAuthCest
         // With no session, the REMEMBERME cookie alone must re-authenticate.
         $I->amOnPage('/dashboard');
         $I->seeCurrentUrlEquals('/dashboard');
-        $I->see('Dashboard', 'h1');
+        // A plain user's dashboard is their own work list (ADR-070).
+        $I->see('My work', 'h1');
     }
 }
