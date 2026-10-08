@@ -150,6 +150,28 @@ final class RentController extends AbstractWorkController
         return $this->billForm($bill->getTenant(), $bill, $request);
     }
 
+    #[Route('/tenants/{id}/delete', name: 'app_rent_tenant_delete', requirements: ['id' => '\d+'], methods: ['POST'])]
+    public function deleteTenant(RentTenant $tenant, Request $request): Response
+    {
+        $this->assertCsrf($request, 'rent_tenant_delete_'.$tenant->getId());
+        $name = $tenant->getName();
+        $done = $this->rent->deleteTenant($tenant, $this->viewer());
+        $this->addFlash('success', sprintf('Tenant "%s" deleted with %d bills and %d payments.', $name, $done['bills'], $done['payments']));
+
+        return $this->redirectToRoute('app_rent_tenants');
+    }
+
+    #[Route('/properties/{id}/delete', name: 'app_rent_property_delete', requirements: ['id' => '\d+'], methods: ['POST'])]
+    public function deleteProperty(RentProperty $property, Request $request): Response
+    {
+        $this->assertCsrf($request, 'rent_property_delete_'.$property->getId());
+        $name = $property->getName();
+        $done = $this->rent->deleteProperty($property, $this->viewer());
+        $this->addFlash('success', sprintf('Property "%s" deleted with %d tenants, %d bills and %d payments.', $name, $done['tenants'], $done['bills'], $done['payments']));
+
+        return $this->redirectToRoute('app_rent_properties');
+    }
+
     #[Route('/bills/{id}/delete', name: 'app_rent_bill_delete', requirements: ['id' => '\d+'], methods: ['POST'])]
     public function deleteBill(RentBill $bill, Request $request): Response
     {

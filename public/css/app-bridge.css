@@ -901,3 +901,15 @@ a.kpi{text-decoration:none;color:inherit}a.kpi:hover{border-color:var(--primary,
 }
 /* A form field toggled with the hidden attribute really hides (.field sets its own display). */
 .field[hidden]{display:none!important}
+/* Project page (ADR-107): details and task summary side by side, stacked on narrow screens. */
+.project-overview{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;margin-bottom:16px}
+.project-overview .card{margin:0}
+.project-kpis{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+@media (max-width:900px){.project-overview{grid-template-columns:1fr}}
+/* Inline delete forms in table rows and page headers (ADR-109). */
+form.inline-delete{display:inline;margin:0;padding:0;border:0;background:none}
+/* Request Payment (ADR-110): the ticked tasks' count and total, beside the button. */
+.rp-selected{margin-right:12px;white-space:nowrap}
+/* Request Payment: the Amount column, its heading and the ticked total line up on the right. */
+.rp-group .t th.right,.rp-group .t td.right{text-align:right}
+.rp-group [data-selected-total]{font-weight:700}

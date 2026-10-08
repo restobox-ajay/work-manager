@@ -75,3 +75,8 @@
     }[statusId] ?? 'plain' -%}
     <span class="badge {{ tone }}">{{ statuses[statusId] ?? '—' }}</span>
 {%- endmacro %}
+
+{# A small POST form that deletes after the browser's confirm (ADR-109). #}
+{% macro deleteButton(action, token, question, label = 'Delete', size = 'xs') %}
+    <form class="mx-form inline-delete" method="post" action="{{ action }}" onsubmit="return confirm({{ question|json_encode }});"><input type="hidden" name="_token" value="{{ csrf_token(token) }}"><button class="btn danger {{ size }}" type="submit">{{ label }}</button></form>
+{%- endmacro %}

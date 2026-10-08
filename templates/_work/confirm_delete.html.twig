@@ -1,0 +1,36 @@
+{% extends 'base.html.twig' %}
+{% import '_work/macros.html.twig' as ui %}
+
+{#
+    Permanent delete confirmation (ADR-109). Expects: kind ("client" / "project"), name, impact (label => count),
+    kept (optional sentence about what stays), action, cancel, token (csrf id), errors.
+#}
+{% block title %}Delete {{ kind }} {{ name }}{% endblock %}
+
+{% block body %}
+<div class="page-head">
+    <div class="ph-main">
+        <div class="eyebrow">Delete {{ kind }}</div>
+        <div class="ph-title"><h1>Delete “{{ name }}” permanently?</h1></div>
+        <p class="lead">This cannot be undone.</p>
+    </div>
+    <div class="ph-actions"><a class="btn secondary back" href="{{ cancel }}">Back</a></div>
+</div>
+{{ ui.errors(errors) }}
+<form class="card mx-form" method="post" action="{{ action }}" style="max-width:640px">
+    <input type="hidden" name="_token" value="{{ csrf_token(token) }}">
+    <div class="v-warn" style="background:var(--danger-soft);border:1px solid #ebccd1;color:#a94442;border-radius:8px;padding:10px 14px">
+        <b>Deleting this {{ kind }} also deletes:</b>
+        <ul style="margin:6px 0 0">
+            {% for label, n in impact %}<li>{{ n }} {{ label }}</li>{% endfor %}
+        </ul>
+        {% if kept %}<p style="margin:8px 0 0">{{ kept }}</p>{% endif %}
+    </div>
+    <div class="field" style="margin-top:14px"><label for="f-confirm">Type <b>{{ name }}</b> to confirm</label>
+        <input type="text" id="f-confirm" name="confirm" autocomplete="off" required autofocus></div>
+    <div class="form-actions" style="margin-top:12px">
+        <a class="btn secondary" href="{{ cancel }}">Cancel</a>
+        <button class="btn danger" type="submit">Delete permanently</button>
+    </div>
+</form>
+{% endblock %}

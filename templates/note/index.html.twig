@@ -41,7 +41,9 @@
                         <td>{{ n.about(note.type, note.subject) }}</td>
                         <td>{{ note.author.name ?: note.author.email }}</td>
                         <td class="nowrap">{{ note.updatedAt|date('Y-m-d H:i') }}</td>
-                        <td class="actions">{% if is_granted('NOTE_EDIT', note) %}<a class="btn warning xs" href="{{ path('app_note_edit', {id: note.id}) }}">Edit</a>{% endif %}</td>
+                        <td class="actions"><a class="btn primary xs" href="{{ path('app_note_view', {id: note.id}) }}">View</a>
+                            {% if is_granted('NOTE_EDIT', note) %}<a class="btn warning xs" href="{{ path('app_note_edit', {id: note.id}) }}">Edit</a>
+                            {{ ui.deleteButton(path('app_note_delete', {id: note.id}), 'note_delete_' ~ note.id, 'Delete this note?') }}{% endif %}</td>
                     </tr>
                 {% else %}
                     <tr><td colspan="5" class="empty"><b>No notes found.</b> <a href="{{ path('app_note_new') }}">Write one</a>.</td></tr>

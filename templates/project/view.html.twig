@@ -13,6 +13,7 @@
         <a class="btn info" href="{{ path('app_task_index', {projectId: project.id}) }}">All tasks</a>
         {% if is_granted('TASK_CREATE') and canEdit %}<a class="btn success" href="{{ path('app_task_create', {projectId: project.id}) }}">+ New task</a>{% endif %}
         {% if canEdit %}<a class="btn warning" href="{{ path('app_project_edit', {id: project.id}) }}">Edit</a>{% endif %}
+        {% if is_granted('ROLE_ADMIN') %}<a class="btn danger" href="{{ path('app_project_delete', {id: project.id}) }}">Delete</a>{% endif %}
     </div>
 </div>
 
@@ -24,6 +25,39 @@
         {% for reason in archivedReasons %}<div>{{ reason }}</div>{% endfor %}
     </div>
 {% endif %}
+
+{% macro money(h, currency) %}{{ (h / 100)|number_format(2, '.', '')|invoice_money(currency) }}{% endmacro %}
+{% import _self as pv %}
+{% set client = project.client %}
+<div class="project-overview">
+    <div class="card">
+        <h2>Project details</h2>
+        <table class="t v-kv">
+            <tr><th>Client</th><td><a href="{{ path('app_client_view', {id: client.id}) }}">{{ client.name }}</a>{% if client.companyName %} <span class="muted">· {{ client.companyName }}</span>{% endif %}{% if client.clientCode %} <span class="badge plain">{{ client.clientCode }}</span>{% endif %}</td></tr>
+            <tr><th>Client contact</th><td>{{ client.email ?: '—' }}{% if client.phone %} · {{ client.phone }}{% endif %}</td></tr>
+            <tr><th>Status</th><td>{{ ui.activeBadge(project.active) }}{% if project.isDeleted %} <span class="badge danger">Removed from list</span>{% endif %}</td></tr>
+            <tr><th>Project ID</th><td>#{{ project.id }}</td></tr>
+            <tr><th>Created</th><td>{{ ui.ts(project.createdAt, 'M j, Y H:i') }}{% if project.createdBy %} <span class="muted">by {{ people[project.createdBy] ?? ('user #' ~ project.createdBy) }}</span>{% endif %}</td></tr>
+            <tr><th>Last updated</th><td>{{ ui.ts(project.updatedAt, 'M j, Y H:i') }}{% if project.updatedBy %} <span class="muted">by {{ people[project.updatedBy] ?? ('user #' ~ project.updatedBy) }}</span>{% endif %}</td></tr>
+            <tr><th>Staff</th><td>{{ staff|length }} {{ staff|length == 1 ? 'person' : 'people' }} · <a href="#staff">see below</a></td></tr>
+        </table>
+    </div>
+    <div class="card">
+        <h2>Tasks at a glance</h2>
+        <div class="kpis rent-kpis project-kpis">
+            <div class="kpi"><span>Tasks</span><b>{{ summary.count }}</b><small><a href="#tasks">see the list</a></small></div>
+            {% for code, f in summary.fees %}
+                <div class="kpi"><span>Payout {{ code }}</span><b>{{ pv.money(f.total, code) }}</b><small>{{ pv.money(f.owed, code) }} approved, unpaid · {{ pv.money(f.paid, code) }} paid</small></div>
+            {% endfor %}
+        </div>
+        {% if summary.byStatus is not empty %}
+            <div class="pills" style="margin-top:12px">
+                {% for name, n in summary.byStatus %}<a class="pill" href="{{ path('app_task_index', {projectId: project.id, taskStatusId: (statuses|filter(v => v == name)|keys|first)}) }}">{{ name }} · {{ n }}</a>{% endfor %}
+            </div>
+        {% endif %}
+        {% if summary.hiddenFees > 0 and summary.fees is not empty %}<p class="muted small">Payout totals leave out {{ summary.hiddenFees }} task{{ summary.hiddenFees == 1 ? '' : 's' }} whose fee you cannot see.</p>{% endif %}
+    </div>
+</div>
 
 {% if project.description %}
     <div class="card"><h2>Description</h2><div style="white-space:pre-line">{{ project.description }}</div></div>
@@ -44,17 +78,28 @@
     <div class="table-header"><h2>Tasks</h2><span class="grow"></span><span class="muted small">{{ tasks|length }} task{{ tasks|length == 1 ? '' : 's' }}, newest first</span></div>
     <div class="tscroll">
         <table class="t">
-            <thead><tr><th>Task</th><th>Status</th><th>Due</th><th>Created</th></tr></thead>
+            <thead><tr><th>#</th><th>Task</th><th>Contractor</th><th>Type</th><th>Status</th><th>Due</th><th>Approved</th><th class="num">Payout</th><th>Created</th><th></th></tr></thead>
             <tbody>
                 {% for task in tasks %}
+                    {% set row = rows[task.id] %}
                     <tr>
-                        <td><a class="bold" href="{{ path('app_task_view', {id: task.id}) }}">{{ ui.short(task.name) }}</a></td>
+                        <td class="muted nowrap">#{{ task.id }}</td>
+                        <td><a class="bold" href="{{ path('app_task_view', {id: task.id}) }}">{{ ui.short(task.name) }}</a>{% if task.statusDetail %}<div class="muted small">{{ ui.short(task.statusDetail, 70) }}</div>{% endif %}</td>
+                        <td>{{ task.assignee ? (task.assignee.name ?: task.assignee.email) : '—' }}</td>
+                        <td>{{ types[task.taskTypeId] ?? '—' }}</td>
                         <td>{{ ui.statusBadge(task.taskStatusId, statuses) }}</td>
                         <td class="nowrap">{{ ui.ts(task.dueDate) }}</td>
+                        <td class="nowrap">{{ ui.ts(task.approvedDate) }}</td>
+                        <td class="num nowrap">{{ row.canSeeFee ? (task.totalAmount ?? '0.00')|invoice_money(currencies[task.currencyId] ?? 'USD') : '—' }}</td>
                         <td class="nowrap">{{ ui.ts(task.createdAt) }}</td>
+                        <td class="actions">
+                            <a class="btn primary xs" href="{{ path('app_task_view', {id: task.id}) }}">View</a>
+                            {% if row.canEdit %}<a class="btn warning xs" href="{{ path('app_task_edit', {id: task.id}) }}">Edit</a>{% endif %}
+                            {% if row.canDelete %}{{ ui.deleteButton(path('app_task_delete', {id: task.id}), 'task_delete_' ~ task.id, 'Delete this task?') }}{% endif %}
+                        </td>
                     </tr>
                 {% else %}
-                    <tr><td colspan="4" class="empty"><b>No tasks yet.</b></td></tr>
+                    <tr><td colspan="10" class="empty"><b>No tasks yet.</b></td></tr>
                 {% endfor %}
             </tbody>
         </table>

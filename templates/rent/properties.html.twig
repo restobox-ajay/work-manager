@@ -28,6 +28,7 @@
                         <td class="actions">
                             <a class="btn success xs" href="{{ path('app_rent_tenant_new', {propertyId: p.id}) }}">+ Tenant</a>
                             <a class="btn warning xs" href="{{ path('app_rent_property_edit', {id: p.id}) }}">Edit</a>
+                            {{ ui.deleteButton(path('app_rent_property_delete', {id: p.id}), 'rent_property_delete_' ~ p.id, 'Delete ' ~ p.name ~ ' with all its tenants, bills and payments? This cannot be undone.') }}
                         </td>
                     </tr>
                 {% else %}

@@ -16,8 +16,10 @@ use App\Service\Client\ClientService;
 use App\Service\Note\NoteService;
 use App\Service\Pagination\Paginated;
 use App\Service\Project\ProjectService;
+use App\Service\Project\ProjectTaskSummary;
 use App\Service\Project\ProjectTaskGrid;
 use App\Service\Project\ProjectStaffService;
+use App\Service\Task\TaskListService;
 use App\Service\Task\TaskLookups;
 use App\Service\Validation\InputValue;
 use Symfony\Bridge\Doctrine\Attribute\MapEntity;
@@ -25,6 +27,7 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
+use App\Service\Work\WorkDeleter;
 
 /** Projects and their staff (ADR-070). Rules: WorkAccess via WorkVoter; writes: ProjectService/ProjectStaffService. */
 #[Route('/project')]
@@ -108,9 +111,9 @@ final class ProjectController extends AbstractWorkController
 
     #[Route('/{id}', name: 'app_project_view', requirements: ['id' => '\d+'], methods: ['GET'])]
     #[IsGranted(WorkVoter::PROJECT_VIEW, 'project')]
-    public function view(#[MapEntity(id: 'id')] Project $project, TaskRepository $tasks): Response
+    public function view(#[MapEntity(id: 'id')] Project $project, TaskRepository $tasks, TaskListService $taskList, ProjectTaskSummary $summary): Response
     {
-        return $this->renderProjectPage($project, $tasks);
+        return $this->renderProjectPage($project, $tasks, $taskList, $summary);
     }
 
     #[Route('/{id}/edit', name: 'app_project_edit', requirements: ['id' => '\d+'], methods: ['GET', 'POST'])]
@@ -156,6 +159,33 @@ final class ProjectController extends AbstractWorkController
         return $this->redirectToRoute('app_project_index');
     }
 
+    /** Permanent delete (ADR-109), admins only: GET shows what goes with the project, POST (name typed) deletes it. */
+    #[Route('/{id}/delete', name: 'app_project_delete', requirements: ['id' => '\d+'], methods: ['GET', 'POST'])]
+    #[IsGranted('ROLE_ADMIN')]
+    public function delete(#[MapEntity(id: 'id')] Project $project, Request $request, WorkDeleter $deleter): Response
+    {
+        $errors = [];
+        if ($request->isMethod('POST')) {
+            $this->assertCsrf($request, 'project_delete_'.$project->getId());
+            if (mb_strtolower(trim($request->request->getString('confirm'))) === mb_strtolower(trim($project->getName()))) {
+                $name = $project->getName();
+                $done = $deleter->deleteProject($project, $this->viewer());
+                $this->addFlash('success', sprintf('Project "%s" deleted with %d tasks.', $name, $done['tasks']));
+
+                return $this->redirectToRoute('app_project_index');
+            }
+            $errors[] = 'Type the project\'s name exactly to confirm.';
+        }
+        $impact = $deleter->projectImpact($project);
+
+        return $this->render('_work/confirm_delete.html.twig', [
+            'kind' => 'project', 'name' => $project->getName(), 'errors' => $errors, 'kept' => null,
+            'impact' => ['tasks' => $impact['tasks'], 'notes' => $impact['notes']],
+            'action' => $this->generateUrl('app_project_delete', ['id' => $project->getId()]), 'cancel' => $this->generateUrl('app_project_view', ['id' => $project->getId()]),
+            'token' => 'project_delete_'.$project->getId(),
+        ], new Response(status: $errors === [] ? 200 : 422));
+    }
+
     #[Route('/{id}/staff', name: 'app_project_staff_add', requirements: ['id' => '\d+'], methods: ['POST'])]
     #[IsGranted(WorkVoter::PROJECT_EDIT, 'project')]
     public function addStaff(#[MapEntity(id: 'id')] Project $project, Request $request, UserRepository $users): Response
@@ -193,8 +223,14 @@ final class ProjectController extends AbstractWorkController
      * @param list<string>         $errors
      */
     /** The project page: details, every one of its tasks (tasks are added on the edit page, ADR-083) and its staff. */
-    private function renderProjectPage(Project $project, TaskRepository $tasks): Response
+    private function renderProjectPage(Project $project, TaskRepository $tasks, TaskListService $taskList, ProjectTaskSummary $summary): Response
     {
+        $projectTasks = $tasks->findForProject((int) $project->getId());
+        // Fee visibility is per task (ADR-107): the page shows a payout only where the viewer may see it.
+        $rows = $taskList->rowDetails($this->viewer(), $projectTasks);
+        $statuses = $this->lookups->statuses();
+        $currencies = $this->lookups->currencies();
+
         $canEdit = $this->isGranted(WorkVoter::PROJECT_EDIT, $project);
         if ($canEdit) {
             // A Client Manager granted after the project was made becomes staff the next time anyone looks.
@@ -207,8 +243,13 @@ final class ProjectController extends AbstractWorkController
             'staff'           => $this->staff->staffOf($project),
             'selectableUsers' => $canEdit ? $this->staff->selectableUsers($project) : [],
             'permissions'     => ProjectStaffService::ASSIGNABLE_PERMISSIONS,
-            'tasks'           => $tasks->findForProject((int) $project->getId()),
-            'statuses'        => $this->lookups->statuses(),
+            'tasks'           => $projectTasks,
+            'rows'            => $rows,
+            'summary'         => $summary->summarise($projectTasks, $rows, $statuses, $currencies),
+            'statuses'        => $statuses,
+            'currencies'      => $currencies,
+            'types'           => $this->lookups->types(),
+            'people'          => $this->lookups->people(),
             'canEdit'         => $canEdit,
             'notes'           => $this->notes->forSubject($project),
             // Seeing the project does not mean seeing each of its tasks, so each task note is checked on its own.

@@ -13,6 +13,7 @@
         <a class="btn info" href="{{ path('app_task_index', {clientId: client.id}) }}">Tasks</a>
         {% if is_granted('PROJECT_CREATE', client) %}<a class="btn success" href="{{ path('app_project_create', {clientId: client.id}) }}">+ New project</a>{% endif %}
         {% if is_granted('CLIENT_EDIT', client) %}<a class="btn warning" href="{{ path('app_client_edit', {id: client.id}) }}">Edit</a>{% endif %}
+        {% if is_granted('ROLE_ADMIN') %}<a class="btn danger" href="{{ path('app_client_delete', {id: client.id}) }}">Delete</a>{% endif %}
     </div>
 </div>
 

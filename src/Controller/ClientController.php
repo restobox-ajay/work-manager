@@ -20,6 +20,7 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
+use App\Service\Work\WorkDeleter;
 
 /** Clients (ADR-070). Rules: WorkAccess via WorkVoter; writes: ClientService. */
 #[Route('/client')]
@@ -154,6 +155,43 @@ final class ClientController extends AbstractWorkController
         $this->addFlash('success', sprintf('Client "%s" archived and removed from the list.', $client->getName()));
 
         return $this->redirectToRoute('app_client_index');
+    }
+
+    /**
+     * Permanent delete (ADR-109), admins only: GET shows what goes with the client, POST (with the client's name
+     * typed to confirm) deletes it all. Invoices already emailed stay, unlinked.
+     */
+    #[Route('/{id}/delete', name: 'app_client_delete', requirements: ['id' => '\d+'], methods: ['GET', 'POST'])]
+    #[IsGranted('ROLE_ADMIN')]
+    public function delete(#[MapEntity(id: 'id')] Client $client, Request $request, WorkDeleter $deleter): Response
+    {
+        $errors = [];
+        if ($request->isMethod('POST')) {
+            $this->assertCsrf($request, 'client_delete_'.$client->getId());
+            if (self::confirmed($request, $client->getName())) {
+                $name = $client->getName();
+                $done = $deleter->deleteClient($client, $this->viewer());
+                $this->addFlash('success', sprintf('Client "%s" deleted with %d projects and %d tasks.', $name, $done['projects'], $done['tasks']));
+
+                return $this->redirectToRoute('app_client_index');
+            }
+            $errors[] = 'Type the client\'s name exactly to confirm.';
+        }
+        $impact = $deleter->clientImpact($client);
+
+        return $this->render('_work/confirm_delete.html.twig', [
+            'kind' => 'client', 'name' => $client->getName(), 'errors' => $errors,
+            'impact' => ['projects' => $impact['projects'], 'tasks' => $impact['tasks'], 'notes' => $impact['notes'], 'unsent invoices' => $impact['unsentInvoices']],
+            'kept' => $impact['sentInvoices'] > 0 ? sprintf('%d invoice(s) already emailed will be kept, unlinked from the client.', $impact['sentInvoices']) : null,
+            'action' => $this->generateUrl('app_client_delete', ['id' => $client->getId()]), 'cancel' => $this->generateUrl('app_client_view', ['id' => $client->getId()]),
+            'token' => 'client_delete_'.$client->getId(),
+        ], new Response(status: $errors === [] ? 200 : 422));
+    }
+
+    /** The typed name must match (case and surrounding spaces aside). */
+    private static function confirmed(Request $request, string $name): bool
+    {
+        return mb_strtolower(trim($request->request->getString('confirm'))) === mb_strtolower(trim($name));
     }
 
     /** @return array<string, mixed> */

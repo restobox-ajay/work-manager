@@ -40,6 +40,7 @@
                             <a class="btn info xs" href="{{ path('app_rent_year', {tenant: t.id}) }}">Year</a>
                             <a class="btn success xs" href="{{ path('app_rent_bill_new', {id: t.id}) }}">+ Bill</a>
                             <a class="btn primary xs" href="{{ path('app_rent_payment_new', {id: t.id}) }}">+ Payment</a>
+                            {{ ui.deleteButton(path('app_rent_tenant_delete', {id: t.id}), 'rent_tenant_delete_' ~ t.id, 'Delete ' ~ t.name ~ ' with all their bills and payments? This cannot be undone.') }}
                         </td>
                     </tr>
                 {% else %}

@@ -16,6 +16,7 @@ use App\Service\Validation\InputValue;
 use App\Service\Validation\WriteResult;
 use App\Service\WorkAuditTrail;
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\DBAL\ArrayParameterType;
 
 /**
  * Every write of the rent module (ADR-085): properties, tenancies, monthly bills and payments. Amounts are checked as
@@ -197,6 +198,55 @@ final class RentService
 
         return $this->persist($bill, $isNew, 'bill', sprintf('%s %s total %s', $tenant->getName(), $period->format('Y-m'),
             InvoiceMoney::display($bill->getTotal(), RentMoney::CURRENCY)), $actor);
+    }
+
+    /** Deletes a tenancy with all its bills and payments (ADR-109). @return array{bills: int, payments: int} */
+    public function deleteTenant(RentTenant $tenant, User $actor): array
+    {
+        $label = sprintf('#%d %s', (int) $tenant->getId(), $tenant->getName());
+        $counts = $this->removeTenancies([(int) $tenant->getId()]);
+        $this->audit->record($actor, 'rent.tenant_delete', sprintf('%s with %d bills and %d payments', $label, $counts['bills'], $counts['payments']));
+
+        return $counts;
+    }
+
+    /**
+     * Deletes a property with its tenancies, their bills and payments (ADR-109). Expenses recorded against it stay,
+     * without the property.
+     *
+     * @return array{tenants: int, bills: int, payments: int}
+     */
+    public function deleteProperty(RentProperty $property, User $actor): array
+    {
+        $id = (int) $property->getId();
+        $label = sprintf('#%d %s', $id, $property->getName());
+        $tenantIds = array_map('intval', $this->em->getConnection()->fetchFirstColumn('SELECT id FROM rent_tenant WHERE property_id = ?', [$id]));
+        $counts = ['tenants' => count($tenantIds)] + $this->removeTenancies($tenantIds, $id);
+        $this->audit->record($actor, 'rent.property_delete', sprintf('%s with %d tenants, %d bills and %d payments', $label, $counts['tenants'], $counts['bills'], $counts['payments']));
+
+        return $counts;
+    }
+
+    /** @param list<int> $tenantIds @return array{bills: int, payments: int} */
+    private function removeTenancies(array $tenantIds, ?int $propertyId = null): array
+    {
+        $this->em->clear(); // rows go behind the ORM's back
+        $db = $this->em->getConnection();
+
+        return $db->transactional(static function () use ($db, $tenantIds, $propertyId): array {
+            $ints = ArrayParameterType::INTEGER;
+            $counts = ['bills' => 0, 'payments' => 0];
+            if ($tenantIds !== []) {
+                $counts['payments'] = $db->executeStatement('DELETE FROM rent_payment WHERE tenant_id IN (?)', [$tenantIds], [$ints]);
+                $counts['bills'] = $db->executeStatement('DELETE FROM rent_bill WHERE tenant_id IN (?)', [$tenantIds], [$ints]);
+                $db->executeStatement('DELETE FROM rent_tenant WHERE id IN (?)', [$tenantIds], [$ints]);
+            }
+            if ($propertyId !== null) {
+                $db->executeStatement('DELETE FROM rent_property WHERE id = ?', [$propertyId]); // expenses: FK sets property_id NULL
+            }
+
+            return $counts;
+        });
     }
 
     public function deleteBill(RentBill $bill, User $actor): void

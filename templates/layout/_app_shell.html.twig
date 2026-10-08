@@ -78,9 +78,7 @@
               current: cur starts with 'app_invoice_' and (cur == 'app_invoice_tasks' or cur == 'app_invoice_new_tasks' or (invoiceKind ?? '') == 'tasks'),
               add: { label: 'Invoice approved tasks', href: path('app_invoice_new_tasks') } },
         ] },
-        { label: 'Request Payment', icon: 'send', children: [
-            { label: 'Approved Tasks', href: path('app_request_payment'), current: cur == 'app_request_payment' },
-        ] },
+        { label: 'Request Payment', icon: 'send', href: path('app_request_payment'), current: cur == 'app_request_payment' },
         { label: 'Rent', icon: 'home', children: [
             { label: 'Summary', href: path('app_rent_summary'), current: cur == 'app_rent_summary' },
             { label: 'Tenants', href: path('app_rent_tenants'), current: (cur starts with 'app_rent_tenant' and cur != 'app_rent_tenant_year_all') or cur starts with 'app_rent_bill' or cur starts with 'app_rent_payment',

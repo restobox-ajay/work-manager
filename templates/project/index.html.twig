@@ -58,6 +58,7 @@
                             <a class="btn primary xs" href="{{ path('app_project_view', {id: project.id}) }}">View</a>
                             <a class="btn info xs" href="{{ path('app_task_index', {projectId: project.id}) }}">Tasks</a>
                             {% if is_granted('PROJECT_EDIT', project) %}<a class="btn warning xs" href="{{ path('app_project_edit', {id: project.id}) }}">Edit</a>{% endif %}
+                            {% if is_granted('ROLE_ADMIN') %}<a class="btn danger xs" href="{{ path('app_project_delete', {id: project.id}) }}">Delete</a>{% endif %}
                         </td>
                     </tr>
                 {% else %}

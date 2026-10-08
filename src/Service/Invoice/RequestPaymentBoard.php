@@ -24,6 +24,37 @@ final class RequestPaymentBoard
     }
 
     /**
+     * One client's page (ADR-110): the clients that have approved, uninvoiced tasks (for the dropdown, with how many),
+     * the chosen one ($clientId, when it has any; none until one is picked) and that client's blocks, one per currency.
+     *
+     * @return array{clients: list<array{client: Client, count: int}>, client: ?Client, groups: list<array{client: Client, currency: string, tasks: list<Task>, total: int}>, totals: array<string, int>, noClient: list<Task>}
+     */
+    public function forClient(?int $clientId): array
+    {
+        $all = $this->build(null, null);
+        $clients = [];
+        foreach ($all['groups'] as $group) {
+            $id = (int) $group['client']->getId();
+            $clients[$id] ??= ['client' => $group['client'], 'count' => 0];
+            $clients[$id]['count'] += count($group['tasks']);
+        }
+        $chosen = $clientId !== null && isset($clients[$clientId]) ? $clientId : null;
+        $groups = array_values(array_filter($all['groups'], static fn (array $g) => (int) $g['client']->getId() === $chosen));
+        $totals = [];
+        foreach ($groups as $group) {
+            $totals[$group['currency']] = ($totals[$group['currency']] ?? 0) + $group['total'];
+        }
+
+        return [
+            'clients'  => array_values($clients),
+            'client'   => $chosen !== null ? $clients[$chosen]['client'] : null,
+            'groups'   => $groups,
+            'totals'   => $totals,
+            'noClient' => $all['noClient'],
+        ];
+    }
+
+    /**
      * @return array{groups: list<array{client: Client, currency: string, tasks: list<Task>, total: int}>, noClient: list<Task>, totals: array<string, int>}
      *         totals are per currency, in hundredths
      */

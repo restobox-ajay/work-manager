@@ -18,6 +18,7 @@
         <a class="btn success" href="{{ path('app_rent_bill_new', {id: tenant.id}) }}">+ Monthly bill</a>
         <a class="btn primary" href="{{ path('app_rent_payment_new', {id: tenant.id}) }}">+ Payment</a>
         <a class="btn warning" href="{{ path('app_rent_tenant_edit', {id: tenant.id}) }}">Edit</a>
+        {{ ui.deleteButton(path('app_rent_tenant_delete', {id: tenant.id}), 'rent_tenant_delete_' ~ tenant.id, 'Delete ' ~ tenant.name ~ ' with all their bills and payments? This cannot be undone.', 'Delete', '') }}
     </div>
 </div>
 {{ ui.flashes() }}

@@ -2744,3 +2744,52 @@ form field (app-bridge.css), since `.field` sets its own display.
 **Decision.** Tasks menu gains "List Tasks" (`/task` with no status filter: every task the viewer may see); it is the
 current entry when the list has no status filter, "Tasks By Client/Project" when it has one. The client, project and
 task lists get a "View" button (first in the row's actions) to the record's detail page.
+
+
+## ADR-107: Project page shows all its details (owner request, 2026-10-08)
+
+**Decision.** The project page opens with "Project details" (client with company, code and contact; status; id;
+created and last updated with who) and "Tasks at a glance" (task count, a pill per status linking to the filtered
+task list, and per-currency payout: total, approved-unpaid, paid — `ProjectTaskSummary`). The task table adds id,
+contractor, type, approved date, payout and View / Edit. Payout figures follow the existing per-task fee rule
+(`TaskListService::rowDetails()` canSeeFee): a fee the viewer may not see shows "—" and is left out of the totals.
+
+
+## ADR-108: Demo data for every module (owner request, 2026-10-08)
+
+**Decision.** `php bin/console app:demo-data` (logic in `App\Service\Demo\DemoData`) now fills every module, not
+just work: 4 clients, 7 projects with staff, 21 tasks in mixed statuses; 2 approved-tasks invoices and 1 independent
+invoice (using the only active billing profile, or a "Demo Billing Co." one when there is none) with the remaining
+approved tasks left for Request Payment; 4 notes (client, project, task, independent); 2 rent properties with
+tenants, 3 months of bills and payments (current month unpaid); 12 expenses over two months; 6 subscriptions with
+sign-up details (one overdue, one renewing in 4 days, one one-time, one paused) and renewal payments. Records after
+the tasks go through the module services, so they are validated and appear in the Activity Log. `--purge` removes
+exactly the demo records by their markers (client code DEMO…, property "Demo – …", expense / note title "Demo: …",
+subscriptions tagged [demo-data]). The Password Manager is not seeded: entries are encrypted in the browser.
+
+
+## ADR-109: Delete buttons everywhere; permanent client / project delete (owner request, 2026-10-08)
+
+**Decision.** Lists and detail pages get a Delete button wherever a record can be deleted: clients, projects, tasks
+(project page and task list, per the existing task-delete rule), notes (plus a View button), subscriptions, rent
+tenants and properties (new: `RentService::deleteTenant/deleteProperty`, with their bills and payments; expenses keep
+their amount and lose the property link). Invoices, expenses, config lists and users already had theirs. Small
+deletes use `ui.deleteButton()` (POST + CSRF + browser confirm). Clients and projects are deleted **permanently with
+everything under them** (owner's choice) by `WorkDeleter`, admins only, via a confirmation page that lists what goes
+and requires typing the name: projects, tasks (with their notes, task managers, priority rows; invoice lines keep
+their text but lose the task link), notes, staff, client managers and invoices never emailed. Invoices already
+emailed are kept, unlinked from the client. One transaction; audited as client.delete / project.delete with counts.
+The older "Archive and remove from the list" stays on the project page as the reversible option.
+
+
+## ADR-110: Request Payment shows one client at a time (owner request, 2026-10-08)
+
+**Decision.** The Request Payment page shows a single client: the dropdown lists only clients with approved,
+uninvoiced tasks (with the task count), the first is chosen by default, and choosing another reloads with just that
+client's blocks (one per currency) and totals (`RequestPaymentBoard::forClient()`). The currency filter is removed.
+
+**Follow-up (same day).** No client is pre-selected: the page asks to choose one (and says how many have work).
+The summary tiles are gone. Tasks start unticked; each block's footer shows the ticked tasks' count and total live,
+and its button stays disabled until at least one task is ticked.
+
+**Menu (same day).** "Request Payment" is a single menu link to the page (its "Approved Tasks" submenu entry is gone).

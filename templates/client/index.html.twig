@@ -61,6 +61,7 @@
                             <a class="btn primary xs" href="{{ path('app_client_view', {id: client.id}) }}">View</a>
                             <a class="btn info xs" href="{{ path('app_task_index', {clientId: client.id}) }}">Tasks</a>
                             {% if is_granted('CLIENT_EDIT', client) %}<a class="btn warning xs" href="{{ path('app_client_edit', {id: client.id}) }}">Edit</a>{% endif %}
+                            {% if is_granted('ROLE_ADMIN') %}<a class="btn danger xs" href="{{ path('app_client_delete', {id: client.id}) }}">Delete</a>{% endif %}
                         </td>
                     </tr>
                 {% else %}

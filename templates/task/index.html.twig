@@ -120,6 +120,7 @@
                         <td class="actions">
                             <a class="btn primary xs" href="{{ path('app_task_view', {id: task.id}) }}">View</a>
                             {% if row.canEdit %}<a class="btn warning xs" href="{{ path('app_task_edit', {id: task.id}) }}">Edit</a>{% endif %}
+                            {% if row.canDelete %}{{ ui.deleteButton(path('app_task_delete', {id: task.id}), 'task_delete_' ~ task.id, 'Delete this task?') }}{% endif %}
                         </td>
                     </tr>
                 {% else %}
