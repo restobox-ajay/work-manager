@@ -112,6 +112,32 @@ final class NoteTest extends WebTestCase
         self::assertSelectorExists(sprintf('#notes a[href="/note/new?%s=%d"]', $type, $id));
     }
 
+    public function testTheProjectPageAlsoShowsTheNotesOnItsTasks(): void
+    {
+        $this->persistNote(self::ADMIN, 'Project-level note', 'project');
+        $this->persistNote(self::ADMIN, 'Note on the task', 'task');
+        $deletedTask = (new Task())->setName('Deleted task')->setIsDeleted(1)
+            ->setProject($this->em->getRepository(Project::class)->find($this->projectId));
+        $this->em->persist($deletedTask);
+        $this->em->flush();
+        $this->em->persist((new Note())->setTitle('Note on a deleted task')->attachTo($deletedTask)
+            ->setAuthor($this->em->getRepository(User::class)->findOneBy(['email' => self::ADMIN]))
+            ->setCreatedAt(time())->setUpdatedAt(time()));
+        $this->em->flush();
+        $this->em->clear();
+
+        $this->signIn(self::ADMIN);
+        $crawler = $this->client->request('GET', '/project/'.$this->projectId);
+
+        self::assertResponseIsSuccessful();
+        $card = $crawler->filter('#notes')->text();
+        self::assertStringContainsString('Project-level note', $card);
+        self::assertStringContainsString("Notes on this project's tasks", $card);
+        self::assertStringContainsString('Note on the task', $card);
+        self::assertCount(1, $crawler->filter(sprintf('#notes a[href="/task/%d"]', $this->taskId)), 'A task note links to its task.');
+        self::assertStringNotContainsString('Note on a deleted task', $card);
+    }
+
     public function testSomeoneWhoCannotSeeTheRecordCanNeitherReadNorWriteItsNotes(): void
     {
         $note = $this->persistNote(self::ADMIN, 'Client secret', 'client');

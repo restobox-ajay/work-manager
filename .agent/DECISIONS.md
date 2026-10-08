@@ -2695,5 +2695,8 @@ A note's record is fixed when it is written.
   their own independent notes; for anyone else, only the notes they wrote (the rest are on the record pages, which
   check access) — so the list needs no per-row visibility rules.
 - A new note from the menu is independent; a note on a record is started from that record's page.
+- The project page's Notes card also lists the notes on the project's tasks (deleted tasks left out), each linking
+  to its task. Seeing a project does not imply seeing each task, so every task note is checked with
+  `NoteVoter::VIEW` before it is shown.
 
 **Tripwire:** verifiable — Verified by `tests/Functional/Note/NoteTest.php`.

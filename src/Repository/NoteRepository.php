@@ -43,6 +43,19 @@ class NoteRepository extends ServiceEntityRepository
             ->getResult();
     }
 
+    /** @return Note[] the notes on a project's tasks (deleted tasks left out), with their task loaded */
+    public function findOnTasksOf(Project $project): array
+    {
+        return $this->ordered($this->createQueryBuilder('n')
+            ->addSelect('a', 't')
+            ->join('n.author', 'a')
+            ->join('n.task', 't')
+            ->andWhere('t.project = :project AND t.isDeleted = 0')
+            ->setParameter('project', $project))
+            ->getQuery()
+            ->getResult();
+    }
+
     /**
      * @param array{term?: ?string, type?: ?string} $filters
      *

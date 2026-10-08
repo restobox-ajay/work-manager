@@ -21,11 +21,26 @@
     <span class="muted small">{{ note.author.name ?: note.author.email }} · {{ note.updatedAt|date('Y-m-d H:i') }}{% if note.updatedAt != note.createdAt %} (edited){% endif %}</span>
 {% endmacro %}
 
+{# One note in a Notes card; withTask also names the task it is on (the project page's task notes). #}
+{% macro item(note, withTask = false) %}
+    {% import _self as n %}
+    <div class="note-item{{ note.pinned ? ' pinned' }}">
+        <div class="btn-row" style="justify-content:space-between">
+            <a class="bold" href="{{ path('app_note_view', {id: note.id}) }}">{% if note.pinned %}📌 {% endif %}{{ note.title }}</a>
+            {% if is_granted('NOTE_EDIT', note) %}<a class="btn warning xs" href="{{ path('app_note_edit', {id: note.id}) }}">Edit</a>{% endif %}
+        </div>
+        {% if withTask %}<div class="small">{{ n.about('task', note.task) }}</div>{% endif %}
+        {% if note.body %}<div class="note-body">{{ note.body|length > 400 ? note.body|slice(0, 400) ~ '…' : note.body }}</div>{% endif %}
+        {{ n.byline(note) }}
+    </div>
+{% endmacro %}
+
 {#
     The Notes card on a client, project or task page: its notes, pinned first, and an "Add note" link.
-    newQuery is the record's key for /note/new, e.g. {client: client.id}.
+    newQuery is the record's key for /note/new, e.g. {client: client.id}. taskNotes (project page only) are the
+    notes on the project's tasks, listed under their own heading.
 #}
-{% macro panel(notes, newQuery) %}
+{% macro panel(notes, newQuery, taskNotes = []) %}
     {% import _self as n %}
     <div class="card" id="notes">
         <div class="btn-row" style="justify-content:space-between;margin-bottom:6px">
@@ -33,16 +48,13 @@
             <a class="btn success sm" href="{{ path('app_note_new', newQuery) }}">+ Add note</a>
         </div>
         {% for note in notes %}
-            <div class="note-item{{ note.pinned ? ' pinned' }}">
-                <div class="btn-row" style="justify-content:space-between">
-                    <a class="bold" href="{{ path('app_note_view', {id: note.id}) }}">{% if note.pinned %}📌 {% endif %}{{ note.title }}</a>
-                    {% if is_granted('NOTE_EDIT', note) %}<a class="btn warning xs" href="{{ path('app_note_edit', {id: note.id}) }}">Edit</a>{% endif %}
-                </div>
-                {% if note.body %}<div class="note-body">{{ note.body|length > 400 ? note.body|slice(0, 400) ~ '…' : note.body }}</div>{% endif %}
-                {{ n.byline(note) }}
-            </div>
+            {{ n.item(note) }}
         {% else %}
             <p class="muted" style="margin:0">No notes yet.</p>
         {% endfor %}
+        {% if taskNotes is not empty %}
+            <div class="section-label" style="margin-top:12px">Notes on this project's tasks <span class="badge num">{{ taskNotes|length }}</span></div>
+            {% for note in taskNotes %}{{ n.item(note, true) }}{% endfor %}
+        {% endif %}
     </div>
 {% endmacro %}

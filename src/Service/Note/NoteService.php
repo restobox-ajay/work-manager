@@ -75,6 +75,12 @@ final class NoteService
         return $this->notes->findForSubject($subject);
     }
 
+    /** @return Note[] the notes on a project's tasks, for the project page; the caller filters by NoteVoter::VIEW */
+    public function onTasksOf(Project $project): array
+    {
+        return $this->notes->findOnTasksOf($project);
+    }
+
     /**
      * The record a new note is for, from "?client=5" / "?project=7" / "?task=9"; null for an independent note, or
      * when the record does not exist or is archived and removed from its list.

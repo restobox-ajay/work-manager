@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
+use App\Entity\Note;
 use App\Entity\Project;
 use App\Entity\ProjectStaff;
 use App\Repository\TaskRepository;
 use App\Repository\UserRepository;
+use App\Security\Voter\NoteVoter;
 use App\Security\Voter\WorkVoter;
 use App\Security\Work\WorkAccess;
 use App\Service\Client\ClientService;
@@ -209,6 +211,11 @@ final class ProjectController extends AbstractWorkController
             'statuses'        => $this->lookups->statuses(),
             'canEdit'         => $canEdit,
             'notes'           => $this->notes->forSubject($project),
+            // Seeing the project does not mean seeing each of its tasks, so each task note is checked on its own.
+            'taskNotes'       => array_values(array_filter(
+                $this->notes->onTasksOf($project),
+                fn (Note $note) => $this->isGranted(NoteVoter::VIEW, $note),
+            )),
         ]);
     }
 
