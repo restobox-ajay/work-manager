@@ -120,17 +120,18 @@ final class InvoiceService
     }
 
     /**
-     * Approved tasks of a client not yet on a live invoice, optionally in one currency.
+     * Approved tasks not yet on a live invoice — of one client, or of every client (null, the Request Payment page,
+     * ADR-103) — optionally in one currency.
      *
      * @return Task[]
      */
-    public function invoiceableTasks(int $clientId, ?string $currency): array
+    public function invoiceableTasks(?int $clientId, ?string $currency): array
     {
-        $tasks = $this->tasks->findAllMatching([
-            'clientId'        => $clientId,
-            'taskStatusId'    => TaskStatus::APPROVED_ID,
-            'includeArchived' => true,
-        ], 't.id', 'ASC');
+        $criteria = ['taskStatusId' => TaskStatus::APPROVED_ID, 'includeArchived' => true];
+        if ($clientId !== null) {
+            $criteria['clientId'] = $clientId;
+        }
+        $tasks = $this->tasks->findAllMatching($criteria, 't.id', 'ASC');
         $onInvoice = $this->items->findLiveInvoiceNumbersForTasks(array_map(static fn (Task $task) => (int) $task->getId(), $tasks));
         $currencyId = $currency !== null ? $this->currencyId($currency) : null;
 

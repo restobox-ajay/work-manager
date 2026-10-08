@@ -2700,3 +2700,47 @@ A note's record is fixed when it is written.
   `NoteVoter::VIEW` before it is shown.
 
 **Tripwire:** verifiable — Verified by `tests/Functional/Note/NoteTest.php`.
+
+
+## ADR-102: Dashboard opens on Pending tasks (owner request, 2026-10-08)
+
+**Decision.** The manager dashboard with no `taskStatusId` shows Pending tasks with the Pending pill selected
+(`DashboardService::managerQuery()`); the "All" pill links to `?taskStatusId=all`. Pending is looked up by name in
+the task statuses, falling back to `TaskStatus::PENDING_ID`, because its id differs between databases (2 in
+work-platform's data, 1 in this app's seed). Also: "Add a new client" reads "Add new client".
+
+
+## ADR-103: Request Payment menu, demo data command, Administration renamed System (owner request, 2026-10-08)
+
+**Decision.** "Request Payment › Approved Tasks" (`/request-payment`, admins) lists every approved task not yet on a
+live invoice, one block per client and currency (`RequestPaymentBoard`, reusing `InvoiceService::invoiceableTasks()`,
+now callable for all clients), with client / currency filters and per-currency totals. Each block's "Generate invoice
+& email" opens the existing approved-tasks invoice form for the ticked tasks with `then=email`; after saving it goes
+straight to the invoice's email page (the email page now shows flash messages). Tasks without a client are listed
+apart: an invoice needs one. `php bin/console app:demo-data` adds four demo clients (codes DEMO1–4, USD and CAD),
+seven projects and 21 tasks in mixed statuses (10 approved with amounts); `--purge` removes exactly those clients
+with their projects, tasks and invoices; it refuses to run with APP_ENV=prod. The "Administration" menu is "System".
+
+
+## ADR-104: Subscription sign-up details (owner request, 2026-10-08)
+
+**Decision.** A subscription records what was used to open the account: name, phone, sign-in method (email,
+Google, Apple, Microsoft, GitHub, phone, other), username / account ID, recovery email, billing company, GST / VAT
+number, billing address and the card's last 4 digits only. All optional; shown in a "Sign-up details" section on the
+form and the subscription page. Migration `Version20261013090000`. Passwords, recovery codes and full card numbers
+stay in the Password Manager: the card field accepts exactly 4 digits.
+
+
+## ADR-105: "Other" sign-up method has a description (owner request, 2026-10-08)
+
+**Decision.** Choosing "Other" under a subscription's "Signed up with" shows a "Describe Other" field
+(`signup_method_note`, migration `Version20261013100000`); it is hidden for every other choice, and saving with
+another method clears it. The subscription page shows "Other: <description>". `.field[hidden]` now really hides a
+form field (app-bridge.css), since `.field` sets its own display.
+
+
+## ADR-106: "List Tasks" menu entry; View buttons on client, project and task lists (owner request, 2026-10-08)
+
+**Decision.** Tasks menu gains "List Tasks" (`/task` with no status filter: every task the viewer may see); it is the
+current entry when the list has no status filter, "Tasks By Client/Project" when it has one. The client, project and
+task lists get a "View" button (first in the row's actions) to the record's detail page.

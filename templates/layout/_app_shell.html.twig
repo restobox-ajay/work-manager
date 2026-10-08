@@ -33,7 +33,8 @@
 {% set pending = constant('App\\Entity\\Settings\\TaskStatus::PENDING_ID') %}
 {% set taskLinks = [
     is_granted('TASK_CREATE') ? { label: 'Add Task', href: path('app_task_create'), current: cur == 'app_task_create' } : null,
-    { label: 'Tasks By Client/Project', href: path('app_task_index', {taskStatusId: pending}), current: cur == 'app_task_index' or cur == 'app_task_view' or cur == 'app_task_edit',
+    { label: 'List Tasks', href: path('app_task_index'), current: cur == 'app_task_index' and not q.has('taskStatusId') },
+    { label: 'Tasks By Client/Project', href: path('app_task_index', {taskStatusId: pending}), current: (cur == 'app_task_index' and q.has('taskStatusId')) or cur == 'app_task_view' or cur == 'app_task_edit',
       add: is_granted('TASK_CREATE') ? { label: 'New task', href: path('app_task_create') } : null },
     { label: 'Tasks By Contractor', href: path('app_task_contractor', {taskStatusId: pending}), current: cur == 'app_task_contractor' },
     { label: 'Task By Date', href: path('app_task_by_date'), current: cur == 'app_task_by_date' },
@@ -77,6 +78,9 @@
               current: cur starts with 'app_invoice_' and (cur == 'app_invoice_tasks' or cur == 'app_invoice_new_tasks' or (invoiceKind ?? '') == 'tasks'),
               add: { label: 'Invoice approved tasks', href: path('app_invoice_new_tasks') } },
         ] },
+        { label: 'Request Payment', icon: 'send', children: [
+            { label: 'Approved Tasks', href: path('app_request_payment'), current: cur == 'app_request_payment' },
+        ] },
         { label: 'Rent', icon: 'home', children: [
             { label: 'Summary', href: path('app_rent_summary'), current: cur == 'app_rent_summary' },
             { label: 'Tenants', href: path('app_rent_tenants'), current: (cur starts with 'app_rent_tenant' and cur != 'app_rent_tenant_year_all') or cur starts with 'app_rent_bill' or cur starts with 'app_rent_payment',
@@ -116,7 +120,7 @@
             { label: 'Email Log', href: path('app_admin_email_log'), current: cur starts with 'app_admin_email_log' },
             { label: 'Error Log', href: path('app_admin_error_log'), current: cur starts with 'app_admin_error_log' },
         ] },
-        { label: 'Administration', icon: 'settings', children: [
+        { label: 'System', icon: 'settings', children: [
             { label: 'Overview', href: path('app_admin_dashboard'), current: cur == 'app_admin_dashboard' },
             { label: 'General Config', href: path('app_admin_config'), current: cur == 'app_admin_config' },
             { label: 'API Docs', href: path('app_admin_api_docs'), current: cur starts with 'app_admin_api_docs' },

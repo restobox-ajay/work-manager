@@ -172,6 +172,7 @@ final class SubscriptionController extends AbstractWorkController
             'currencies' => $this->service->currencies(),
             'cycles'     => BillingCycle::choices(),
             'statuses'   => Subscription::STATUSES,
+            'signupMethods' => Subscription::SIGNUP_METHODS,
         ], new Response(status: $errors === [] ? 200 : 422));
     }
 }

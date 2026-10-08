@@ -45,6 +45,7 @@
 
 <form class="card mx-form invoice-form" method="post" id="invoice-form" style="max-width:1100px">
     <input type="hidden" name="_token" value="{{ csrf_token('invoice_form') }}">
+    {% if thenEmail ?? false %}<input type="hidden" name="then" value="email">{% endif %}
     <div class="form-grid">
         {# Name / email / phone rows (below) are three across and stack on narrow screens. #}
         <div class="field">
@@ -138,7 +139,7 @@
     </div>
     <div class="form-actions" style="margin-top:10px">
         <a class="btn secondary" href="{{ backHref }}">Cancel</a>
-        <button class="btn primary" type="submit">{{ invoice ? 'Save' : 'Create invoice' }}</button>
+        <button class="btn primary" type="submit">{{ invoice ? 'Save' : ((thenEmail ?? false) ? 'Create invoice & continue to email' : 'Create invoice') }}</button>
     </div>
 
     <template id="inv-line-template">{{ f.line('__i__', {taskId: null, name: '', description: '', gstRate: '0', quantity: '1', rate: ''}, isTasks, gstChoices) }}</template>

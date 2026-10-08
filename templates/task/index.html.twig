@@ -118,6 +118,7 @@
                             <td colspan="2" class="muted small center">—</td>
                         {% endif %}
                         <td class="actions">
+                            <a class="btn primary xs" href="{{ path('app_task_view', {id: task.id}) }}">View</a>
                             {% if row.canEdit %}<a class="btn warning xs" href="{{ path('app_task_edit', {id: task.id}) }}">Edit</a>{% endif %}
                         </td>
                     </tr>

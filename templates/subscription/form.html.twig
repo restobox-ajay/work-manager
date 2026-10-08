@@ -61,9 +61,39 @@
         <div class="field"><label for="f-website">Website</label><input type="text" id="f-website" name="websiteUrl" value="{{ v.websiteUrl ?? '' }}" maxlength="255" placeholder="https://"></div>
         <div class="field span-all"><label for="f-notes">Notes</label><textarea id="f-notes" name="notes" rows="3">{{ v.notes ?? '' }}</textarea></div>
     </div>
+
+    <div class="section-label" style="margin-top:18px">Sign-up details</div>
+    <p class="muted small" style="margin:0 0 6px">What was used to open this account. Keep passwords, recovery codes and full card numbers in the Password Manager, not here.</p>
+    <div class="form-grid">
+        <div class="field"><label for="f-signup-name">Name used</label><input type="text" id="f-signup-name" name="signupName" value="{{ v.signupName ?? '' }}" maxlength="120" autocomplete="off"></div>
+        <div class="field"><label for="f-signup-method">Signed up with</label>
+            <select id="f-signup-method" name="signupMethod"><option value="">—</option>{% for k, label in signupMethods %}<option value="{{ k }}" {{ (v.signupMethod ?? '') == k ? 'selected' }}>{{ label }}</option>{% endfor %}</select></div>
+        <div class="field" id="f-signup-other-field" {{ (v.signupMethod ?? '') != 'other' ? 'hidden' }}><label for="f-signup-other">Describe "Other"</label><input type="text" id="f-signup-other" name="signupMethodNote" value="{{ v.signupMethodNote ?? '' }}" maxlength="120" placeholder="e.g. company SSO, Facebook, invite link" autocomplete="off"></div>
+        <div class="field"><label for="f-username">Username / account ID</label><input type="text" id="f-username" name="accountUsername" value="{{ v.accountUsername ?? '' }}" maxlength="120" autocomplete="off"></div>
+        <div class="field"><label for="f-signup-phone">Phone used</label><input type="tel" id="f-signup-phone" name="signupPhone" value="{{ v.signupPhone ?? '' }}" maxlength="40" autocomplete="off"></div>
+        <div class="field"><label for="f-recovery">Recovery email</label><input type="email" id="f-recovery" name="recoveryEmail" value="{{ v.recoveryEmail ?? '' }}" maxlength="180" autocomplete="off"></div>
+        <div class="field"><label for="f-card">Card last 4 digits</label><input type="text" id="f-card" name="cardLast4" value="{{ v.cardLast4 ?? '' }}" maxlength="4" inputmode="numeric" pattern="[0-9]{4}" placeholder="1234" autocomplete="off"></div>
+        <div class="field"><label for="f-billing-company">Billing company</label><input type="text" id="f-billing-company" name="billingCompany" value="{{ v.billingCompany ?? '' }}" maxlength="160" autocomplete="off"></div>
+        <div class="field"><label for="f-tax">GST / VAT number</label><input type="text" id="f-tax" name="taxId" value="{{ v.taxId ?? '' }}" maxlength="60" autocomplete="off"></div>
+        <div class="field span-all"><label for="f-billing-address">Billing address</label><textarea id="f-billing-address" name="billingAddress" rows="2" maxlength="1000">{{ v.billingAddress ?? '' }}</textarea></div>
+    </div>
     <div class="form-actions" style="margin-top:10px">
         <a class="btn secondary" href="{{ back }}">Cancel</a>
         <button class="btn primary" type="submit">Save subscription</button>
     </div>
 </form>
+<script>
+    // Sign-up details: the "Other" description shows only while "Other" is chosen (ADR-105).
+    (function () {
+        var select = document.getElementById('f-signup-method');
+        var field = document.getElementById('f-signup-other-field');
+        if (!select || !field) { return; }
+        function sync() { field.hidden = select.value !== 'other'; }
+        select.addEventListener('change', function () {
+            sync();
+            if (!field.hidden) { document.getElementById('f-signup-other').focus(); }
+        });
+        sync();
+    })();
+</script>
 {% endblock %}

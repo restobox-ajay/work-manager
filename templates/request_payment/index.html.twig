@@ -1,0 +1,114 @@
+{% extends 'base.html.twig' %}
+{% import '_work/macros.html.twig' as ui %}
+
+{#
+    Request Payment (ADR-103): approved tasks not yet invoiced, one block per client and currency (one invoice each).
+    Each block is its own GET form to the approved-tasks invoice form, with then=email so saving leads to the email.
+#}
+{% block title %}Request Payment{% endblock %}
+
+{% macro money(h, currency) %}{{ (h / 100)|number_format(2, '.', '')|invoice_money(currency) }}{% endmacro %}
+
+{% block body %}
+{% import _self as rp %}
+<div class="page-head">
+    <div class="ph-main">
+        <div class="eyebrow">Request Payment</div>
+        <div class="ph-title"><h1>Approved tasks to invoice</h1></div>
+        <p class="lead">Every approved task that is not on an invoice yet, grouped by client and currency. Tick the tasks, then <b>Generate invoice &amp; email</b>: check the invoice, save it, and send it to the client.</p>
+    </div>
+    <div class="ph-actions"><a class="btn info" href="{{ path('app_invoice_index') }}">All invoices</a></div>
+</div>
+{{ ui.flashes() }}
+
+<form class="table-card mx-form" method="get" action="{{ path('app_request_payment') }}" style="margin-bottom:16px">
+    <div class="table-header">
+        <label for="f-client" class="bold">Client</label>
+        <select id="f-client" name="clientId" style="width:auto" onchange="this.form.submit()">
+            <option value="">All clients</option>
+            {% for c in clients %}<option value="{{ c.id }}" {{ clientId == c.id ? 'selected' }}>{{ c.name }}</option>{% endfor %}
+        </select>
+        <label for="f-currency" class="bold">Currency</label>
+        <select id="f-currency" name="currency" style="width:auto" onchange="this.form.submit()">
+            <option value="">Any</option>
+            {% for code in currencies %}<option value="{{ code }}" {{ currency == code|upper ? 'selected' }}>{{ code }}</option>{% endfor %}
+        </select>
+        <noscript><button class="btn primary sm" type="submit">Filter</button></noscript>
+        <span class="grow"></span>
+    </div>
+</form>
+
+<div class="kpis rent-kpis">
+    <div class="kpi"><span>Ready to invoice</span><b>{{ groups|reduce((c, g) => c + g.tasks|length, 0) }}</b><small>approved task{{ groups|reduce((c, g) => c + g.tasks|length, 0) == 1 ? '' : 's' }} in {{ groups|length }} invoice{{ groups|length == 1 ? '' : 's' }}</small></div>
+    {% for code, h in totals %}
+        <div class="kpi"><span>Total {{ code }}</span><b>{{ rp.money(h, code) }}</b><small>not yet invoiced</small></div>
+    {% endfor %}
+</div>
+
+{% for g in groups %}
+    <form class="table-card rp-group mx-form" method="get" action="{{ path('app_invoice_new_tasks') }}" style="margin-top:16px">
+        <input type="hidden" name="clientId" value="{{ g.client.id }}">
+        <input type="hidden" name="currency" value="{{ g.currency }}">
+        <input type="hidden" name="then" value="email">
+        <div class="table-header">
+            <b>{{ g.client.name }}</b>{% if g.client.companyName %}<span class="muted">· {{ g.client.companyName }}</span>{% endif %}
+            <span class="badge plain">{{ g.currency }}</span>
+            <span class="muted">{{ g.client.email ?: 'no email on file' }}</span>
+            <span class="grow"></span>
+            <span class="bold">{{ g.tasks|length }} task{{ g.tasks|length == 1 ? '' : 's' }} · {{ rp.money(g.total, g.currency) }}</span>
+        </div>
+        <div class="tscroll">
+            <table class="t">
+                <thead><tr>
+                    <th style="width:36px"><input type="checkbox" checked data-check-all aria-label="Select all tasks of {{ g.client.name }}"></th>
+                    <th>Task</th><th>Project</th><th>Contractor</th><th>Approved</th><th class="num">Amount</th>
+                </tr></thead>
+                <tbody>
+                    {% for t in g.tasks %}
+                        <tr>
+                            <td><input type="checkbox" name="taskIds[]" value="{{ t.id }}" checked aria-label="Include task #{{ t.id }}"></td>
+                            <td><a href="{{ path('app_task_view', {id: t.id}) }}">#{{ t.id }} {{ ui.short(t.name, 80) }}</a></td>
+                            <td>{% if t.project %}<a href="{{ path('app_project_view', {id: t.project.id}) }}">{{ t.project.name }}</a>{% else %}—{% endif %}</td>
+                            <td>{{ t.assignee ? (t.assignee.name ?: t.assignee.email) : '—' }}</td>
+                            <td class="nowrap">{{ t.approvedDate ? t.approvedDate|date('M j, Y') : '—' }}</td>
+                            <td class="num bold">{{ (t.totalAmount ?? '0.00')|invoice_money(g.currency) }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div class="table-foot">
+            <span class="grow muted">Opens the invoice with these tasks as lines; nothing is saved or sent until you confirm.</span>
+            <button class="btn success" type="submit">Generate invoice &amp; email</button>
+        </div>
+    </form>
+{% else %}
+    <div class="card" style="margin-top:16px"><b>Nothing to invoice.</b> Approved tasks that are not on an invoice yet will appear here.</div>
+{% endfor %}
+
+{% if noClient is not empty %}
+    <div class="card" style="margin-top:16px">
+        <b>{{ noClient|length }} approved task{{ noClient|length == 1 ? '' : 's' }} without a client</b>
+        <p class="muted">An invoice needs a client: give these tasks a project with a client first.</p>
+        <ul>{% for t in noClient %}<li><a href="{{ path('app_task_view', {id: t.id}) }}">#{{ t.id }} {{ ui.short(t.name, 80) }}</a></li>{% endfor %}</ul>
+    </div>
+{% endif %}
+
+<script>
+    // Each block's header checkbox ticks / unticks its tasks; a block with nothing ticked cannot be submitted.
+    document.querySelectorAll('.rp-group').forEach(function (form) {
+        var all = form.querySelector('[data-check-all]');
+        var boxes = form.querySelectorAll('input[name="taskIds[]"]');
+        var button = form.querySelector('button[type=submit]');
+        function sync() {
+            var ticked = Array.prototype.filter.call(boxes, function (b) { return b.checked; }).length;
+            all.checked = ticked === boxes.length;
+            all.indeterminate = ticked > 0 && ticked < boxes.length;
+            button.disabled = ticked === 0;
+        }
+        all.addEventListener('change', function () { boxes.forEach(function (b) { b.checked = all.checked; }); sync(); });
+        boxes.forEach(function (b) { b.addEventListener('change', sync); });
+        sync();
+    });
+</script>
+{% endblock %}

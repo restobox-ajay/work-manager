@@ -47,7 +47,7 @@ final class DashboardController extends AbstractWorkController
             ]);
         }
 
-        $filters = $taskList->filtersFrom($request->query->all());
+        $filters = $taskList->filtersFrom($dashboard->managerQuery($request->query->all(), $lookupMaps['statuses']));
         $page = $taskList->search($viewer, $filters, 1, $request->query->getString('sort'), DashboardService::MANAGER_TASK_LIMIT);
         $clientId = $filters['clientId'];
 

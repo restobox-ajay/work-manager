@@ -15,6 +15,7 @@
     <div class="ph-actions"><a class="btn secondary back" href="{{ path('app_invoice_view', {id: invoice.id}) }}">Back</a></div>
 </div>
 
+{{ ui.flashes() }}
 {{ ui.errors(errors) }}
 
 <form class="card mx-form" method="post" style="max-width:900px">

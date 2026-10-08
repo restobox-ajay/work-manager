@@ -30,6 +30,30 @@ final class DashboardService
     ) {
     }
 
+    /** The "All" pill's taskStatusId: every status rather than the default one. */
+    public const ALL_STATUSES = 'all';
+
+    /**
+     * The manager view's filters (ADR-102): opening the dashboard shows Pending tasks; ?taskStatusId=all shows every
+     * status. Pending is found by name, because its id differs between databases (work-platform data has it as 2).
+     *
+     * @param array<string, mixed> $query
+     * @param array<int, string>   $statuses id => name
+     *
+     * @return array<string, mixed> the query with taskStatusId settled
+     */
+    public function managerQuery(array $query, array $statuses): array
+    {
+        if (!array_key_exists('taskStatusId', $query)) {
+            $pending = array_search('pending', array_map(static fn (string $name) => strtolower(trim($name)), $statuses), true);
+            $query['taskStatusId'] = $pending !== false ? $pending : TaskStatus::PENDING_ID;
+        } elseif ($query['taskStatusId'] === self::ALL_STATUSES) {
+            unset($query['taskStatusId']);
+        }
+
+        return $query;
+    }
+
     public function showsManagerView(User $viewer, bool $mineRequested): bool
     {
         return !$mineRequested && $this->access->managesAnyWork($viewer);

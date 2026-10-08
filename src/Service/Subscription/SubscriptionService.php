@@ -52,6 +52,10 @@ final class SubscriptionService
             'autoRenew' => $s->isAutoRenew(), 'status' => $s->getStatus(), 'accountEmail' => $s->getAccountEmail(),
             'seats' => $s->getSeats(), 'assignedTo' => $s->getAssignedTo(), 'paymentMethod' => $s->getPaymentMethod(),
             'websiteUrl' => $s->getWebsiteUrl(), 'billingUrl' => $s->getBillingUrl(), 'notes' => $s->getNotes(),
+            'signupName' => $s->getSignupName(), 'signupPhone' => $s->getSignupPhone(), 'signupMethod' => $s->getSignupMethod(), 'signupMethodNote' => $s->getSignupMethodNote(),
+            'accountUsername' => $s->getAccountUsername(), 'recoveryEmail' => $s->getRecoveryEmail(),
+            'billingCompany' => $s->getBillingCompany(), 'taxId' => $s->getTaxId(), 'billingAddress' => $s->getBillingAddress(),
+            'cardLast4' => $s->getCardLast4(),
         ];
     }
 
@@ -124,6 +128,7 @@ final class SubscriptionService
                 $errors[] = $label.' must be at most 120 characters.';
             }
         }
+        $signup = $this->signupDetails($posted, $errors);
         if ($errors !== []) {
             return WriteResult::failed($errors);
         }
@@ -137,7 +142,11 @@ final class SubscriptionService
             ->setStatus($status)->setAccountEmail($email)->setSeats($seats !== null ? (int) $seats : null)
             ->setAssignedTo($short['assignedTo'])->setPaymentMethod($short['paymentMethod'])
             ->setWebsiteUrl($urls['websiteUrl'])->setBillingUrl($urls['billingUrl'])
-            ->setNotes($notes !== '' ? $notes : null)->setUpdatedAt(time());
+            ->setNotes($notes !== '' ? $notes : null)->setUpdatedAt(time())
+            ->setSignupName($signup['signupName'])->setSignupPhone($signup['signupPhone'])->setSignupMethod($signup['signupMethod'])->setSignupMethodNote($signup['signupMethodNote'])
+            ->setAccountUsername($signup['accountUsername'])->setRecoveryEmail($signup['recoveryEmail'])
+            ->setBillingCompany($signup['billingCompany'])->setTaxId($signup['taxId'])->setBillingAddress($signup['billingAddress'])
+            ->setCardLast4($signup['cardLast4']);
         if ($isNew) {
             $this->em->persist($subscription);
         }
@@ -293,6 +302,52 @@ final class SubscriptionService
         uasort($costs, static fn (array $a, array $b) => $b['count'] <=> $a['count']);
 
         return $costs;
+    }
+
+    /**
+     * The sign-up details (ADR-104), each null when blank. Only the card's last 4 digits are accepted: full card
+     * numbers, passwords and recovery codes belong in the Password Manager.
+     *
+     * @param array<string, mixed> $posted
+     * @param list<string>         $errors appended to
+     *
+     * @return array<string, ?string>
+     */
+    private function signupDetails(array $posted, array &$errors): array
+    {
+        $limits = ['signupName' => ['Name used', 120], 'signupPhone' => ['Phone used', 40], 'accountUsername' => ['Username / account ID', 120],
+            'billingCompany' => ['Billing company', 160], 'taxId' => ['GST / VAT number', 60]];
+        $values = [];
+        foreach ($limits as $field => [$label, $max]) {
+            $values[$field] = InputValue::text($posted[$field] ?? null);
+            if ($values[$field] !== null && mb_strlen($values[$field]) > $max) {
+                $errors[] = sprintf('%s must be at most %d characters.', $label, $max);
+            }
+        }
+        $values['recoveryEmail'] = InputValue::text($posted['recoveryEmail'] ?? null);
+        if ($values['recoveryEmail'] !== null && (filter_var($values['recoveryEmail'], \FILTER_VALIDATE_EMAIL) === false || mb_strlen($values['recoveryEmail']) > 180)) {
+            $errors[] = 'Recovery email is not a valid email address.';
+        }
+        $values['signupMethod'] = InputValue::text($posted['signupMethod'] ?? null);
+        if ($values['signupMethod'] !== null && !isset(Subscription::SIGNUP_METHODS[$values['signupMethod']])) {
+            $errors[] = 'Choose how the account was opened, or leave it blank.';
+        }
+        // The description only belongs to "Other"; switching to another method drops it.
+        $values['signupMethodNote'] = $values['signupMethod'] === Subscription::SIGNUP_OTHER ? InputValue::text($posted['signupMethodNote'] ?? null) : null;
+        if ($values['signupMethodNote'] !== null && mb_strlen($values['signupMethodNote']) > 120) {
+            $errors[] = 'The "Other" description must be at most 120 characters.';
+        }
+        $values['cardLast4'] = InputValue::text($posted['cardLast4'] ?? null);
+        if ($values['cardLast4'] !== null && preg_match('/^\d{4}$/', $values['cardLast4']) !== 1) {
+            $errors[] = 'Card: enter only the last 4 digits (keep full card numbers out of here).';
+        }
+        $address = is_scalar($posted['billingAddress'] ?? null) ? trim(str_replace("\r\n", "\n", (string) $posted['billingAddress'])) : '';
+        if (mb_strlen($address) > 1000) {
+            $errors[] = 'Billing address must be at most 1000 characters.';
+        }
+        $values['billingAddress'] = $address !== '' ? $address : null;
+
+        return $values;
     }
 
     /** @return array{0: ?\DateTimeImmutable, 1: bool} the date (null when blank) and whether the input was valid */

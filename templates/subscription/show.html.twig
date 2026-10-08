@@ -44,6 +44,18 @@
             <tr><th>Billing portal</th><td>{{ me.link(s.billingUrl) }}</td></tr>
             <tr><th>Notes</th><td>{{ s.notes ? s.notes|nl2br : '—' }}</td></tr>
         </table>
+        <div class="section-label" style="margin-top:14px">Sign-up details</div>
+        <table class="t v-kv">
+            <tr><th>Name used</th><td>{{ s.signupName ?: '—' }}</td></tr>
+            <tr><th>Signed up with</th><td>{{ s.signupMethodLabel ?: '—' }}</td></tr>
+            <tr><th>Username / account ID</th><td>{{ s.accountUsername ?: '—' }}</td></tr>
+            <tr><th>Phone used</th><td>{{ s.signupPhone ?: '—' }}</td></tr>
+            <tr><th>Recovery email</th><td>{{ s.recoveryEmail ?: '—' }}</td></tr>
+            <tr><th>Card</th><td>{{ s.cardLast4 ? '•••• ' ~ s.cardLast4 : '—' }}{% if s.paymentMethod %} <span class="muted">({{ s.paymentMethod }})</span>{% endif %}</td></tr>
+            <tr><th>Billing company</th><td>{{ s.billingCompany ?: '—' }}</td></tr>
+            <tr><th>GST / VAT number</th><td>{{ s.taxId ?: '—' }}</td></tr>
+            <tr><th>Billing address</th><td>{{ s.billingAddress ? s.billingAddress|nl2br : '—' }}</td></tr>
+        </table>
     </div>
     <div class="card">
         <div class="section-label">Record a payment</div>

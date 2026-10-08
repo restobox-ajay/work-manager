@@ -899,3 +899,5 @@ a.kpi{text-decoration:none;color:inherit}a.kpi:hover{border-color:var(--primary,
     margin: 0 -10px;
     padding: 8px 10px;
 }
+/* A form field toggled with the hidden attribute really hides (.field sets its own display). */
+.field[hidden]{display:none!important}

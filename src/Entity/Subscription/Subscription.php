@@ -19,6 +19,10 @@ class Subscription
 {
     public const STATUSES = ['active' => 'Active', 'paused' => 'Paused', 'cancelled' => 'Cancelled'];
     public const STATUS_ACTIVE = 'active';
+    public const SIGNUP_OTHER = 'other';
+
+    /** How the account was opened (sign-up details, ADR-104). */
+    public const SIGNUP_METHODS = ['email' => 'Email and password', 'google' => 'Google', 'apple' => 'Apple', 'microsoft' => 'Microsoft', 'github' => 'GitHub', 'phone' => 'Phone number', 'other' => 'Other'];
 
     #[ORM\Id]
     #[ORM\GeneratedValue]
@@ -85,6 +89,38 @@ class Subscription
 
     #[ORM\Column(nullable: true)]
     private ?int $updatedAt = null;
+
+    // Sign-up details (ADR-104): what was used to open the account. Never passwords or full card numbers.
+    #[ORM\Column(length: 120, nullable: true)]
+    private ?string $signupName = null;
+
+    #[ORM\Column(length: 40, nullable: true)]
+    private ?string $signupPhone = null;
+
+    #[ORM\Column(length: 20, nullable: true)]
+    private ?string $signupMethod = null;
+
+    /** What "Other" means when signupMethod is other (ADR-105). */
+    #[ORM\Column(length: 120, nullable: true)]
+    private ?string $signupMethodNote = null;
+
+    #[ORM\Column(length: 120, nullable: true)]
+    private ?string $accountUsername = null;
+
+    #[ORM\Column(length: 180, nullable: true)]
+    private ?string $recoveryEmail = null;
+
+    #[ORM\Column(length: 160, nullable: true)]
+    private ?string $billingCompany = null;
+
+    #[ORM\Column(length: 60, nullable: true)]
+    private ?string $taxId = null;
+
+    #[ORM\Column(type: 'text', nullable: true)]
+    private ?string $billingAddress = null;
+
+    #[ORM\Column(length: 4, nullable: true)]
+    private ?string $cardLast4 = null;
 
     #[ORM\ManyToOne(targetEntity: SubscriptionCategory::class)]
     #[ORM\JoinColumn(name: 'category_id', nullable: true, onDelete: 'SET NULL')]
@@ -335,6 +371,114 @@ class Subscription
         return $this;
     }
 
+    public function getSignupName(): ?string
+    {
+        return $this->signupName;
+    }
+
+    public function setSignupName(?string $signupName): static
+    {
+        $this->signupName = $signupName;
+
+        return $this;
+    }
+
+    public function getSignupPhone(): ?string
+    {
+        return $this->signupPhone;
+    }
+
+    public function setSignupPhone(?string $signupPhone): static
+    {
+        $this->signupPhone = $signupPhone;
+
+        return $this;
+    }
+
+    public function getSignupMethod(): ?string
+    {
+        return $this->signupMethod;
+    }
+
+    public function setSignupMethod(?string $signupMethod): static
+    {
+        $this->signupMethod = $signupMethod;
+
+        return $this;
+    }
+
+    public function getAccountUsername(): ?string
+    {
+        return $this->accountUsername;
+    }
+
+    public function setAccountUsername(?string $accountUsername): static
+    {
+        $this->accountUsername = $accountUsername;
+
+        return $this;
+    }
+
+    public function getRecoveryEmail(): ?string
+    {
+        return $this->recoveryEmail;
+    }
+
+    public function setRecoveryEmail(?string $recoveryEmail): static
+    {
+        $this->recoveryEmail = $recoveryEmail;
+
+        return $this;
+    }
+
+    public function getBillingCompany(): ?string
+    {
+        return $this->billingCompany;
+    }
+
+    public function setBillingCompany(?string $billingCompany): static
+    {
+        $this->billingCompany = $billingCompany;
+
+        return $this;
+    }
+
+    public function getTaxId(): ?string
+    {
+        return $this->taxId;
+    }
+
+    public function setTaxId(?string $taxId): static
+    {
+        $this->taxId = $taxId;
+
+        return $this;
+    }
+
+    public function getBillingAddress(): ?string
+    {
+        return $this->billingAddress;
+    }
+
+    public function setBillingAddress(?string $billingAddress): static
+    {
+        $this->billingAddress = $billingAddress;
+
+        return $this;
+    }
+
+    public function getCardLast4(): ?string
+    {
+        return $this->cardLast4;
+    }
+
+    public function setCardLast4(?string $cardLast4): static
+    {
+        $this->cardLast4 = $cardLast4;
+
+        return $this;
+    }
+
     public function getCategory(): ?SubscriptionCategory
     {
         return $this->category;
@@ -350,6 +494,29 @@ class Subscription
     public function cycle(): BillingCycle
     {
         return BillingCycle::tryFrom($this->billingCycle) ?? BillingCycle::Monthly;
+    }
+
+    public function getSignupMethodNote(): ?string
+    {
+        return $this->signupMethodNote;
+    }
+
+    public function setSignupMethodNote(?string $signupMethodNote): static
+    {
+        $this->signupMethodNote = $signupMethodNote;
+
+        return $this;
+    }
+
+    /** "Google", or for Other its description ("Other: company SSO"). */
+    public function signupMethodLabel(): ?string
+    {
+        if ($this->signupMethod === null) {
+            return null;
+        }
+        $label = self::SIGNUP_METHODS[$this->signupMethod] ?? $this->signupMethod;
+
+        return $this->signupMethod === self::SIGNUP_OTHER && $this->signupMethodNote !== null ? $label.': '.$this->signupMethodNote : $label;
     }
 
     public function isActive(): bool

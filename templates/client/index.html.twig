@@ -12,7 +12,7 @@
         <p class="lead">Archived clients stay listed under the Archive filter; their projects' tasks leave the unfiltered task list.</p>
     </div>
     {% if is_granted('CLIENT_CREATE') %}
-        <div class="ph-actions"><a class="btn success" href="{{ path('app_client_create') }}">+ Add a new client</a></div>
+        <div class="ph-actions"><a class="btn success" href="{{ path('app_client_create') }}">+ Add new client</a></div>
     {% endif %}
 </div>
 
@@ -58,6 +58,7 @@
                         <td>{{ ui.activeBadge(client.active) }}</td>
                         <td class="nowrap">{{ ui.ts(client.createdAt) }}</td>
                         <td class="actions">
+                            <a class="btn primary xs" href="{{ path('app_client_view', {id: client.id}) }}">View</a>
                             <a class="btn info xs" href="{{ path('app_task_index', {clientId: client.id}) }}">Tasks</a>
                             {% if is_granted('CLIENT_EDIT', client) %}<a class="btn warning xs" href="{{ path('app_client_edit', {id: client.id}) }}">Edit</a>{% endif %}
                         </td>

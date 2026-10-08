@@ -85,7 +85,7 @@ security:
         - { path: ^/dashboard, roles: ROLE_USER }
         # Clients, projects, tasks and their settings (ADR-070). Signed in is the floor; WorkVoter decides
         # record by record, and the settings controllers require ROLE_ADMIN themselves.
-        - { path: ^/(client|project|task|config|invoice|settings|rent|expense|subscription|vault|logs)(/|$), roles: ROLE_USER }
+        - { path: ^/(client|project|task|config|invoice|settings|rent|expense|subscription|vault|logs|request-payment)(/|$), roles: ROLE_USER }
 
 when@test:
     security:

@@ -39,6 +39,8 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 #[Route('/invoice')]
 final class InvoiceController extends AbstractWorkController
 {
+    private const THEN_EMAIL = 'email';
+
     /** How a filtered invoice list can be grouped. */
     private const GROUPINGS = ['month', 'year'];
 
@@ -83,8 +85,10 @@ final class InvoiceController extends AbstractWorkController
     #[Route('/tasks/new', name: 'app_invoice_new_tasks', methods: ['GET', 'POST'])]
     public function newForTasks(Request $request): Response
     {
+        // ?then=email (from Request Payment, ADR-103): after saving, go straight on to emailing the invoice.
+        $thenEmail = ($request->isMethod('POST') ? $request->request->getString('then') : $request->query->getString('then')) === self::THEN_EMAIL;
         if ($request->isMethod('POST')) {
-            return $this->form(InvoiceKind::Tasks, null, $request, new InvoiceInput());
+            return $this->form(InvoiceKind::Tasks, null, $request, new InvoiceInput(), $thenEmail);
         }
 
         $query = $request->query;
@@ -96,7 +100,7 @@ final class InvoiceController extends AbstractWorkController
         if ($client !== null && $taskIds !== []) {
             $input = $this->invoices->inputForTasks($client, $currency, $taskIds);
             if ($input->lines !== []) {
-                return $this->form(InvoiceKind::Tasks, null, $request, $input);
+                return $this->form(InvoiceKind::Tasks, null, $request, $input, $thenEmail);
             }
             $this->addFlash('error', 'Those tasks can no longer be invoiced: pick again.');
         }
@@ -254,7 +258,7 @@ final class InvoiceController extends AbstractWorkController
         ]);
     }
 
-    private function form(InvoiceKind $kind, ?Invoice $invoice, Request $request, InvoiceInput $input): Response
+    private function form(InvoiceKind $kind, ?Invoice $invoice, Request $request, InvoiceInput $input, bool $thenEmail = false): Response
     {
         $errors = [];
         if ($request->isMethod('POST')) {
@@ -266,7 +270,7 @@ final class InvoiceController extends AbstractWorkController
             if ($result->isSaved()) {
                 $this->addFlash('success', sprintf('Invoice %s saved.', $result->record->getNumber()));
 
-                return $this->redirectToRoute('app_invoice_view', ['id' => $result->record->getId()]);
+                return $this->redirectToRoute($thenEmail ? 'app_invoice_email' : 'app_invoice_view', ['id' => $result->record->getId()]);
             }
             $errors = $result->errors;
         }
@@ -276,6 +280,7 @@ final class InvoiceController extends AbstractWorkController
         return $this->render('invoice/form.html.twig', [
             'kind'       => $kind,
             'invoice'    => $invoice,
+            'thenEmail'  => $thenEmail,
             'input'      => $input,
             'errors'     => $errors,
             'profiles'   => $this->profiles->findSelectable($invoice?->getBillingProfileId()),

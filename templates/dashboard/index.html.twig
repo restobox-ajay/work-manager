@@ -59,7 +59,7 @@
 
     <div>
         <div class="pills" style="margin-bottom:12px">
-            <a class="pill{{ filters.taskStatusId is null ? ' active' }}" href="{{ path('app_dashboard', base) }}">All</a>
+            <a class="pill{{ filters.taskStatusId is null ? ' active' }}" href="{{ path('app_dashboard', base|merge({taskStatusId: 'all'})) }}">All</a>
             {% for id, name in statuses %}
                 <a class="pill{{ filters.taskStatusId == id ? ' active' }}" href="{{ path('app_dashboard', base|merge({taskStatusId: id})) }}">{{ name }}</a>
             {% endfor %}
