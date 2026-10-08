@@ -113,6 +113,9 @@
     {% endif %}
 </div>
 
+{% import 'note/_macros.html.twig' as n %}
+{{ n.panel(notes, {project: project.id}) }}
+
 {% if canEdit and not project.isDeleted %}
     <form class="mx-form" method="post" action="{{ path('app_project_remove', {id: project.id}) }}" style="text-align:right"
           onsubmit="return confirm('Archive this project and remove it from the list? This cannot be undone here.');">

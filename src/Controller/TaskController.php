@@ -10,6 +10,7 @@ use App\Repository\TaskRepository;
 use App\Security\Voter\WorkVoter;
 use App\Security\Work\WorkAccess;
 use App\Service\Client\ClientService;
+use App\Service\Note\NoteService;
 use App\Service\Pagination\Paginated;
 use App\Service\Project\ProjectService;
 use App\Service\Task\TaskInput;
@@ -112,7 +113,7 @@ final class TaskController extends AbstractWorkController
 
     #[Route('/{id}', name: 'app_task_view', requirements: ['id' => '\d+'], methods: ['GET'])]
     #[IsGranted(WorkVoter::TASK_VIEW, 'task')]
-    public function view(#[MapEntity(id: 'id')] Task $task): Response
+    public function view(#[MapEntity(id: 'id')] Task $task, NoteService $notes): Response
     {
         if ($task->isDeleted()) {
             throw $this->createNotFoundException();
@@ -125,6 +126,7 @@ final class TaskController extends AbstractWorkController
             'types'           => $this->lookups->types(),
             'currencies'      => $this->lookups->currencies(),
             'people'          => $this->lookups->people(),
+            'notes'           => $notes->forSubject($task),
         ]);
     }
 

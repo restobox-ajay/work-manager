@@ -1,0 +1,48 @@
+{#
+    Notes (ADR-101): shared pieces of the note pages and the Notes card on client, project and task pages.
+    Usage: {% import 'note/_macros.html.twig' as n %}
+#}
+
+{# What a note is about, as a link to that record; "Independent" for a note on nothing. #}
+{% macro about(type, subject) %}
+    {%- if type == 'client' -%}
+        <span class="badge plain">Client</span> <a href="{{ path('app_client_view', {id: subject.id}) }}">{{ subject.name }}</a>
+    {%- elseif type == 'project' -%}
+        <span class="badge plain">Project</span> <a href="{{ path('app_project_view', {id: subject.id}) }}">{{ subject.client.name }} › {{ subject.name }}</a>
+    {%- elseif type == 'task' -%}
+        <span class="badge plain">Task</span> <a href="{{ path('app_task_view', {id: subject.id}) }}">#{{ subject.id }} {{ subject.name|length > 60 ? subject.name|slice(0, 60) ~ '…' : subject.name }}</a>
+    {%- else -%}
+        <span class="badge plain">Independent</span> <span class="muted small">only you can see it</span>
+    {%- endif -%}
+{% endmacro %}
+
+{# Who wrote it and when it last changed. #}
+{% macro byline(note) %}
+    <span class="muted small">{{ note.author.name ?: note.author.email }} · {{ note.updatedAt|date('Y-m-d H:i') }}{% if note.updatedAt != note.createdAt %} (edited){% endif %}</span>
+{% endmacro %}
+
+{#
+    The Notes card on a client, project or task page: its notes, pinned first, and an "Add note" link.
+    newQuery is the record's key for /note/new, e.g. {client: client.id}.
+#}
+{% macro panel(notes, newQuery) %}
+    {% import _self as n %}
+    <div class="card" id="notes">
+        <div class="btn-row" style="justify-content:space-between;margin-bottom:6px">
+            <h2 style="margin:0">Notes{% if notes is not empty %} <span class="badge num">{{ notes|length }}</span>{% endif %}</h2>
+            <a class="btn success sm" href="{{ path('app_note_new', newQuery) }}">+ Add note</a>
+        </div>
+        {% for note in notes %}
+            <div class="note-item{{ note.pinned ? ' pinned' }}">
+                <div class="btn-row" style="justify-content:space-between">
+                    <a class="bold" href="{{ path('app_note_view', {id: note.id}) }}">{% if note.pinned %}📌 {% endif %}{{ note.title }}</a>
+                    {% if is_granted('NOTE_EDIT', note) %}<a class="btn warning xs" href="{{ path('app_note_edit', {id: note.id}) }}">Edit</a>{% endif %}
+                </div>
+                {% if note.body %}<div class="note-body">{{ note.body|length > 400 ? note.body|slice(0, 400) ~ '…' : note.body }}</div>{% endif %}
+                {{ n.byline(note) }}
+            </div>
+        {% else %}
+            <p class="muted" style="margin:0">No notes yet.</p>
+        {% endfor %}
+    </div>
+{% endmacro %}

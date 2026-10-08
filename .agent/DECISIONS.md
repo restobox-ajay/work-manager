@@ -2679,3 +2679,21 @@ task's existing values. Hidden, not removed: the columns stay (`user_id`, `revie
 contractor dashboard, Tasks By Contractor, access rules, priority tabs) is unchanged, so they can come back.
 
 **Tripwire:** verifiable — Verified by `tests/Functional/Task/TaskHiddenFieldsTest.php`.
+
+## ADR-101: Notes — on a client, project or task, or independent (owner request, 2026-10-08)
+
+**Decision.** A `note` table (migration `Version20261012140000`): title (required, 150), text (optional, 20 000),
+pinned, author, created/updated. It is on **at most one** client, project or task (three nullable FKs, `ON DELETE
+CASCADE`, so a deleted record never leaves its notes behind as "independent"), or on none — an independent note.
+A note's record is fixed when it is written.
+- **Who sees it** (`NoteVoter`): a note on a record is as visible as the record (`WorkAccess::canView*`); an
+  independent note is its author's alone — admins included, as these are personal notes.
+- **Who changes it**: the author or an admin (who must also be able to see it). Changes are audited as
+  `note.create|update|delete` with id, type and title — never the text.
+- **Where**: a Notes menu (Add Note, All Notes — search, type filter, pinned first, paged) and a Notes card with
+  "+ Add note" on every client, project and task page. All Notes lists, for an admin, every note on a record plus
+  their own independent notes; for anyone else, only the notes they wrote (the rest are on the record pages, which
+  check access) — so the list needs no per-row visibility rules.
+- A new note from the menu is independent; a note on a record is started from that record's page.
+
+**Tripwire:** verifiable — Verified by `tests/Functional/Note/NoteTest.php`.

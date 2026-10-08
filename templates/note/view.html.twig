@@ -1,0 +1,33 @@
+{% extends 'base.html.twig' %}
+{% import '_work/macros.html.twig' as ui %}
+{% import 'note/_macros.html.twig' as n %}
+
+{% block title %}Note · {{ note.title }}{% endblock %}
+
+{% block body %}
+<div class="page-head">
+    <div class="ph-main">
+        <div class="eyebrow">Notes</div>
+        <div class="ph-title"><h1 style="text-transform:none;letter-spacing:0">{% if note.pinned %}📌 {% endif %}{{ note.title }}</h1></div>
+        <p class="lead">{{ n.about(note.type, note.subject) }}</p>
+    </div>
+    <div class="ph-actions">
+        <a class="btn secondary back" href="{{ path('app_note_index') }}">Notes</a>
+        {% if is_granted('NOTE_EDIT', note) %}<a class="btn warning" href="{{ path('app_note_edit', {id: note.id}) }}">Edit</a>{% endif %}
+    </div>
+</div>
+
+{{ ui.flashes() }}
+
+<div class="card" style="max-width:860px">
+    {% if note.body %}<div class="note-body">{{ note.body }}</div>{% else %}<p class="muted" style="margin:0">No text.</p>{% endif %}
+    <div style="margin-top:10px">{{ n.byline(note) }}</div>
+</div>
+
+{% if is_granted('NOTE_EDIT', note) %}
+    <form class="mx-form" method="post" action="{{ path('app_note_delete', {id: note.id}) }}" onsubmit="return confirm('Delete this note?');">
+        <input type="hidden" name="_token" value="{{ csrf_token('note_delete_' ~ note.id) }}">
+        <button class="btn danger" type="submit">Delete note</button>
+    </form>
+{% endif %}
+{% endblock %}

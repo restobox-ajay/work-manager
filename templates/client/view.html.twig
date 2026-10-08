@@ -74,4 +74,7 @@
         {% endif %}
     </div>
 </div>
+
+{% import 'note/_macros.html.twig' as n %}
+{{ n.panel(notes, {client: client.id}) }}
 {% endblock %}

@@ -51,6 +51,11 @@
           add: is_granted('PROJECT_CREATE') ? { label: 'New project', href: path('app_project_create') } : null },
     ]|filter(link => link) },
     { label: 'Tasks', icon: 'check-square', children: taskLinks },
+    { label: 'Notes', icon: 'file', children: [
+        { label: 'Add Note', href: path('app_note_new'), current: cur == 'app_note_new' },
+        { label: 'All Notes', href: path('app_note_index'), current: cur starts with 'app_note_' and cur != 'app_note_new',
+          add: { label: 'New note', href: path('app_note_new') } },
+    ] },
 ] %}
 {# Config: one CRUD page per list (ADR-075), in work-platform's Settings menu order. #}
 {% set kind = app.request.attributes.get('kind') %}

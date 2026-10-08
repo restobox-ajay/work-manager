@@ -1,0 +1,54 @@
+{% extends 'base.html.twig' %}
+{% import '_work/macros.html.twig' as ui %}
+{% import 'note/_macros.html.twig' as n %}
+
+{% block title %}Notes{% endblock %}
+
+{% block body %}
+<div class="page-head">
+    <div class="ph-main">
+        <div class="eyebrow">Notes</div>
+        <div class="ph-title"><h1>Notes</h1></div>
+        <p class="lead">{{ is_granted('ROLE_ADMIN') ? 'Notes on clients, projects and tasks, and your own independent notes.' : 'The notes you have written. Notes others wrote are on the client, project or task they are about.' }}</p>
+    </div>
+    <div class="ph-actions"><a class="btn primary" href="{{ path('app_note_new') }}">+ New note</a></div>
+</div>
+
+{{ ui.flashes() }}
+
+<div class="table-card">
+    <form class="table-header mx-form" method="get" action="{{ path('app_note_index') }}" style="flex-wrap:wrap">
+        <input type="search" name="q" value="{{ filters.term }}" placeholder="Search title or text" aria-label="Search notes">
+        <select name="type" aria-label="Type" style="width:auto">
+            <option value="">All notes</option>
+            {% for value, label in types %}<option value="{{ value }}" {{ filters.type == value ? 'selected' }}>{{ label }}</option>{% endfor %}
+        </select>
+        <button class="btn primary sm" type="submit">Filter</button>
+        {% if params is not empty %}<a class="btn secondary sm" href="{{ path('app_note_index') }}">Reset</a>{% endif %}
+        <span class="grow"></span>
+        <span class="muted small">{{ page.total }} note{{ page.total == 1 ? '' : 's' }}</span>
+    </form>
+    <div class="tscroll">
+        <table class="t">
+            <thead><tr><th>Title</th><th>About</th><th>Author</th><th>Updated</th><th></th></tr></thead>
+            <tbody>
+                {% for note in page.items %}
+                    <tr>
+                        <td>
+                            <a class="bold" href="{{ path('app_note_view', {id: note.id}) }}">{% if note.pinned %}📌 {% endif %}{{ note.title }}</a>
+                            {% if note.body %}<div class="muted small">{{ ui.short(note.body, 120) }}</div>{% endif %}
+                        </td>
+                        <td>{{ n.about(note.type, note.subject) }}</td>
+                        <td>{{ note.author.name ?: note.author.email }}</td>
+                        <td class="nowrap">{{ note.updatedAt|date('Y-m-d H:i') }}</td>
+                        <td class="actions">{% if is_granted('NOTE_EDIT', note) %}<a class="btn warning xs" href="{{ path('app_note_edit', {id: note.id}) }}">Edit</a>{% endif %}</td>
+                    </tr>
+                {% else %}
+                    <tr><td colspan="5" class="empty"><b>No notes found.</b> <a href="{{ path('app_note_new') }}">Write one</a>.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {{ ui.pager(page, 'app_note_index', params) }}
+</div>
+{% endblock %}

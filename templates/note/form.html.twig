@@ -1,0 +1,43 @@
+{% extends 'base.html.twig' %}
+{% import '_work/macros.html.twig' as ui %}
+{% import 'note/_macros.html.twig' as n %}
+
+{% block title %}{{ note ? 'Edit note' : 'New note' }}{% endblock %}
+
+{% block body %}
+{% set back = note ? path('app_note_view', {id: note.id}) : (subject ? path('app_' ~ subjectType ~ '_view', {id: subject.id}) : path('app_note_index')) %}
+<div class="page-head">
+    <div class="ph-main">
+        <div class="eyebrow">Notes</div>
+        <div class="ph-title"><h1>{{ note ? 'Edit note' : 'New note' }}</h1></div>
+        <p class="lead">{{ n.about(subjectType, subject) }}</p>
+    </div>
+    <div class="ph-actions"><a class="btn secondary back" href="{{ back }}">Back</a></div>
+</div>
+
+{{ ui.errors(errors) }}
+
+<form class="card mx-form" method="post" style="max-width:760px">
+    <input type="hidden" name="_token" value="{{ csrf_token('note_form') }}">
+    <div class="form-grid">
+        <div class="field span-all">
+            <label for="f-title">Title <span class="req">*</span></label>
+            <input type="text" id="f-title" name="title" value="{{ values.title ?? '' }}" maxlength="150" required {{ note ? '' : 'autofocus' }}>
+        </div>
+        <div class="field span-all">
+            <label for="f-body">Note</label>
+            <textarea id="f-body" name="body" rows="10" maxlength="20000">{{ values.body ?? '' }}</textarea>
+        </div>
+        <div class="field span-all">
+            <label class="check"><input type="checkbox" name="pinned" value="1" {{ (values.pinned ?? false) ? 'checked' }}> Pin to the top</label>
+        </div>
+    </div>
+    {% if not note and not subject %}
+        <p class="muted small" style="margin:8px 0 0">An independent note is private to you. To write a note on a client, project or task, use <b>+ Add note</b> on its page.</p>
+    {% endif %}
+    <div class="form-actions" style="margin-top:10px">
+        <a class="btn secondary" href="{{ back }}">Cancel</a>
+        <button class="btn primary" type="submit">Save note</button>
+    </div>
+</form>
+{% endblock %}

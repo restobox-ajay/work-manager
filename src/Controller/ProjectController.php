@@ -11,6 +11,7 @@ use App\Repository\UserRepository;
 use App\Security\Voter\WorkVoter;
 use App\Security\Work\WorkAccess;
 use App\Service\Client\ClientService;
+use App\Service\Note\NoteService;
 use App\Service\Pagination\Paginated;
 use App\Service\Project\ProjectService;
 use App\Service\Project\ProjectTaskGrid;
@@ -37,6 +38,7 @@ final class ProjectController extends AbstractWorkController
         private readonly ProjectTaskGrid $taskGrid,
         private readonly TaskLookups $lookups,
         private readonly WorkAccess $access,
+        private readonly NoteService $notes,
     ) {
     }
 
@@ -206,6 +208,7 @@ final class ProjectController extends AbstractWorkController
             'tasks'           => $tasks->findForProject((int) $project->getId()),
             'statuses'        => $this->lookups->statuses(),
             'canEdit'         => $canEdit,
+            'notes'           => $this->notes->forSubject($project),
         ]);
     }
 

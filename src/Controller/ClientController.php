@@ -11,6 +11,7 @@ use App\Repository\UserRepository;
 use App\Security\Voter\WorkVoter;
 use App\Service\Client\ClientCodeGenerator;
 use App\Service\Client\ClientService;
+use App\Service\Note\NoteService;
 use App\Service\Pagination\Paginated;
 use App\Service\Validation\InputValue;
 use Symfony\Bridge\Doctrine\Attribute\MapEntity;
@@ -101,12 +102,13 @@ final class ClientController extends AbstractWorkController
 
     #[Route('/{id}', name: 'app_client_view', requirements: ['id' => '\d+'], methods: ['GET'])]
     #[IsGranted(WorkVoter::CLIENT_VIEW, 'client')]
-    public function view(#[MapEntity(id: 'id')] Client $client, ProjectRepository $projects): Response
+    public function view(#[MapEntity(id: 'id')] Client $client, ProjectRepository $projects, NoteService $notes): Response
     {
         return $this->render('client/view.html.twig', [
             'client'   => $client,
             'managers' => $this->clients->managersOf($client),
             'projects' => $projects->findForClient((int) $client->getId()),
+            'notes'    => $notes->forSubject($client),
         ]);
     }
 
