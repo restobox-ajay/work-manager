@@ -132,6 +132,9 @@ final class TaskReportController extends AbstractWorkController
         }
 
         $tabs = $this->reports->priorityTabs($targetId);
+        // One section at a time, as tabs (ADR-113); an unknown ?tab= falls back to the first.
+        $activeTab = $request->query->getString('tab');
+        $activeTab = isset($tabs[$activeTab]) ? $activeTab : (string) array_key_first($tabs);
         $fee = [];
         foreach ($tabs as $tab) {
             foreach ($tab['tasks'] as $task) {
@@ -141,6 +144,7 @@ final class TaskReportController extends AbstractWorkController
 
         return $this->render('task/priority.html.twig', $this->lookupMaps() + [
             'tabs'       => $tabs,
+            'activeTab'  => $activeTab,
             'targetId'   => $targetId,
             'peopleList' => $this->reports->priorityPeople($viewer),
             'canReorder' => $this->reports->canReorder($viewer),
@@ -164,9 +168,14 @@ final class TaskReportController extends AbstractWorkController
             InputValue::int($request->request->get('taskId')),
             in_array($move, ['top', 'bottom'], true) ? $move : null,
         );
+        // Drag and drop (ADR-112) saves in the background: no redirect, no flash message.
+        if ($request->headers->get('X-Requested-With') === 'fetch') {
+            return new Response(null, Response::HTTP_NO_CONTENT);
+        }
         $this->addFlash('success', 'Task priority updated.');
+        $tab = $request->request->getString('tab');
 
-        return $this->redirectToRoute('app_task_priority', ['userId' => $userId]);
+        return $this->redirectToRoute('app_task_priority', ['userId' => $userId] + (isset(TaskReportService::PRIORITY_TABS[$tab]) ? ['tab' => $tab] : []));
     }
 
     /** @return array<string, array<int, string>> */

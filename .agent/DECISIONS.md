@@ -2801,3 +2801,69 @@ and its button stays disabled until at least one task is ticked.
 `/dashboard?clientId=…` and a project name `/dashboard?clientId=…&projectId=…`, with that client (and project)
 selected in the dashboard's sidebar. Task names still open the task; the rows' View buttons still open the client /
 project detail pages. The dashboard's default status (Pending, ADR-102) still applies; its "All" pill shows the rest.
+
+
+## ADR-112: Task Priority — drag and drop, in the Tasks menu (owner request, 2026-10-08)
+
+**Decision.** The Task Priority page (`/task/priority`, ADR-072) is in the Tasks menu and, for admins, each row has a
+drag handle: dropping a row posts the tab's new order in the background to the existing sort endpoint (which now
+answers 204 to `X-Requested-With: fetch` instead of redirecting) and shows "Order saved." The To top / To bottom
+buttons stay for touch screens and keyboards. `TaskReportService::reorder()` now keeps only ids that are on that
+person's priority page, so a crafted request cannot create order rows for other tasks.
+
+
+## ADR-113: Task Priority sections as tabs (owner request, 2026-10-08)
+
+**Decision.** The three priority lists (Assignee (Pending), Reviewer (Reviewing), Reviewer (Pending)) are tabs with
+their counts; one is shown at a time (`?tab=`, default the first). The chosen tab is kept after To top / To bottom
+(posted as `tab`, checked against `TaskReportService::PRIORITY_TABS`) and when switching person.
+
+
+## ADR-114: One-person setup — tasks are the owner's (owner request, 2026-10-08)
+
+**Decision.** For now the owner is the only user, so every task is theirs. A new task with no assignee (the task
+form no longer asks, ADR-100) is assigned to whoever creates it (`TaskService::create()`), including quick add and
+the project task grid. `php bin/console app:tasks:assign-unassigned <email> [--dry-run]` assigns every existing task
+without an assignee to that account once (audited as task.assign_unassigned). Demo data assigns its tasks to the
+admin when there are no other users. When more people join, tasks assigned to them stay theirs; only unassigned ones
+default to the creator.
+
+## ADR-115: Task Priority — drag any row, bars icon, saved message (owner request, 2026-10-08)
+
+**Decision.** The To top / To bottom buttons are gone; the whole row is draggable (not only the handle), and the first
+column shows a "bars" icon (new glyph in `layout/_icons.html.twig`) as the cue. After a drop is saved a green
+"Task priority saved" message appears above the list for four seconds (a red one stays if the save fails). The
+controller still accepts `move=top|bottom`, now unused by the page.
+
+## ADR-116: Task status detail is a multi-line text area (owner request, 2026-10-08)
+
+**Decision.** On the task page and the task form, Status detail is a `<textarea>` (the column is already TEXT); the
+read-only view keeps the line breaks (`white-space: pre-line`). The task page's Save button sits under the box.
+
+## ADR-117: Created date on the dashboard task tables and the task list (owner request, 2026-10-08)
+
+**Decision.** `_work/task_rows` (Dashboard, and the contractor's own dashboard) gains a "Created" column after "Due".
+Both it and the task list's existing "Created" column show the task's creation date (the date on the form) and fall
+back to the date the row was entered — the same rule as the task page. Sorting the list by Created still uses the
+entry timestamp.
+
+**Addendum.** Task Priority shows the same "Created" column, after "Due".
+
+## ADR-118: Task description — right-hand column, rich-text editor (owner request, 2026-10-08)
+
+**Decision.** The task form is two columns: the fields on the left, Description on the right (stacked under 1100px).
+Description is a small built-in editor (`public/js/rich-editor.js`, enhances `<textarea data-rich-editor>`): bold,
+italic, underline, strike, heading, quote, bulleted/numbered lists, links, clear, undo/redo; paste comes in as plain
+text. No third-party editor: nothing to install or load from a CDN, and the server does not trust the editor anyway.
+
+**Security.** `App\Service\Text\RichText` keeps an allowlist of formatting tags; scripts/styles/iframes/forms are
+removed with their content, other tags are unwrapped, every attribute except `a[href]` is dropped, and a link keeps
+only an http(s)/mailto href (opened with `rel="noopener noreferrer nofollow"`). It runs when the description is saved
+(`TaskInput`) and again when it is shown (`|rich_text` Twig filter), so older plain-text descriptions render with
+their line breaks and anything stored another way is still cleaned. Empty editor content is stored as NULL.
+Unit-tested (`RichTextTest`).
+
+**Also.** `TaskHiddenFieldsTest` expected a new task to have no assignee; since ADR-114 it is the creator's — the
+expectation was updated to the owner's decision.
+
+**Addendum (layout).** The fields column is fixed at 640px; Description takes all the remaining width (the form has no max width) and stretches to the fields column's height.

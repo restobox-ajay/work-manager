@@ -109,7 +109,7 @@
                         <td class="small">{{ task.statusDetail ? ui.short(task.statusDetail, 60) : '—' }}</td>
                         <td>{{ types[task.taskTypeId] ?? '—' }}</td>
                         <td class="nowrap">{{ ui.ts(task.dueDate) }}</td>
-                        <td class="nowrap">{{ ui.ts(task.createdAt) }}</td>
+                        <td class="nowrap">{{ task.creationDate ? task.creationDate|date('Y-m-d') : ui.ts(task.createdAt) }}</td>
                         <td>{{ ui.statusBadge(task.taskStatusId, statuses) }}</td>
                         {% if row.canSeeFee %}
                             <td>{{ currencies[task.currencyId] ?? '—' }}</td>

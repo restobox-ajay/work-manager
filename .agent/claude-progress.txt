@@ -4232,3 +4232,12 @@ ADR-108 (2026-10-08): app:demo-data fills every module (work, invoices, notes, r
 ADR-109 (2026-10-08): delete buttons on all lists; permanent client/project delete with confirmation; rent tenant/property delete; note View button. Browser-checked every delete; no orphan rows; 75-page sweep clean.
 ADR-110 (2026-10-08): Request Payment one client at a time, no currency filter. Browser-checked.
 ADR-111 (2026-10-08): client/project names link to the filtered dashboard (client, project, task lists and dashboard rows). Browser-checked.
+ADR-112 (2026-10-08): Task Priority drag-and-drop (saved instantly, survives reload), menu entry, reorder limited to listed tasks. Browser-checked.
+ADR-113 (2026-10-08): Task Priority lists as tabs; tab kept after reorder and person switch. Browser-checked.
+ADR-114 (2026-10-08): new tasks default to their creator; app:tasks:assign-unassigned one-off command; demo tasks to the admin in a one-person setup. Checked.
+ADR-115 (2026-10-08): Task Priority whole-row drag, bars icon, saved message; Top/Bottom buttons removed. Browser-checked (drag, persist, message).
+ADR-116 (2026-10-08): status detail as textarea (task page + form). Browser-checked multi-line save.
+ADR-117 (2026-10-08): Created column on dashboard task tables; task list Created shows creation date. Browser-checked.
+ADR-117 addendum (2026-10-08): Created column also on Task Priority. Browser-checked.
+ADR-118 (2026-10-08): task form two columns, Description rich-text editor with server-side allowlist (RichText + |rich_text). Unit tests 9/9; Task functional tests green (TaskHiddenFieldsTest updated for ADR-114). Browser-checked create/view/edit/legacy text/narrow layout.
+ADR-118 addendum (2026-10-08): task form fields fixed at 640px, Description fills the remaining width and the full height. Browser-checked.

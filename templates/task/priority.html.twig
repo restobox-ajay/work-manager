@@ -1,9 +1,11 @@
 {% extends 'base.html.twig' %}
 {% import '_work/macros.html.twig' as ui %}
+{% import 'layout/_icons.html.twig' as icons %}
 
 {#
-    Task Priority (ADR-072): one person's pending work and reviews, in their priority order. Admins move a task to
-    the top or bottom; the order is per person, so it never changes anyone else's list.
+    Task Priority (ADR-072, ADR-112): one person's pending work and reviews, in their priority order. Admins drag any
+    row to a new place (saved at once, with a confirmation); the order is per person, so it never changes anyone
+    else's list (ADR-115: whole-row dragging, no Top/Bottom buttons).
 #}
 {% block title %}Task priority{% endblock %}
 
@@ -13,10 +15,11 @@
     <div class="ph-main">
         <div class="eyebrow">Tasks</div>
         <div class="ph-title"><h1>Task priority</h1></div>
-        <p class="lead">{{ targetId == app.user.id ? 'Your' : targetName ~ '’s' }} pending tasks and reviews, most important first.</p>
+        <p class="lead">{{ targetId == app.user.id ? 'Your' : targetName ~ '’s' }} pending tasks and reviews, most important first.{% if canReorder %} Drag any row to change the order — it is saved straight away.{% endif %}</p>
     </div>
     {% if peopleList is not empty %}
         <form class="ph-actions mx-form" method="get" action="{{ path('app_task_priority') }}">
+            <input type="hidden" name="tab" value="{{ activeTab }}">
             <select name="userId" aria-label="Person" onchange="this.form.submit()" style="width:auto">
                 <option value="{{ app.user.id }}">Me</option>
                 {% for person in peopleList %}{% if person.id != app.user.id %}<option value="{{ person.id }}" {{ targetId == person.id ? 'selected' }}>{{ person.name ?: person.email }}</option>{% endif %}{% endfor %}
@@ -28,42 +31,120 @@
 
 {{ ui.flashes() }}
 
-{% for key, tab in tabs %}
+<nav class="tabs" aria-label="Priority lists">
+    {% for key, tab in tabs %}
+        <a class="{{ key == activeTab ? 'active' }}" href="{{ path('app_task_priority', {userId: targetId, tab: key}) }}" {{ key == activeTab ? 'aria-current="page"' }}>{{ tab.label }} <span class="badge {{ tab.tasks is empty ? 'plain' : 'num' }}">{{ tab.tasks|length }}</span></a>
+    {% endfor %}
+</nav>
+
+{% for key, tab in tabs|filter((t, k) => k == activeTab) %}
+    <div class="alert success prio-saved" data-prio-saved role="status" hidden></div>
     <div class="table-card">
-        <div class="table-header"><h2>{{ tab.label }}</h2><span class="grow"></span><span class="badge num">{{ tab.tasks|length }}</span></div>
+        <div class="table-header"><span class="muted small">{{ tab.label }} · most important first</span><span class="grow"></span><span class="muted small prio-status" data-prio-status aria-live="polite"></span></div>
         {% if canReorder and tab.tasks is not empty %}
-            {# One form per tab carries the tab's current order; each Top/Bottom button names its task. #}
+            {# One form per tab carries the tab's current order (used without JavaScript too). #}
             <form id="sort-{{ key }}" class="mx-form" method="post" action="{{ path('app_task_priority_sort', {userId: targetId}) }}">
                 <input type="hidden" name="_token" value="{{ csrf_token('task_priority_' ~ targetId) }}">
+                <input type="hidden" name="tab" value="{{ key }}">
                 {% for task in tab.tasks %}<input type="hidden" name="taskIds[]" value="{{ task.id }}">{% endfor %}
             </form>
         {% endif %}
         <div class="tscroll">
             <table class="t">
-                <thead><tr><th style="width:40px">#</th><th>Client</th><th>Project</th><th>Task</th><th>Due</th><th>Status</th><th class="right">Payout</th>{% if canReorder %}<th></th>{% endif %}</tr></thead>
-                <tbody>
+                <thead><tr>{% if canReorder %}<th style="width:28px"></th>{% endif %}<th style="width:40px">#</th><th>Client</th><th>Project</th><th>Task</th><th>Due</th><th>Created</th><th>Status</th><th class="right">Payout</th></tr></thead>
+                <tbody {% if canReorder and tab.tasks|length > 1 %}data-prio-list data-form="sort-{{ key }}"{% endif %}>
                     {% for task in tab.tasks %}
-                        <tr>
-                            <td class="muted">{{ loop.index }}</td>
+                        <tr data-task-id="{{ task.id }}" {% if canReorder and tab.tasks|length > 1 %}class="prio-row" draggable="true" title="Drag to reorder"{% endif %}>
+                            {% if canReorder %}<td class="prio-handle" aria-hidden="true">{{ icons.icon('bars') }}</td>{% endif %}
+                            <td class="muted" data-prio-pos>{{ loop.index }}</td>
                             <td>{{ task.project ? task.project.client.name : '—' }}</td>
                             <td>{{ task.project ? task.project.name : '—' }}</td>
                             <td><a class="bold" href="{{ path('app_task_view', {id: task.id}) }}">{{ ui.short(task.name, 80) }}</a></td>
                             <td class="nowrap">{{ ui.ts(task.dueDate) }}</td>
+                            <td class="nowrap">{{ task.creationDate ? task.creationDate|date('Y-m-d') : ui.ts(task.createdAt) }}</td>
                             <td>{{ ui.statusBadge(task.taskStatusId, statuses) }}</td>
                             <td class="right nowrap">{{ fee[task.id] ? (task.totalAmount ?? '0.00') ~ ' ' ~ (currencies[task.currencyId] ?? '') : '—' }}</td>
-                            {% if canReorder %}
-                                <td class="actions">
-                                    <button class="btn light xs" form="sort-{{ key }}" type="submit" name="taskId" value="{{ task.id }}" formaction="{{ path('app_task_priority_sort', {userId: targetId}) }}?move=top" {{ loop.first ? 'disabled' }}>To top</button>
-                                    <button class="btn light xs" form="sort-{{ key }}" type="submit" name="taskId" value="{{ task.id }}" formaction="{{ path('app_task_priority_sort', {userId: targetId}) }}?move=bottom" {{ loop.last ? 'disabled' }}>To bottom</button>
-                                </td>
-                            {% endif %}
                         </tr>
                     {% else %}
-                        <tr><td colspan="8" class="empty">Nothing here.</td></tr>
+                        <tr><td colspan="9" class="empty">Nothing here.</td></tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
     </div>
 {% endfor %}
+
+{% if canReorder %}
+<script>
+    // Drag and drop (ADR-112, ADR-115): drag any row; on drop the tab's new order is posted in the background, the
+    // hidden order fields are updated to match and a success message confirms the save.
+    document.querySelectorAll('[data-prio-list]').forEach(function (body) {
+        var form = document.getElementById(body.dataset.form);
+        var status = body.closest('.table-card').querySelector('[data-prio-status]');
+        var saved = document.querySelector('[data-prio-saved]');
+        var hideTimer = null;
+        function notice(text, ok) {
+            saved.textContent = text;
+            saved.className = 'alert prio-saved ' + (ok ? 'success' : 'danger');
+            saved.hidden = false;
+            clearTimeout(hideTimer);
+            if (ok) { hideTimer = setTimeout(function () { saved.hidden = true; }, 4000); }
+        }
+        var dragged = null;
+
+        function rows() { return Array.prototype.slice.call(body.querySelectorAll('tr[data-task-id]')); }
+        function renumber() {
+            rows().forEach(function (row, i) {
+                row.querySelector('[data-prio-pos]').textContent = i + 1;
+            });
+            form.querySelectorAll('input[name="taskIds[]"]').forEach(function (input) { input.remove(); });
+            rows().forEach(function (row) {
+                var input = document.createElement('input');
+                input.type = 'hidden'; input.name = 'taskIds[]'; input.value = row.dataset.taskId;
+                form.appendChild(input);
+            });
+        }
+        function save() {
+            var data = new FormData();
+            data.append('_token', form.querySelector('input[name="_token"]').value);
+            rows().forEach(function (row) { data.append('taskIds[]', row.dataset.taskId); });
+            status.textContent = 'Saving…';
+            fetch(form.action, { method: 'POST', body: data, credentials: 'same-origin', headers: { 'X-Requested-With': 'fetch' } })
+                .then(function (r) {
+                    status.textContent = '';
+                    if (r.ok) { notice('Task priority saved — the new order is in place.', true); }
+                    else { notice('Could not save the order — reload the page and try again.', false); }
+                })
+                .catch(function () { status.textContent = ''; notice('Could not save the order — check your connection.', false); });
+        }
+
+        body.addEventListener('dragstart', function (e) {
+            var row = e.target.closest && e.target.closest('tr.prio-row');
+            if (!row) { return; }
+            dragged = row;
+            dragged.classList.add('prio-dragging');
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', dragged.dataset.taskId);
+        });
+        body.addEventListener('dragover', function (e) {
+            if (!dragged) { return; }
+            e.preventDefault();
+            var over = e.target.closest('tr[data-task-id]');
+            if (!over || over === dragged) { return; }
+            var box = over.getBoundingClientRect();
+            body.insertBefore(dragged, e.clientY > box.top + box.height / 2 ? over.nextSibling : over);
+        });
+        body.addEventListener('drop', function (e) { if (dragged) { e.preventDefault(); } });
+        body.addEventListener('dragend', function () {
+            if (!dragged) { return; }
+            dragged.classList.remove('prio-dragging');
+            var before = Array.prototype.map.call(form.querySelectorAll('input[name="taskIds[]"]'), function (i) { return i.value; }).join(',');
+            renumber();
+            var after = rows().map(function (r) { return r.dataset.taskId; }).join(',');
+            dragged = null;
+            if (before !== after) { save(); }
+        });
+    });
+</script>
+{% endif %}
 {% endblock %}

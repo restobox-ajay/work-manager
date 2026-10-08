@@ -127,6 +127,17 @@ final class TaskReportService
      */
     public function reorder(int $targetUserId, array $orderedTaskIds, ?int $taskId, ?string $move): void
     {
+        // Only tasks that are on this person's priority page can be ordered (ADR-112): ids posted for anything else
+        // are dropped, so a crafted request cannot create order rows for other tasks.
+        $listed = [];
+        foreach ($this->priorityTabs($targetUserId) as $tab) {
+            foreach ($tab['tasks'] as $task) {
+                $listed[(int) $task->getId()] = true;
+            }
+        }
+        $orderedTaskIds = array_values(array_unique(array_filter($orderedTaskIds, static fn (int $id) => isset($listed[$id]))));
+        $taskId = $taskId !== null && isset($listed[$taskId]) ? $taskId : null;
+
         $this->priorityOrders->reorder($targetUserId, $orderedTaskIds, $taskId, $move);
     }
 }

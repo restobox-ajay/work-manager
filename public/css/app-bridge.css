@@ -913,3 +913,28 @@ form.inline-delete{display:inline;margin:0;padding:0;border:0;background:none}
 /* Request Payment: the Amount column, its heading and the ticked total line up on the right. */
 .rp-group .t th.right,.rp-group .t td.right{text-align:right}
 .rp-group [data-selected-total]{font-weight:700}
+/* Task Priority drag and drop (ADR-112). */
+.prio-handle{cursor:grab;color:var(--muted);user-select:none;text-align:center;line-height:0}.prio-handle svg{vertical-align:middle}
+tr.prio-row{cursor:grab}tr.prio-row:active{cursor:grabbing}tr.prio-row:hover{background:var(--line-light)}
+.prio-saved{margin-bottom:12px}
+.prio-handle:active{cursor:grabbing}
+tr.prio-dragging{opacity:.5;background:var(--line-light)}
+/* ADR-118: task form in two columns; small rich-text editor and its rendered output. */
+.task-form{max-width:none}
+/* ADR-119: the fields keep a readable width; Description takes all the remaining space and the full height. */
+.task-form-cols{display:grid;grid-template-columns:minmax(0,640px) minmax(0,1fr);gap:16px;align-items:stretch}
+.task-form-side{display:flex;flex-direction:column}.task-form-side>.field{flex:1;display:flex;flex-direction:column}
+.task-form-side .rte{flex:1;display:flex;flex-direction:column}.task-form-side .rte-area{flex:1;max-height:none}
+.task-form-cols>.card{margin-bottom:0}
+@media (max-width:1100px){.task-form-cols{grid-template-columns:1fr}}
+.rte{border:1.5px solid var(--line);border-radius:8px;background:#fff;overflow:hidden}
+.rte:focus-within{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-soft)}
+.rte-toolbar{display:flex;flex-wrap:wrap;gap:2px;align-items:center;padding:4px;border-bottom:1px solid var(--line);background:var(--line-light,#f6f7f9)}
+.rte .rte-toolbar button.rte-btn{all:unset;box-sizing:border-box;border-radius:5px;padding:4px 8px;font-size:13px;line-height:1.2;cursor:pointer;color:var(--text,#1f2937);min-width:28px;text-align:center}
+.rte .rte-toolbar button.rte-btn:hover{background:rgba(0,0,0,.07)}.rte .rte-toolbar button.rte-btn:focus-visible{outline:2px solid var(--primary)}.rte .rte-toolbar button.rte-btn.on{background:var(--primary-soft);color:var(--primary)}
+.rte-sep{width:1px;height:18px;background:var(--line);margin:0 4px}
+.rte-area{padding:10px 12px;min-height:12em;max-height:70vh;overflow:auto;outline:none;line-height:1.55}
+.rte-area:empty::before{content:attr(data-placeholder);color:var(--muted)}
+.rte-area p,.rich-text p{margin:0 0 .6em}.rte-area ul,.rte-area ol,.rich-text ul,.rich-text ol{margin:0 0 .6em;padding-left:1.4em}
+.rte-area h3,.rich-text h3{font-size:1.05em;margin:.6em 0 .4em}.rte-area blockquote,.rich-text blockquote{margin:0 0 .6em;padding-left:10px;border-left:3px solid var(--line);color:var(--muted)}
+.rich-text>:last-child{margin-bottom:0}

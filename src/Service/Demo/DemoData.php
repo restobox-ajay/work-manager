@@ -156,7 +156,8 @@ final class DemoData
             }
         }
 
-        return [$creator, $assignees];
+        // A one-person setup (ADR-114): the demo tasks are the admin's own.
+        return [$creator, $assignees === [] && $creator !== null ? [$creator] : $assignees];
     }
 
     /**

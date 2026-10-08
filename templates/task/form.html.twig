@@ -22,8 +22,11 @@
 
 {{ ui.errors(errors) }}
 
-<form class="card mx-form" method="post" style="max-width:980px">
+{# ADR-118: fields on the left, the Description editor on the right (stacked on narrow screens). #}
+<form class="mx-form task-form" method="post">
     <input type="hidden" name="_token" value="{{ csrf_token('task_form') }}">
+    <div class="task-form-cols">
+    <div class="card task-form-main">
     <div class="form-grid three">
         <div class="field span-all">
             <label for="f-name">Task name <span class="req">*</span></label>
@@ -57,7 +60,7 @@
         </div>
         <div class="field span-all">
             <label for="f-status-detail">Status detail</label>
-            <input type="text" id="f-status-detail" name="statusDetail" value="{{ input.statusDetail }}">
+            <textarea id="f-status-detail" name="statusDetail" rows="3">{{ input.statusDetail }}</textarea>
         </div>
         {# type="text", not "url": a link typed without "http://" is completed server-side, not refused by the browser. #}
         <div class="field span-all">
@@ -79,17 +82,22 @@
 
         <div class="section-label">Details</div>
         <div class="field span-all">
-            <label for="f-description">Description</label>
-            <textarea id="f-description" name="description" rows="6">{{ input.description }}</textarea>
-        </div>
-        <div class="field span-all">
             <label for="f-tutorial">Tutorial</label>
             <textarea id="f-tutorial" name="tutorial" rows="3">{{ input.tutorial }}</textarea>
         </div>
+    </div>
+    </div>
+    <div class="card task-form-side">
+        <div class="field">
+            <label for="f-description">Description</label>
+            <textarea id="f-description" name="description" rows="14" data-rich-editor placeholder="What needs doing, links, acceptance notes…">{{ input.description }}</textarea>
+        </div>
+    </div>
     </div>
     <div class="form-actions" style="margin-top:10px">
         <a class="btn secondary" href="{{ back }}">Cancel</a>
         <button class="btn primary" type="submit">{{ task ? 'Save' : 'Create task' }}</button>
     </div>
 </form>
+<script src="{{ versioned('/js/rich-editor.js') }}" defer></script>
 {% endblock %}

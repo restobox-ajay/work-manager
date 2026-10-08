@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Service\Task;
 
 use App\Entity\Task;
+use App\Service\Text\RichText;
 use App\Service\Validation\InputValue;
 use Symfony\Component\Validator\Constraints as Assert;
 
@@ -93,7 +94,7 @@ final class TaskInput
                 'totalAmount'    => $this->totalAmount = ($amount = InputValue::text($value)) !== null ? str_replace(',', '', $amount) : null,
                 'timeBudget'     => $this->timeBudget = InputValue::text($value),
                 'statusDetail'   => $this->statusDetail = InputValue::text($value),
-                'description'    => $this->description = InputValue::text($value),
+                'description'    => $this->description = RichText::clean(InputValue::text($value)), // editor HTML, allowlisted (ADR-118)
                 'tutorial'       => $this->tutorial = InputValue::text($value),
                 'docUrl'         => $this->docUrl = InputValue::url($value),
                 'dueDate'        => $this->dueDate = InputValue::timestamp($value),

@@ -72,7 +72,8 @@ final class TaskHiddenFieldsTest extends WebTestCase
         self::assertResponseRedirects();
         $task = $this->em->getRepository(Task::class)->findOneBy(['name' => 'Plain task']);
         self::assertNotNull($task);
-        self::assertNull($task->getAssignee());
+        // ADR-114 (owner's one-person setup): with no assignee field, a new task is its creator's.
+        self::assertSame(self::EMAIL, $task->getAssignee()?->getEmail());
         self::assertNull($task->getReviewerUserId());
         self::assertNull($task->getTimeBudget());
         self::assertNull($task->getBillableDate());

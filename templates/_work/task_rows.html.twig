@@ -9,7 +9,7 @@
             <tr>
                 <th>Client</th><th>Project</th><th>Task</th>
                 {% if showContractor ?? false %}<th>Contractor</th>{% endif %}
-                <th>Status</th><th>Due</th><th class="right">Payout</th>
+                <th>Status</th><th>Due</th><th>Created</th><th class="right">Payout</th>
             </tr>
         </thead>
         <tbody>
@@ -22,10 +22,11 @@
                     {% if showContractor ?? false %}<td>{{ task.assignee ? (task.assignee.name ?: task.assignee.email) : '—' }}</td>{% endif %}
                     <td>{{ ui.statusBadge(task.taskStatusId, statuses) }}</td>
                     <td class="nowrap">{{ ui.ts(task.dueDate) }}</td>
+                    <td class="nowrap">{{ task.creationDate ? task.creationDate|date('Y-m-d') : ui.ts(task.createdAt) }}</td>
                     <td class="right nowrap">{{ row.canSeeFee ? (task.totalAmount ?? '0.00') ~ ' ' ~ (currencies[task.currencyId] ?? '') : '—' }}</td>
                 </tr>
             {% else %}
-                <tr><td colspan="{{ (showContractor ?? false) ? 7 : 6 }}" class="empty">{{ empty ?? 'Nothing here.' }}</td></tr>
+                <tr><td colspan="{{ (showContractor ?? false) ? 8 : 7 }}" class="empty">{{ empty ?? 'Nothing here.' }}</td></tr>
             {% endfor %}
         </tbody>
     </table>

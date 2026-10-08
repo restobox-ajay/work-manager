@@ -38,6 +38,7 @@
       add: is_granted('TASK_CREATE') ? { label: 'New task', href: path('app_task_create') } : null },
     { label: 'Tasks By Contractor', href: path('app_task_contractor', {taskStatusId: pending}), current: cur == 'app_task_contractor' },
     { label: 'Task By Date', href: path('app_task_by_date'), current: cur == 'app_task_by_date' },
+    { label: 'Task Priority', href: path('app_task_priority'), current: cur == 'app_task_priority' },
 ]|filter(link => link) %}
 {% set items = [
     { label: 'Dashboard', icon: 'dashboard', href: path('app_dashboard'), current: cur == 'app_dashboard' },

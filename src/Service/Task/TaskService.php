@@ -50,6 +50,10 @@ final class TaskService
 
         $task = new Task();
         $this->populate($task, $input, $project, $this->access->canSetFees($actor, $project));
+        // No assignee chosen (the task form no longer asks, ADR-100): the task is its creator's (ADR-114).
+        if ($task->getAssignee() === null) {
+            $task->setAssignee($actor);
+        }
 
         $now = time();
         $task->setCreatedAt($now)->setCreatedBy($actor->getId())->setUpdatedAt($now)->setUpdatedBy($actor->getId());

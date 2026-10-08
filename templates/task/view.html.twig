@@ -32,19 +32,19 @@
 
 <div class="detail">
     <div>
-        {% if task.description %}<div class="card"><h2>Description</h2><div style="white-space:pre-line">{{ task.description }}</div></div>{% endif %}
+        {% if task.description %}<div class="card"><h2>Description</h2><div class="rich-text">{{ task.description|rich_text }}</div></div>{% endif %}
         {% if task.tutorial %}<div class="card"><h2>Tutorial</h2><div style="white-space:pre-line">{{ task.tutorial }}</div></div>{% endif %}
 
         <div class="card">
             <h2>Status detail</h2>
             {% if is_granted('TASK_STATUS_DETAIL', task) %}
-                <form class="mx-form btn-row" method="post" action="{{ path('app_task_status_detail', {id: task.id}) }}">
+                <form class="mx-form" method="post" action="{{ path('app_task_status_detail', {id: task.id}) }}">
                     <input type="hidden" name="_token" value="{{ csrf_token('task_status_detail_' ~ task.id) }}">
-                    <input type="text" name="statusDetail" value="{{ task.statusDetail }}" aria-label="Status detail" placeholder="Where this task stands" style="flex:1">
-                    <button class="btn primary" type="submit">Save</button>
+                    <textarea name="statusDetail" rows="4" aria-label="Status detail" placeholder="Where this task stands">{{ task.statusDetail }}</textarea>
+                    <div class="btn-row" style="justify-content:flex-end;margin-top:8px"><button class="btn primary" type="submit">Save</button></div>
                 </form>
             {% else %}
-                <p>{{ task.statusDetail ?? '—' }}</p>
+                <p style="white-space:pre-line">{{ task.statusDetail ?? '—' }}</p>
             {% endif %}
         </div>
     </div>
