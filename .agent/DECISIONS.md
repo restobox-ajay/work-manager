@@ -2793,3 +2793,11 @@ The summary tiles are gone. Tasks start unticked; each block's footer shows the 
 and its button stays disabled until at least one task is ticked.
 
 **Menu (same day).** "Request Payment" is a single menu link to the page (its "Approved Tasks" submenu entry is gone).
+
+
+## ADR-111: Client and project names open the Dashboard filtered to them (owner request, 2026-10-08)
+
+**Decision.** In the client, project and task lists and the dashboard's task table, clicking a client name opens
+`/dashboard?clientId=…` and a project name `/dashboard?clientId=…&projectId=…`, with that client (and project)
+selected in the dashboard's sidebar. Task names still open the task; the rows' View buttons still open the client /
+project detail pages. The dashboard's default status (Pending, ADR-102) still applies; its "All" pill shows the rest.

@@ -49,8 +49,8 @@
             <tbody>
                 {% for project in page.items %}
                     <tr>
-                        <td><a href="{{ path('app_client_view', {id: project.client.id}) }}">{{ project.client.name }}</a></td>
-                        <td><a class="bold" href="{{ path('app_project_view', {id: project.id}) }}">{{ project.name }}</a></td>
+                        <td><a href="{{ path('app_dashboard', {clientId: project.client.id}) }}" title="Tasks of {{ project.client.name }} on the dashboard">{{ project.client.name }}</a></td>
+                        <td><a class="bold" href="{{ path('app_dashboard', {clientId: project.client.id, projectId: project.id}) }}" title="Tasks of {{ project.name }} on the dashboard">{{ project.name }}</a></td>
                         <td class="nowrap">{{ ui.ts(project.createdAt) }}</td>
                         <td>{{ ui.activeBadge(project.active) }}</td>
                         <td>{{ (contractors[project.id] ?? [])|map(u => u.name ?: u.email)|join(', ') ?: '—' }}</td>

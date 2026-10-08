@@ -4231,3 +4231,4 @@ ADR-107 (2026-10-08): project page — details card, task summary (status counts
 ADR-108 (2026-10-08): app:demo-data fills every module (work, invoices, notes, rent, expenses, subscriptions); --purge verified to leave no demo rows. Swept 77 pages with the data: no errors.
 ADR-109 (2026-10-08): delete buttons on all lists; permanent client/project delete with confirmation; rent tenant/property delete; note View button. Browser-checked every delete; no orphan rows; 75-page sweep clean.
 ADR-110 (2026-10-08): Request Payment one client at a time, no currency filter. Browser-checked.
+ADR-111 (2026-10-08): client/project names link to the filtered dashboard (client, project, task lists and dashboard rows). Browser-checked.

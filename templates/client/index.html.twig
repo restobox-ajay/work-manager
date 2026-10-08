@@ -47,7 +47,7 @@
             <tbody>
                 {% for client in page.items %}
                     <tr>
-                        <td><a href="{{ path('app_client_view', {id: client.id}) }}" class="bold">{{ client.name }}</a>{% if client.companyName %}<div class="muted small">{{ client.companyName }}</div>{% endif %}</td>
+                        <td><a href="{{ path('app_dashboard', {clientId: client.id}) }}" class="bold" title="Tasks of {{ client.name }} on the dashboard">{{ client.name }}</a>{% if client.companyName %}<div class="muted small">{{ client.companyName }}</div>{% endif %}</td>
                         <td>{{ client.clientCode ?? '—' }}</td>
                         <td>
                             {% set count = details.projectCounts[client.id] ?? 0 %}
