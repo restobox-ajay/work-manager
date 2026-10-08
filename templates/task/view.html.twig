@@ -52,9 +52,11 @@
         <div class="card">
             <h2>Details</h2>
             <dl class="kv">
-                <dt>Contractor</dt><dd>{{ task.assignee ? (task.assignee.name ?: task.assignee.email) : '—' }}</dd>
-                <dt>Reviewer</dt><dd>{{ people[task.reviewerUserId] ?? '—' }}</dd>
                 <dt>Task type</dt><dd>{{ types[task.taskTypeId] ?? '—' }}</dd>
+                {% if task.docUrl %}
+                    {# Only an http(s) value becomes a link, so a stored "javascript:" can never be clicked. #}
+                    <dt>Doc / Specs</dt><dd style="overflow-wrap:anywhere">{% if task.docUrl starts with 'http://' or task.docUrl starts with 'https://' %}<a href="{{ task.docUrl }}" rel="noopener noreferrer" target="_blank">{{ task.docUrl }}</a>{% else %}{{ task.docUrl }}{% endif %}</dd>
+                {% endif %}
                 <dt>Due</dt><dd>{{ ui.ts(task.dueDate) }}</dd>
                 <dt>Created</dt><dd>{{ task.creationDate ? task.creationDate|date('Y-m-d') : ui.ts(task.createdAt) }}{% if task.createdBy %} by {{ people[task.createdBy] ?? '#' ~ task.createdBy }}{% endif %}</dd>
                 <dt>Updated</dt><dd>{{ ui.ts(task.updatedAt, 'Y-m-d H:i') }}</dd>
@@ -66,8 +68,6 @@
                 <h2>Payout</h2>
                 <dl class="kv">
                     <dt>Amount</dt><dd>{{ task.totalAmount ?? '0.00' }} {{ currencies[task.currencyId] ?? '' }}</dd>
-                    <dt>Billable time</dt><dd>{{ task.timeBudget is not null ? task.timeBudget ~ ' min' : '—' }}</dd>
-                    <dt>Billable date</dt><dd>{{ task.billableDate ? task.billableDate|date('Y-m-d') : '—' }}</dd>
                     {% if task.paymentId %}<dt>Payment</dt><dd>{{ task.paymentId }}</dd>{% endif %}
                 </dl>
             </div>

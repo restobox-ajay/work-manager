@@ -42,6 +42,11 @@ final class TaskInput
 
     public ?string $tutorial = null;
 
+    // requireTld off, as a project's links (ADR-076): a spec may live on http://localhost or a bare intranet host.
+    #[Assert\Url(message: 'Doc / Specs link is not a valid URL.', requireTld: false)]
+    #[Assert\Length(max: 255, maxMessage: 'Doc / Specs link cannot be longer than {{ limit }} characters.')]
+    public ?string $docUrl = null;
+
     public ?int $dueDate = null;
 
     public ?\DateTimeInterface $billableDate = null;
@@ -64,6 +69,7 @@ final class TaskInput
         $input->statusDetail = $task->getStatusDetail();
         $input->description = $task->getDescription();
         $input->tutorial = $task->getTutorial();
+        $input->docUrl = $task->getDocUrl();
         $input->dueDate = $task->getDueDate();
         $input->billableDate = $task->getBillableDate();
         $input->creationDate = $task->getCreationDate();
@@ -89,6 +95,7 @@ final class TaskInput
                 'statusDetail'   => $this->statusDetail = InputValue::text($value),
                 'description'    => $this->description = InputValue::text($value),
                 'tutorial'       => $this->tutorial = InputValue::text($value),
+                'docUrl'         => $this->docUrl = InputValue::url($value),
                 'dueDate'        => $this->dueDate = InputValue::timestamp($value),
                 'billableDate'   => $this->billableDate = InputValue::date($value),
                 'creationDate'   => $this->creationDate = InputValue::date($value),

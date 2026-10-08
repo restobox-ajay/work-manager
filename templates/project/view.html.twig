@@ -44,18 +44,17 @@
     <div class="table-header"><h2>Tasks</h2><span class="grow"></span><span class="muted small">{{ tasks|length }} task{{ tasks|length == 1 ? '' : 's' }}, newest first</span></div>
     <div class="tscroll">
         <table class="t">
-            <thead><tr><th>Task</th><th>Contractor</th><th>Status</th><th>Due</th><th>Created</th></tr></thead>
+            <thead><tr><th>Task</th><th>Status</th><th>Due</th><th>Created</th></tr></thead>
             <tbody>
                 {% for task in tasks %}
                     <tr>
                         <td><a class="bold" href="{{ path('app_task_view', {id: task.id}) }}">{{ ui.short(task.name) }}</a></td>
-                        <td>{{ task.assignee ? (task.assignee.name ?: task.assignee.email) : '—' }}</td>
                         <td>{{ ui.statusBadge(task.taskStatusId, statuses) }}</td>
                         <td class="nowrap">{{ ui.ts(task.dueDate) }}</td>
                         <td class="nowrap">{{ ui.ts(task.createdAt) }}</td>
                     </tr>
                 {% else %}
-                    <tr><td colspan="5" class="empty"><b>No tasks yet.</b></td></tr>
+                    <tr><td colspan="4" class="empty"><b>No tasks yet.</b></td></tr>
                 {% endfor %}
             </tbody>
         </table>

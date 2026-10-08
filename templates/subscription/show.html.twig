@@ -58,7 +58,7 @@
                 <div class="field span-all"><label class="check"><input type="checkbox" name="advance" value="1" {{ (paymentValues.advance ?? false) ? 'checked' }}> Move the next renewal forward one cycle{% if s.nextRenewal %} (to {{ s.nextRenewal|date_modify('+' ~ s.cycle.months ~ ' months')|date('M j, Y') }}){% endif %}</label></div>
                 {% endif %}
             </div>
-            <div class="form-actions" style="margin-top:12px"><button class="btn success" type="submit">Record payment</button></div>
+            <div class="form-actions" style="margin-top:10px"><button class="btn success" type="submit">Record payment</button></div>
         </form>
     </div>
 </div>

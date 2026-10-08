@@ -31,7 +31,7 @@
             </select>
         </div>
     </div>
-    <noscript><div class="form-actions" style="margin-top:12px"><button class="btn info" type="submit">Show tasks</button></div></noscript>
+    <noscript><div class="form-actions" style="margin-top:10px"><button class="btn info" type="submit">Show tasks</button></div></noscript>
 </form>
 
 {% if client %}
@@ -51,9 +51,7 @@
                         <th style="width:32px"><input type="checkbox" aria-label="Select all" data-check-all {{ tasks is empty ? 'disabled' }}></th>
                         <th>Task</th>
                         <th>Project</th>
-                        <th>Assignee</th>
                         <th>Status</th>
-                        <th>Billable Date</th>
                         <th class="num">Amount</th>
                     </tr>
                 </thead>
@@ -63,13 +61,11 @@
                             <td><input type="checkbox" name="taskIds[]" value="{{ task.id }}" aria-label="Select task #{{ task.id }}" checked></td>
                             <td><a href="{{ path('app_task_view', {id: task.id}) }}">#{{ task.id }}</a> {{ ui.short(task.name, 80) }}</td>
                             <td>{{ task.project ? task.project.name : '—' }}</td>
-                            <td>{{ task.assignee ? (task.assignee.name ?: task.assignee.email) : '—' }}</td>
                             <td>{{ ui.statusBadge(task.taskStatusId, statuses) }}</td>
-                            <td class="nowrap">{{ task.billableDate ? task.billableDate|date('Y-m-d') : '—' }}</td>
                             <td class="num nowrap">{{ (task.totalAmount ?? '0')|invoice_money(currency) }}</td>
                         </tr>
                     {% else %}
-                        <tr><td colspan="7" class="empty"><b>No approved tasks to invoice.</b> Tasks already on an invoice, or in another currency, are not listed.</td></tr>
+                        <tr><td colspan="5" class="empty"><b>No approved tasks to invoice.</b> Tasks already on an invoice, or in another currency, are not listed.</td></tr>
                     {% endfor %}
                 </tbody>
             </table>

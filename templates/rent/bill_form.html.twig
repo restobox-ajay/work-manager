@@ -29,7 +29,7 @@
         <div class="field span-2"><label for="f-note">For</label><input type="text" id="f-note" name="otherNote" value="{{ values.otherNote ?? '' }}" maxlength="255" placeholder="e.g. water, maintenance"></div>
     </div>
     <div class="rent-calc" data-calc-out>Units — · Electricity — · Total —</div>
-    <div class="form-actions" style="margin-top:16px">
+    <div class="form-actions" style="margin-top:10px">
         {% if bill %}
             <button class="btn danger" type="submit" form="bill-delete">Delete bill</button>
             <span class="grow" style="flex:1"></span>

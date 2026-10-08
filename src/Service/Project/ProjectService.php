@@ -29,10 +29,11 @@ final class ProjectService
 
     /** The project's links, field => label (form, view and validation messages share the wording). */
     public const LINK_FIELDS = [
-        'localUrl' => 'Local URL',
-        'devUrl'   => 'Dev URL',
-        'prodUrl'  => 'Prod URL',
-        'docUrl'   => 'Doc / Specs link',
+        'localUrl'  => 'Local URL',
+        'devUrl'    => 'Dev URL',
+        'prodUrl'   => 'Prod URL',
+        'docUrl'    => 'Doc / Specs link',
+        'mockupUrl' => 'Mockup URL',
     ];
 
     public function __construct(
@@ -109,7 +110,7 @@ final class ProjectService
         return $reasons;
     }
 
-    /** @return array{clientId: ?int, name: string, description: ?string, status: int, localUrl: ?string, devUrl: ?string, prodUrl: ?string, docUrl: ?string} */
+    /** @return array{clientId: ?int, name: string, description: ?string, status: int, localUrl: ?string, devUrl: ?string, prodUrl: ?string, docUrl: ?string, mockupUrl: ?string} */
     public function valuesFrom(Project $project): array
     {
         return [
@@ -121,6 +122,7 @@ final class ProjectService
             'devUrl'      => $project->getDevUrl(),
             'prodUrl'     => $project->getProdUrl(),
             'docUrl'      => $project->getDocUrl(),
+            'mockupUrl'   => $project->getMockupUrl(),
         ];
     }
 
@@ -232,6 +234,7 @@ final class ProjectService
             ->setDevUrl($input['devUrl'])
             ->setProdUrl($input['prodUrl'])
             ->setDocUrl($input['docUrl'])
+            ->setMockupUrl($input['mockupUrl'])
             ->setUpdatedAt(time())
             ->setUpdatedBy($actor->getId());
 

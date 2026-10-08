@@ -57,6 +57,7 @@ final class ProjectLinksTest extends WebTestCase
             'devUrl'   => 'dev.example.com',
             'prodUrl'  => 'https://example.com',
             'docUrl'   => '',
+            'mockupUrl' => 'figma.com/file/abc',
         ]);
 
         self::assertResponseRedirects();
@@ -65,6 +66,7 @@ final class ProjectLinksTest extends WebTestCase
         self::assertSame('http://dev.example.com', $project->getDevUrl());
         self::assertSame('https://example.com', $project->getProdUrl());
         self::assertNull($project->getDocUrl(), 'A blank link is stored as NULL, not the empty string.');
+        self::assertSame('http://figma.com/file/abc', $project->getMockupUrl());
     }
 
     public function testAnInvalidUrlIsRefusedAndNothingIsSaved(): void
@@ -114,7 +116,7 @@ final class ProjectLinksTest extends WebTestCase
         $this->client->submitForm($button, $fields);
     }
 
-    /** @param array{localUrl?: string, devUrl?: string, prodUrl?: string, docUrl?: string} $links */
+    /** @param array{localUrl?: string, devUrl?: string, prodUrl?: string, docUrl?: string, mockupUrl?: string} $links */
     private function persistProject(array $links): int
     {
         $project = (new Project())
@@ -123,7 +125,8 @@ final class ProjectLinksTest extends WebTestCase
             ->setLocalUrl($links['localUrl'] ?? null)
             ->setDevUrl($links['devUrl'] ?? null)
             ->setProdUrl($links['prodUrl'] ?? null)
-            ->setDocUrl($links['docUrl'] ?? null);
+            ->setDocUrl($links['docUrl'] ?? null)
+            ->setMockupUrl($links['mockupUrl'] ?? null);
         $this->em->persist($project);
         $this->em->flush();
         $this->em->clear();

@@ -73,7 +73,7 @@
             </div>
         {% endif %}
     </div>
-    <div class="form-actions" style="margin-top:16px">
+    <div class="form-actions" style="margin-top:10px">
         <a class="btn secondary" href="{{ client ? path('app_client_view', {id: client.id}) : path('app_client_index') }}">Cancel</a>
         <button class="btn primary" type="submit">{{ client ? 'Save' : 'Create client' }}</button>
     </div>

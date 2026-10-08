@@ -2651,3 +2651,31 @@ page and no account without an invitation, unknown mode treated as invitation-on
 
 **Tripwire:** verifiable — Verified by `tests/Functional/Invoice/InvoiceDeleteTest.php` and
 `tests/Functional/Expense/ExpensePaymentDetailsTest.php`.
+
+## ADR-099: Project mockup URL, task Doc / Specs link, compact forms (owner request, 2026-10-08)
+
+**Decision.**
+- **Project mockup URL.** `project.mockup_url` (VARCHAR 255, nullable; migration `Version20261012130000`), a fifth
+  entry in `ProjectService::LINK_FIELDS`, so it gets the form field, the "Links" row and the URL rules of ADR-076.
+- **Task doc link.** `task.doc_url` (VARCHAR 255, nullable; same migration) — the same field a
+  project has (ADR-076), with the same rules: `InputValue::url()` (blank → NULL, no scheme → `http://`), then
+  `Assert\Url` (`requireTld: false`, http/https) and a 255 limit on `TaskInput`. The task form has a "Doc / Specs
+  link" field; the task page shows it under Details, as a link only when it is http(s).
+- **Compact forms.** Every form is tighter than the mockup's defaults: smaller grid and label gaps, input padding,
+  textarea height, form-card and modal padding, and a 10px button-row margin. The overrides live in
+  `app-bridge.css`, so `app.css` stays an unchanged copy of the mockup (ADR-069).
+
+**Tripwire:** verifiable — Verified by `tests/Functional/Task/TaskDocUrlTest.php` and
+`tests/Functional/Project/ProjectLinksTest.php`.
+
+## ADR-100: Contractor, reviewer, billable time and billable date hidden from every task page (owner request, 2026-10-08)
+
+**Decision.** The four fields are off every page — task form, task page, task list (columns and the contractor
+filter), Quick Add, the project page's task table and task grid (a new row no longer needs a contractor), the
+dashboard's task table, the invoice task picker, and Task By Date (now by creation date only, without the
+contractor and billable-minutes columns). The controllers no longer accept them from a form, so an edit keeps a
+task's existing values. Hidden, not removed: the columns stay (`user_id`, `reviewer_user_id`, `time_budget`,
+`billable_date` were already nullable — no migration), and the code that reads stored values (payouts, the
+contractor dashboard, Tasks By Contractor, access rules, priority tabs) is unchanged, so they can come back.
+
+**Tripwire:** verifiable — Verified by `tests/Functional/Task/TaskHiddenFieldsTest.php`.

@@ -46,7 +46,7 @@
         </div>
         <div class="field span-all"><label for="f-note">Note</label><textarea id="f-note" name="note" rows="3">{{ values.note ?? '' }}</textarea></div>
     </div>
-    <div class="form-actions" style="margin-top:16px">
+    <div class="form-actions" style="margin-top:10px">
         <a class="btn secondary" href="{{ back }}">Cancel</a>
         {% if not expense %}<button class="btn info" type="submit" name="another" value="1">Save and add another</button>{% endif %}
         <button class="btn primary" type="submit">Save expense</button>

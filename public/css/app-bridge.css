@@ -428,6 +428,44 @@ html:not(.js) .user-menu:focus-within .dropdown {
     align-self: flex-start;
 }
 
+/* Compact forms (owner request): tighter field spacing, inputs and form cards than the mockup's defaults, on every
+   form — mockup-classed (.mx-form / .form-grid / .field) and bare alike. */
+.form-grid,
+.mx-form-two {
+    gap: 8px 12px;
+}
+
+.field,
+.page-body form:not(.mx-form) > div {
+    gap: 2px;
+}
+
+.section-label {
+    margin-top: 2px;
+    padding-bottom: 2px;
+}
+
+input[type=text], input[type=email], input[type=password], input[type=number], input[type=date], input[type=tel],
+input[type=search], input[type=url], select, textarea {
+    padding: 4px 8px;
+    font-size: .82rem;
+}
+
+textarea {
+    min-height: 54px;
+}
+
+.page-body form.card,
+.site-app .page-body > form:not([style*="inline"]):not(.mx-form),
+.site-app .page-body > section > form:not([style*="inline"]):not(.mx-form) {
+    gap: 8px;
+    padding: 14px 18px;
+}
+
+.modal-body {
+    padding: 14px 18px;
+}
+
 .field-error {
     color: var(--danger);
     font-size: .74rem;

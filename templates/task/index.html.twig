@@ -69,11 +69,8 @@
             <option value="{{ noneId }}" {{ filters.projectId == noneId ? 'selected' }}>(no project)</option>
             {% for project in projects %}<option value="{{ project.id }}" {{ filters.projectId == project.id ? 'selected' }}>{{ project.client.name }} › {{ project.name }}</option>{% endfor %}
         </select>
-        <select name="assigneeId" aria-label="Contractor" style="width:auto;max-width:170px">
-            <option value="">All contractors</option>
-            <option value="{{ app.user.id }}" {{ filters.assigneeId == app.user.id ? 'selected' }}>Assigned to me</option>
-            {% for id, name in people %}{% if id != app.user.id %}<option value="{{ id }}" {{ filters.assigneeId == id ? 'selected' }}>{{ name }}</option>{% endif %}{% endfor %}
-        </select>
+        {# No contractor filter (ADR-100); a contractor picked in the side list or a dashboard link survives filtering. #}
+        {% if filters.assigneeId is not null %}<input type="hidden" name="assigneeId" value="{{ filters.assigneeId }}">{% endif %}
         <select name="taskStatusId" aria-label="Status" style="width:auto">
             <option value="">All statuses</option>
             {% for id, name in statuses %}<option value="{{ id }}" {{ filters.taskStatusId == id ? 'selected' }}>{{ name }}</option>{% endfor %}
@@ -96,11 +93,7 @@
                     <th>Task Type</th>
                     {{ ui.sortHeader('dueDate', 'Due Date', sort, listRoute, params) }}
                     {{ ui.sortHeader('createdAt', 'Created', sort, listRoute, params) }}
-                    <th>Contractor</th>
-                    <th>Reviewer</th>
                     <th>Status</th>
-                    {{ ui.sortHeader('timeBudget', 'Billable (min)', sort, listRoute, params) }}
-                    {{ ui.sortHeader('billableDate', 'Billable Date', sort, listRoute, params) }}
                     <th>Currency</th>
                     {{ ui.sortHeader('totalAmount', 'Payout', sort, listRoute, params) }}
                     <th></th>
@@ -117,23 +110,19 @@
                         <td>{{ types[task.taskTypeId] ?? '—' }}</td>
                         <td class="nowrap">{{ ui.ts(task.dueDate) }}</td>
                         <td class="nowrap">{{ ui.ts(task.createdAt) }}</td>
-                        <td>{{ task.assignee ? (task.assignee.name ?: task.assignee.email) : '—' }}</td>
-                        <td>{{ people[task.reviewerUserId] ?? '—' }}</td>
                         <td>{{ ui.statusBadge(task.taskStatusId, statuses) }}</td>
                         {% if row.canSeeFee %}
-                            <td class="right">{{ task.timeBudget ?? '—' }}</td>
-                            <td class="nowrap">{{ task.billableDate ? task.billableDate|date('Y-m-d') : '—' }}</td>
                             <td>{{ currencies[task.currencyId] ?? '—' }}</td>
                             <td class="right nowrap">{{ task.totalAmount ?? '—' }}</td>
                         {% else %}
-                            <td colspan="4" class="muted small center">—</td>
+                            <td colspan="2" class="muted small center">—</td>
                         {% endif %}
                         <td class="actions">
                             {% if row.canEdit %}<a class="btn warning xs" href="{{ path('app_task_edit', {id: task.id}) }}">Edit</a>{% endif %}
                         </td>
                     </tr>
                 {% else %}
-                    <tr><td colspan="15" class="empty"><b>No tasks found.</b>{% if not named %} Tasks under archived work appear when you pick their client or project.{% endif %}</td></tr>
+                    <tr><td colspan="11" class="empty"><b>No tasks found.</b>{% if not named %} Tasks under archived work appear when you pick their client or project.{% endif %}</td></tr>
                 {% endfor %}
             </tbody>
         </table>

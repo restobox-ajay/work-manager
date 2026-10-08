@@ -30,7 +30,7 @@
         <div class="field span-all"><label for="f-message">Message <span class="req">*</span></label><textarea id="f-message" name="message" rows="9" required>{{ values.message }}</textarea></div>
         <div class="field span-all"><small>Attachment: {{ 'invoice-' ~ invoice.number ~ '.pdf' }}</small></div>
     </div>
-    <div class="form-actions" style="margin-top:16px">
+    <div class="form-actions" style="margin-top:10px">
         <a class="btn secondary" href="{{ path('app_invoice_view', {id: invoice.id}) }}">Cancel</a>
         <button class="btn primary" type="submit">Send</button>
     </div>

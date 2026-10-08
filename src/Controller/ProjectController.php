@@ -218,11 +218,9 @@ final class ProjectController extends AbstractWorkController
             'gridBlank' => $this->taskGrid->blankRow($this->viewer()),
             'grid'      => [
                 'types'       => $this->lookups->activeTypes(),
-                'people'      => $this->lookups->activePeople(),
                 'statuses'    => $this->lookups->assignableStatuses(),
                 'currencies'  => $this->lookups->currencies(),
                 'allTypes'    => $this->lookups->types(),
-                'allPeople'   => $this->lookups->people(),
                 'allStatuses' => $this->lookups->statuses(),
             ],
         ];

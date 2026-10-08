@@ -149,6 +149,9 @@ class Task
     #[ORM\Column(type: Types::TEXT, nullable: true)]
     private ?string $tutorial = null;
 
+    #[ORM\Column(length: 255, nullable: true)]
+    private ?string $docUrl = null;
+
     #[ORM\Column(type: Types::DATE_IMMUTABLE, nullable: true)]
     private ?\DateTimeInterface $creationDate = null;
 
@@ -579,6 +582,18 @@ class Task
     public function setTutorial(?string $tutorial): static
     {
         $this->tutorial = $tutorial;
+
+        return $this;
+    }
+
+    public function getDocUrl(): ?string
+    {
+        return $this->docUrl;
+    }
+
+    public function setDocUrl(?string $docUrl): static
+    {
+        $this->docUrl = $docUrl;
 
         return $this;
     }

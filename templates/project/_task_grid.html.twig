@@ -1,8 +1,8 @@
 {#
     The tasks grid (ADR-083), after work-platform's project task rows: one row per task. Used in the project edit form
     (the project's tasks + new rows, saved with the project) and on the project page (new rows only).
-    Expects: rows, locked (task id => read-only), fees (show the fee columns), grid (types, people, statuses,
-    currencies, allTypes, allPeople, allStatuses).
+    Expects: rows, locked (task id => read-only), fees (show the fee columns), grid (types, statuses, currencies,
+    allTypes, allStatuses).
     New rows are added and removed in the browser (public/js/project-task-grid.js); the server only sees the rows.
 #}
 {% macro select(name, value, options, all, required, blank, cls) %}
@@ -21,7 +21,6 @@
             <td><input type="hidden" name="{{ n }}[existingTaskId]" value="{{ row.existingTaskId }}">
                 <a href="{{ path('app_task_view', {id: row.existingTaskId}) }}">#{{ row.existingTaskId }}</a> {{ row.name }}</td>
             <td>{{ grid.allTypes[row.taskTypeId] ?? '—' }}</td>
-            <td>{{ grid.allPeople[row.assigneeId] ?? '—' }}</td>
             <td class="nowrap">{{ row.dueDate ?: '—' }}</td>
             <td>{{ grid.allStatuses[row.taskStatusId] ?? '—' }}</td>
             <td>{{ row.statusDetail ?: '—' }}</td>
@@ -33,7 +32,6 @@
                 <input type="text" name="{{ n }}[name]" value="{{ row.name }}" maxlength="5000" aria-label="Task name" placeholder="Task name" style="min-width:160px">
             </td>
             <td>{{ g.select(n ~ '[taskTypeId]', row.taskTypeId, grid.types, grid.allTypes, false, '', 'ptg-taskTypeId') }}</td>
-            <td>{{ g.select(n ~ '[assigneeId]', row.assigneeId, grid.people, grid.allPeople, false, '', 'ptg-assigneeId') }}</td>
             <td><input type="date" name="{{ n }}[dueDate]" value="{{ row.dueDate }}" class="ptg-dueDate" aria-label="Due date"></td>
             <td>{{ g.select(n ~ '[taskStatusId]', row.taskStatusId, grid.statuses, grid.allStatuses, false, false, 'ptg-taskStatusId') }}</td>
             <td><input type="text" name="{{ n }}[statusDetail]" value="{{ row.statusDetail }}" class="ptg-statusDetail" aria-label="Status detail"></td>
@@ -53,7 +51,6 @@
             <tr>
                 <th>Task Name</th>
                 <th>Task Type</th>
-                <th>Contractor</th>
                 <th>Due Date</th>
                 <th>Task Status</th>
                 <th>Status Detail</th>
@@ -72,6 +69,6 @@
 </div>
 <div class="btn-row" style="margin-top:8px">
     <button type="button" class="btn success sm" data-ptg-add>+ Add Row</button>
-    <span class="muted small">A row needs a name, task type and contractor{{ fees ? ' and payout' }}; empty new rows are ignored. Approved and paid tasks are locked.</span>
+    <span class="muted small">A row needs a name{{ fees ? ',' : ' and' }} task type{{ fees ? ' and payout' }}; empty new rows are ignored. Approved and paid tasks are locked.</span>
 </div>
 <script src="{{ versioned('/js/project-task-grid.js') }}" defer></script>

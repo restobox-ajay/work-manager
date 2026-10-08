@@ -65,7 +65,7 @@
             {% endfor %}
         </div>
         <div class="table-card">
-            {% include '_work/task_rows.html.twig' with {tasks: page.items, showContractor: true, empty: 'No tasks match.'} %}
+            {% include '_work/task_rows.html.twig' with {tasks: page.items, empty: 'No tasks match.'} %}
             <div class="table-foot">
                 <span>Showing {{ page.items|length }} of {{ page.total }} task{{ page.total == 1 ? '' : 's' }}.</span>
                 <span class="grow"></span>

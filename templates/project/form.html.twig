@@ -55,7 +55,7 @@
        tasks plus any added here. #}
     <div class="section-label" id="tasks" style="margin-top:16px">{{ project ? 'Tasks' : 'Add Tasks' }}</div>
     {% include 'project/_task_grid.html.twig' with {rows: taskRows, locked: gridLocked, fees: gridFees, grid: grid, blankRow: gridBlank} only %}
-    <div class="form-actions" style="margin-top:16px">
+    <div class="form-actions" style="margin-top:10px">
         <a class="btn secondary" href="{{ back }}">Cancel</a>
         <button class="btn primary" type="submit">{{ project ? 'Save' : 'Create project' }}</button>
     </div>

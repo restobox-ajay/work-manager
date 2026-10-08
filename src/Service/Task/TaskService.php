@@ -159,6 +159,7 @@ final class TaskService
             ->setStatusDetail($input->statusDetail)
             ->setDescription($input->description)
             ->setTutorial($input->tutorial)
+            ->setDocUrl($input->docUrl)
             ->setDueDate($input->dueDate)
             ->setCreationDate($input->creationDate ?? $task->getCreationDate());
 

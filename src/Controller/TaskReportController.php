@@ -57,7 +57,7 @@ final class TaskReportController extends AbstractWorkController
             $failed = [];
             foreach ($rows as $i => $row) {
                 $result = $tasks->create((new TaskInput())->overlay(array_intersect_key($row, array_flip([
-                    'name', 'projectId', 'assigneeId', 'taskTypeId', 'dueDate', 'totalAmount', 'currencyId', 'timeBudget',
+                    'name', 'projectId', 'taskTypeId', 'dueDate', 'totalAmount', 'currencyId',
                 ]))), $viewer);
                 if ($result->isSaved()) {
                     ++$created;
@@ -84,18 +84,19 @@ final class TaskReportController extends AbstractWorkController
             'rows'       => $rows,
             'projects'   => $projectChoices,
             'types'      => $this->lookups->activeTypes(),
-            'people'     => $this->lookups->activePeople(),
             'currencies' => $this->lookups->currencies(),
             'showFees'   => $this->access->canSetFeesForAnyProject($viewer),
             'errors'     => $errors,
         ], new Response(status: $errors === [] ? 200 : 422));
     }
 
-    /** Task By Date: a billing report grouped by billable (or creation) date, with each day's totals. */
+    /**
+     * Task By Date: a billing report grouped by creation date, with each day's totals. Billable date is off every
+     * page (ADR-100), so it is no longer offered as the reporting date.
+     */
     #[Route('/by-date', name: 'app_task_by_date', methods: ['GET'])]
     public function byDate(Request $request): Response
     {
-        $field = $request->query->get('reportingBy') === 'creationDate' ? 'creationDate' : 'billableDate';
         $from = $this->date($request->query->get('startDate')) ?? new \DateTimeImmutable(sprintf('-%d days', self::BY_DATE_DEFAULT_DAYS));
         $to = $this->date($request->query->get('endDate')) ?? new \DateTimeImmutable('today');
         if ($from > $to) {
@@ -104,7 +105,7 @@ final class TaskReportController extends AbstractWorkController
         }
 
         $viewer = $this->viewer();
-        $groups = $this->reports->byDate($viewer, $field, $from->setTime(0, 0), $to->setTime(0, 0));
+        $groups = $this->reports->byDate($viewer, 'creationDate', $from->setTime(0, 0), $to->setTime(0, 0));
         $fee = [];
         foreach ($groups as $group) {
             foreach ($group['tasks'] as $task) {
@@ -114,7 +115,6 @@ final class TaskReportController extends AbstractWorkController
 
         return $this->render('task/by_date.html.twig', $this->lookupMaps() + [
             'groups'    => $groups,
-            'field'     => $field,
             'startDate' => $from->format('Y-m-d'),
             'endDate'   => $to->format('Y-m-d'),
             'fee'       => $fee,

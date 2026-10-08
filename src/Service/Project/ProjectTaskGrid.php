@@ -30,8 +30,8 @@ use Doctrine\ORM\EntityManagerInterface;
  */
 final class ProjectTaskGrid
 {
-    /** Posted per row. Reviewer, billable time and billable date are not on the grid: a task keeps its values. */
-    public const FIELDS = ['name', 'taskTypeId', 'assigneeId', 'dueDate', 'taskStatusId', 'statusDetail', 'currencyId', 'totalAmount'];
+    /** Posted per row. Contractor, reviewer, billable time and billable date are not on the grid (ADR-100): a task keeps its values. */
+    public const FIELDS = ['name', 'taskTypeId', 'dueDate', 'taskStatusId', 'statusDetail', 'currencyId', 'totalAmount'];
     private const FEE_FIELDS = ['currencyId', 'totalAmount'];
     private const MAX_ROWS = 200;
 
@@ -46,7 +46,7 @@ final class ProjectTaskGrid
     /** @return array<string, mixed> a new row: status Pending, currency USD */
     public function blankRow(User $viewer): array
     {
-        return ['existingTaskId' => null, 'name' => '', 'taskTypeId' => null, 'assigneeId' => null, 'dueDate' => '',
+        return ['existingTaskId' => null, 'name' => '', 'taskTypeId' => null, 'dueDate' => '',
             'taskStatusId' => TaskStatus::PENDING_ID, 'statusDetail' => '',
             'currencyId' => 1, 'totalAmount' => ''];
     }
@@ -264,9 +264,6 @@ final class ProjectTaskGrid
             if ($row['taskTypeId'] === '') {
                 $problems[] = 'choose the task type';
             }
-            if ($row['assigneeId'] === '') {
-                $problems[] = 'choose the contractor';
-            }
             if ($fees && $row['totalAmount'] === '') {
                 $problems[] = 'enter the payout';
             }
@@ -292,7 +289,7 @@ final class ProjectTaskGrid
     private function isBlank(array $row): bool
     {
         // The defaults a new row starts with (status, currency) do not count as filling it in.
-        foreach (['name', 'taskTypeId', 'assigneeId', 'dueDate', 'statusDetail', 'totalAmount'] as $field) {
+        foreach (['name', 'taskTypeId', 'dueDate', 'statusDetail', 'totalAmount'] as $field) {
             if ($row[$field] !== '') {
                 return false;
             }

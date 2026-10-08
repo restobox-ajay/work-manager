@@ -43,14 +43,6 @@
             <select id="f-type" name="taskTypeId">{{ f.options(types, input.taskTypeId, '—') }}</select>
         </div>
         <div class="field">
-            <label for="f-assignee">Contractor</label>
-            <select id="f-assignee" name="assigneeId">{{ f.options(people, input.assigneeId, 'Unassigned') }}</select>
-        </div>
-        <div class="field">
-            <label for="f-reviewer">Reviewer</label>
-            <select id="f-reviewer" name="reviewerUserId">{{ f.options(people, input.reviewerUserId, 'No reviewer') }}</select>
-        </div>
-        <div class="field">
             <label for="f-status">Status</label>
             <select id="f-status" name="taskStatusId">{{ f.options(statuses, input.taskStatusId ?? constant('App\\Entity\\Settings\\TaskStatus::PENDING_ID'), null) }}</select>
         </div>
@@ -67,6 +59,11 @@
             <label for="f-status-detail">Status detail</label>
             <input type="text" id="f-status-detail" name="statusDetail" value="{{ input.statusDetail }}">
         </div>
+        {# type="text", not "url": a link typed without "http://" is completed server-side, not refused by the browser. #}
+        <div class="field span-all">
+            <label for="f-docUrl">Doc / Specs link</label>
+            <input type="text" inputmode="url" id="f-docUrl" name="docUrl" value="{{ input.docUrl }}" maxlength="255" placeholder="example.com">
+        </div>
 
         {% if showFees %}
             <div class="section-label">Payout</div>
@@ -77,14 +74,6 @@
             <div class="field">
                 <label for="f-currency">Currency</label>
                 <select id="f-currency" name="currencyId">{{ f.options(currencies, input.currencyId ?? 1, null) }}</select>
-            </div>
-            <div class="field">
-                <label for="f-time">Billable time (min)</label>
-                <input type="number" id="f-time" name="timeBudget" value="{{ input.timeBudget }}" step="1">
-            </div>
-            <div class="field">
-                <label for="f-billable">Billable date</label>
-                <input type="date" id="f-billable" name="billableDate" value="{{ input.billableDate ? input.billableDate|date('Y-m-d') : '' }}">
             </div>
         {% endif %}
 
@@ -98,7 +87,7 @@
             <textarea id="f-tutorial" name="tutorial" rows="3">{{ input.tutorial }}</textarea>
         </div>
     </div>
-    <div class="form-actions" style="margin-top:16px">
+    <div class="form-actions" style="margin-top:10px">
         <a class="btn secondary" href="{{ back }}">Cancel</a>
         <button class="btn primary" type="submit">{{ task ? 'Save' : 'Create task' }}</button>
     </div>

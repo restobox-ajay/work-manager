@@ -54,6 +54,9 @@ class Project
     #[ORM\Column(length: 255, nullable: true)]
     private ?string $docUrl = null;
 
+    #[ORM\Column(length: 255, nullable: true)]
+    private ?string $mockupUrl = null;
+
     #[ORM\Column(type: Types::SMALLINT)]
     private int $status = self::STATUS_ACTIVE;
 
@@ -166,6 +169,18 @@ class Project
     public function setDocUrl(?string $docUrl): static
     {
         $this->docUrl = $docUrl;
+
+        return $this;
+    }
+
+    public function getMockupUrl(): ?string
+    {
+        return $this->mockupUrl;
+    }
+
+    public function setMockupUrl(?string $mockupUrl): static
+    {
+        $this->mockupUrl = $mockupUrl;
 
         return $this;
     }

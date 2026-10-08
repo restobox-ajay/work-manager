@@ -28,10 +28,13 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 #[Route('/task')]
 final class TaskController extends AbstractWorkController
 {
-    /** The form's fields, as TaskInput names them. */
+    /**
+     * The form's fields, as TaskInput names them. Contractor, reviewer, billable time and billable date are off the
+     * form (ADR-100): not posted, so an edit keeps a task's existing values.
+     */
     private const FORM_FIELDS = [
-        'name', 'projectId', 'assigneeId', 'reviewerUserId', 'taskTypeId', 'taskStatusId', 'currencyId',
-        'totalAmount', 'timeBudget', 'statusDetail', 'description', 'tutorial', 'dueDate', 'billableDate', 'creationDate',
+        'name', 'projectId', 'taskTypeId', 'taskStatusId', 'currencyId',
+        'totalAmount', 'statusDetail', 'description', 'tutorial', 'docUrl', 'dueDate', 'creationDate',
     ];
 
     public function __construct(
@@ -196,7 +199,6 @@ final class TaskController extends AbstractWorkController
             'statuses'   => $this->lookups->assignableStatuses($task?->getTaskStatusId()),
             'types'      => $this->lookups->activeTypes($task?->getTaskTypeId()),
             'currencies' => $this->lookups->currencies(),
-            'people'     => $this->lookups->activePeople(),
             'errors'     => $errors,
         ], new Response(status: $errors === [] ? 200 : 422));
     }

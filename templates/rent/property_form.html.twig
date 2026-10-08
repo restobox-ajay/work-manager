@@ -22,7 +22,7 @@
         <label class="mx-check span-all"><span>Active <small>(offered when adding tenants)</small></span><input type="checkbox" name="isActive" value="1" {{ (values.isActive ?? true) ? 'checked' }}></label>
         <div class="field span-all"><label for="f-notes">Notes</label><textarea id="f-notes" name="notes" rows="3">{{ values.notes ?? '' }}</textarea></div>
     </div>
-    <div class="form-actions" style="margin-top:16px">
+    <div class="form-actions" style="margin-top:10px">
         <a class="btn secondary" href="{{ path('app_rent_properties') }}">Cancel</a>
         <button class="btn primary" type="submit">{{ property ? 'Save' : 'Create property' }}</button>
     </div>
