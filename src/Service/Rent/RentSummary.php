@@ -25,9 +25,11 @@ final class RentSummary
     }
 
     /**
+     * A $tenantId narrows every figure (rows, totals, dues) to that one tenancy (ADR-123).
+     *
      * @return array{rows: list<array<string, mixed>>, totals: array<string, int>, dues: list<array<string, mixed>>, duesTotal: array<string, int>}
      */
-    public function forMonth(\DateTimeImmutable $month): array
+    public function forMonth(\DateTimeImmutable $month, ?int $tenantId = null): array
     {
         $key = $month->format('Y-m');
         $billsByTenant = [];
@@ -48,6 +50,9 @@ final class RentSummary
 
         foreach ($this->tenants->findAllOrdered() as $tenant) {
             $id = (int) $tenant->getId();
+            if ($tenantId !== null && $id !== $tenantId) {
+                continue;
+            }
             $ledger = $this->ledger->build($tenant, $billsByTenant[$id] ?? [], $paymentsByTenant[$id] ?? []);
 
             $row = null;

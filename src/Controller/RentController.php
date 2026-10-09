@@ -16,6 +16,7 @@ use App\Service\Rent\RentLedger;
 use App\Service\Rent\RentMoney;
 use App\Service\Rent\RentService;
 use App\Service\Rent\RentSummary;
+use App\Service\Validation\InputValue;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
@@ -41,10 +42,21 @@ final class RentController extends AbstractWorkController
     public function summary(Request $request, RentSummary $summary): Response
     {
         $month = $this->monthFrom($request->query->getString('month'));
+        // Optional tenant filter (ADR-123): nothing chosen means every tenancy; an unknown id is ignored.
+        $tenantList = $this->tenants->findAllOrdered();
+        $tenantId = InputValue::int($request->query->get('tenantId'));
+        $tenant = null;
+        foreach ($tenantList as $candidate) {
+            if ($candidate->getId() === $tenantId) {
+                $tenant = $candidate;
+            }
+        }
 
         return $this->render('rent/summary.html.twig', [
-            'month'   => $month,
-            'summary' => $summary->forMonth($month),
+            'month'      => $month,
+            'summary'    => $summary->forMonth($month, $tenant?->getId()),
+            'tenantList' => $tenantList,
+            'tenant'     => $tenant,
         ]);
     }
 

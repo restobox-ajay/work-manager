@@ -37,6 +37,7 @@
                         <td class="num">{{ r.inr(b.remaining.electricity) }}</td>
                         <td class="num bold">{{ r.inr(b.remainingTotal) }}</td>
                         <td class="actions">
+                            <a class="btn primary xs" href="{{ path('app_rent_tenant', {id: t.id}) }}">View</a>
                             <a class="btn info xs" href="{{ path('app_rent_year', {tenant: t.id}) }}">Year</a>
                             <a class="btn success xs" href="{{ path('app_rent_bill_new', {id: t.id}) }}">+ Bill</a>
                             <a class="btn primary xs" href="{{ path('app_rent_payment_new', {id: t.id}) }}">+ Payment</a>

@@ -2901,3 +2901,12 @@ migrations because their implicit DDL commits leave DBAL's savepoint bookkeeping
 **Verified** on a copy of the development database: declined confirmation and unknown email change nothing; a run
 leaves one user, zero work rows, seeded lookups, schema in sync and migrations up to date; the kept account logs in
 and the main pages load.
+
+**ADR-106 addendum (2026-10-09).** Rent tenants get the same first-in-row "View" button (to /rent/tenants/{id}) on the Tenants list and on both tables of the Rent summary page.
+
+## ADR-123: Rent summary tenant filter (owner request, 2026-10-09)
+
+**Decision.** `/rent` has a tenant dropdown beside the month picker, "All tenants" by default (nothing preselected).
+Picking a tenant narrows every figure on the page — the KPI cards, the month table and the dues — to that tenancy
+(`RentSummary::forMonth($month, $tenantId)`); changing month keeps the tenant and a "Clear" button returns to all.
+An unknown or malformed `tenantId` is ignored (shows all). Moved-out tenants are listed, tagged.

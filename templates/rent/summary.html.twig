@@ -10,7 +10,7 @@
     <div class="ph-main">
         <div class="eyebrow">Rent</div>
         <div class="ph-title"><h1>Summary · {{ month|date('F Y') }}</h1></div>
-        <p class="lead">Billed and collected this month for every tenancy, and who still owes what.</p>
+        <p class="lead">{% if tenant %}Billed, collected and still owed for <a href="{{ path('app_rent_tenant', {id: tenant.id}) }}">{{ tenant.name }}</a>.{% else %}Billed and collected this month for every tenancy, and who still owes what.{% endif %}</p>
     </div>
     <div class="ph-actions">
         <a class="btn success" href="{{ path('app_rent_month_bills', {month: month|date('Y-m')}) }}">+ Bills for {{ month|date('M Y') }}</a>
@@ -19,7 +19,21 @@
 </div>
 
 {{ ui.flashes() }}
-<div style="margin-bottom:12px">{{ r.monthPicker('app_rent_summary', month) }}</div>
+{# ADR-123: month and an optional tenant ("All tenants" unless one is picked); each keeps the other. #}
+<div class="btn-row" style="margin-bottom:12px;flex-wrap:wrap;gap:8px">
+    {{ r.monthPicker('app_rent_summary', month, tenant ? {tenantId: tenant.id} : {}) }}
+    <form class="mx-form" method="get" action="{{ path('app_rent_summary') }}">
+        <input type="hidden" name="month" value="{{ month|date('Y-m') }}">
+        <select name="tenantId" aria-label="Tenant" onchange="this.form.submit()" style="width:auto;min-width:220px">
+            <option value="">All tenants</option>
+            {% for option in tenantList %}
+                <option value="{{ option.id }}" {{ tenant and tenant.id == option.id ? 'selected' }}>{{ option.name }} — {{ option.property.name }}{{ option.active ? '' : ' (moved out)' }}</option>
+            {% endfor %}
+        </select>
+        <noscript><button class="btn primary sm" type="submit">Show</button></noscript>
+    </form>
+    {% if tenant %}<a class="btn secondary sm" href="{{ path('app_rent_summary', {month: month|date('Y-m')}) }}">Clear</a>{% endif %}
+</div>
 
 <div class="kpis rent-kpis">
     <div class="kpi"><span>Billed this month</span><b>{{ r.inr(t.dueTotal) }}</b><small>Rent {{ r.inr(t.rentDue) }} · Electricity {{ r.inr(t.electricityDue) }}</small></div>
@@ -50,12 +64,13 @@
                         <td class="num">{{ r.inr(row.otherPaid) }}</td>
                         <td class="num bold {{ row.owedAtMonthEnd > 0 ? 'text-danger' }}">{{ r.inr(row.owedAtMonthEnd) }}</td>
                         <td class="actions">
+                            <a class="btn primary xs" href="{{ path('app_rent_tenant', {id: row.tenant.id}) }}">View</a>
                             {% if not row.bill %}<a class="btn success xs" href="{{ path('app_rent_bill_new', {id: row.tenant.id}) }}">+ Bill</a>{% endif %}
                             <a class="btn primary xs" href="{{ path('app_rent_payment_new', {id: row.tenant.id}) }}">+ Payment</a>
                         </td>
                     </tr>
                 {% else %}
-                    <tr><td colspan="12" class="empty"><b>No tenancies this month.</b> <a href="{{ path('app_rent_tenant_new') }}">Add a tenant</a>.</td></tr>
+                    <tr><td colspan="12" class="empty">{% if tenant %}<b>{{ tenant.name }} has no tenancy this month.</b>{% else %}<b>No tenancies this month.</b> <a href="{{ path('app_rent_tenant_new') }}">Add a tenant</a>.{% endif %}</td></tr>
                 {% endfor %}
             </tbody>
             {% if summary.rows is not empty %}
@@ -89,7 +104,7 @@
                         <td class="num">{{ r.units(d.unitsRemaining) }}</td>
                         <td class="num">{{ r.inr(d.remaining.other) }}</td>
                         <td class="num bold">{{ r.inr(d.remainingTotal) }}</td>
-                        <td class="actions"><a class="btn primary xs" href="{{ path('app_rent_payment_new', {id: due.tenant.id}) }}">+ Payment</a></td>
+                        <td class="actions"><a class="btn primary xs" href="{{ path('app_rent_tenant', {id: due.tenant.id}) }}">View</a> <a class="btn primary xs" href="{{ path('app_rent_payment_new', {id: due.tenant.id}) }}">+ Payment</a></td>
                     </tr>
                 {% else %}
                     <tr><td colspan="9" class="empty"><b>Nothing owed.</b></td></tr>

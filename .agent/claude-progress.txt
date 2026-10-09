@@ -4244,3 +4244,5 @@ ADR-118 addendum (2026-10-08): task form fields fixed at 640px, Description fill
 ADR-120 (2026-10-08): task descriptions (formatted, clamped, Show more) on dashboard, task list, by-date, priority, project page. Browser-checked.
 ADR-121 (2026-10-08): task page Details/Dates/Payout cards; fixed name+id concatenation (Twig ?? precedence) in 3 templates. Task/Invoice tests 24/24 green. Browser-checked.
 ADR-122 (2026-10-08): app:reset-database <email> — drop all, migrate, restore one account (+2FA, Password Manager). Verified on a DB copy incl. login.
+ADR-106 addendum (2026-10-09): View button to the tenant page on the Tenants list and both Rent summary tables. Browser-checked.
+ADR-123 (2026-10-09): /rent tenant dropdown (All tenants default), filters KPIs/month/dues; month nav keeps it. Rent tests 17/17; browser-checked.
