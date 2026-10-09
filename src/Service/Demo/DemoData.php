@@ -6,7 +6,6 @@ namespace App\Service\Demo;
 
 use App\Entity\Client;
 use App\Entity\Project;
-use App\Entity\ProjectStaff;
 use App\Entity\Settings\BillingProfile;
 use App\Entity\Settings\TaskStatus;
 use App\Entity\Task;
@@ -22,7 +21,6 @@ use App\Service\Invoice\InvoiceInput;
 use App\Service\Invoice\InvoiceLineInput;
 use App\Service\Invoice\InvoiceService;
 use App\Service\Note\NoteService;
-use App\Service\Project\ProjectStaffService;
 use App\Service\Rent\RentService;
 use App\Service\Subscription\SubscriptionService;
 use App\Service\Validation\WriteResult;
@@ -31,7 +29,7 @@ use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
 
 /**
- * Demo data for every module (ADR-103, ADR-108): clients, projects, staff and tasks; invoices; notes; rent; expenses
+ * Demo data for every module (ADR-103, ADR-108): clients, projects and tasks; invoices; notes; rent; expenses
  * and subscriptions. Everything after the tasks goes through the modules' own services, so it is validated and
  * audited (it fills the Activity Log too) exactly as if typed in. Each demo record carries a marker so purge()
  * removes only demo data: client codes DEMO…, property names "Demo – …", expense descriptions "Demo: …", note titles
@@ -123,7 +121,6 @@ final class DemoData
         private readonly EntityManagerInterface $em,
         private readonly Connection $connection,
         private readonly UserRepository $users,
-        private readonly ProjectStaffService $staff,
         private readonly InvoiceService $invoices,
         private readonly BillingProfileRepository $billingProfiles,
         private readonly NoteService $notes,
@@ -167,7 +164,6 @@ final class DemoData
     {
         $problems = [];
         [$clients, $projects, $counts] = $this->seedWork($actor, $assignees);
-        $counts['staff'] = $this->seedStaff($projects, $assignees, $actor, $problems);
         $counts['invoices'] = $this->seedInvoices($clients, $actor, $problems);
         $counts['notes'] = $this->seedNotes($clients, $projects, $actor, $problems);
         [$counts['properties'], $counts['tenants'], $counts['rent bills'], $counts['rent payments']] = $this->seedRent($actor, $problems);
@@ -193,13 +189,7 @@ final class DemoData
             $counts['invoices'] = count($invoiceIds);
             $projectIds = $clientIds === [] ? [] : $db->fetchFirstColumn('SELECT id FROM project WHERE client_id IN (?)', [$clientIds], [$ints]);
             $counts['tasks'] = $projectIds === [] ? 0 : $db->executeStatement('DELETE FROM task WHERE project_id IN (?)', [$projectIds], [$ints]); // their notes cascade
-            if ($projectIds !== []) {
-                $db->executeStatement('DELETE FROM project_staff WHERE project_id IN (?)', [$projectIds], [$ints]);
-            }
             $counts['projects'] = $clientIds === [] ? 0 : $db->executeStatement('DELETE FROM project WHERE client_id IN (?)', [$clientIds], [$ints]);
-            if ($clientIds !== []) {
-                $db->executeStatement('DELETE FROM client_admin WHERE client_id IN (?)', [$clientIds], [$ints]);
-            }
             $counts['clients'] = $clientIds === [] ? 0 : $db->executeStatement('DELETE FROM client WHERE id IN (?)', [$clientIds], [$ints]);
             $counts['notes'] = $db->executeStatement('DELETE FROM note WHERE title LIKE ?', [self::TEXT_PREFIX.'%']);
 
@@ -271,21 +261,6 @@ final class DemoData
         $this->em->flush();
 
         return [$clients, $projects, ['clients' => count($clients), 'projects' => count($projects), 'tasks' => $tasks]];
-    }
-
-    /** @param list<Project> $projects @param list<string> $problems */
-    private function seedStaff(array $projects, array $assignees, User $actor, array &$problems): int
-    {
-        $added = 0;
-        foreach ($projects as $i => $project) {
-            if ($assignees === []) {
-                break;
-            }
-            $error = $this->staff->add($project, $assignees[$i % count($assignees)], ProjectStaff::PERMISSION_CONTRACTOR, $i % 2 === 0, $actor);
-            $error === null ? ++$added : $problems[] = 'Project staff: '.$error;
-        }
-
-        return $added;
     }
 
     /**

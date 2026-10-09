@@ -141,7 +141,6 @@ final class TaskDocUrlTest extends WebTestCase
         $conn = $this->em->getConnection();
         $projects = 'SELECT id FROM project WHERE client_id IN (SELECT id FROM client WHERE name = ?)';
         $conn->executeStatement("DELETE FROM task WHERE project_id IN ($projects)", [self::CLIENT_NAME]);
-        $conn->executeStatement("DELETE FROM project_staff WHERE project_id IN ($projects)", [self::CLIENT_NAME]);
         $conn->executeStatement('DELETE FROM project WHERE client_id IN (SELECT id FROM client WHERE name = ?)', [self::CLIENT_NAME]);
         $conn->executeStatement('DELETE FROM client WHERE name = ?', [self::CLIENT_NAME]);
         $conn->executeStatement('DELETE FROM "user" WHERE email = ?', [self::EMAIL]);

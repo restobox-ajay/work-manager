@@ -37,7 +37,6 @@
                     {{ ui.sortHeader('name', 'Name', sort, 'app_client_index', params) }}
                     {{ ui.sortHeader('clientCode', 'Client Code', sort, 'app_client_index', params) }}
                     <th>Projects</th>
-                    <th>Client Manager</th>
                     {{ ui.sortHeader('email', 'Email', sort, 'app_client_index', params) }}
                     {{ ui.sortHeader('isActive', 'Status', sort, 'app_client_index', params) }}
                     {{ ui.sortHeader('createdAt', 'Created', sort, 'app_client_index', params) }}
@@ -53,7 +52,6 @@
                             {% set count = details.projectCounts[client.id] ?? 0 %}
                             {% if count > 0 %}<a href="{{ path('app_project_index', {clientId: client.id}) }}">{{ count }}</a>{% else %}0{% endif %}
                         </td>
-                        <td>{{ (details.managers[client.id] ?? [])|map(u => u.name ?: u.email)|join(', ') ?: '—' }}</td>
                         <td>{{ client.email ?? '—' }}</td>
                         <td>{{ ui.activeBadge(client.active) }}</td>
                         <td class="nowrap">{{ ui.ts(client.createdAt) }}</td>
@@ -65,7 +63,7 @@
                         </td>
                     </tr>
                 {% else %}
-                    <tr><td colspan="8" class="empty"><b>No clients found.</b>{% if q or status %} Try clearing the filters.{% endif %}</td></tr>
+                    <tr><td colspan="7" class="empty"><b>No clients found.</b>{% if q or status %} Try clearing the filters.{% endif %}</td></tr>
                 {% endfor %}
             </tbody>
         </table>

@@ -8,7 +8,6 @@ use App\Entity\Project;
 use App\Entity\User;
 use App\Repository\ClientRepository;
 use App\Repository\ProjectRepository;
-use App\Repository\ProjectStaffRepository;
 use App\Security\Work\WorkAccess;
 use App\Service\Pagination\Paginated;
 use App\Service\Validation\InputValue;
@@ -19,7 +18,7 @@ use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Validator\Constraints as Assert;
 
 /**
- * Projects (ADR-070): list, create, edit, archive/remove. Staff rows are ProjectStaffService's.
+ * Projects (ADR-070): list, create, edit, archive/remove. (Project staff were removed, ADR-124.)
  */
 final class ProjectService
 {
@@ -38,9 +37,7 @@ final class ProjectService
 
     public function __construct(
         private readonly ProjectRepository $projects,
-        private readonly ProjectStaffRepository $projectStaff,
         private readonly ClientRepository $clients,
-        private readonly ProjectStaffService $staff,
         private readonly WorkAccess $access,
         private readonly WriteValidator $validator,
         private readonly WorkAuditTrail $audit,
@@ -62,18 +59,6 @@ final class ProjectService
             $this->projects->countSearch($filters, $visibleIds),
             $page,
             self::PAGE_SIZE,
-        );
-    }
-
-    /**
-     * @param Project[] $projects
-     *
-     * @return array<int, User[]> project id => contractors
-     */
-    public function contractorsOf(array $projects): array
-    {
-        return $this->projectStaff->findContractorsByProjectIds(
-            array_map(static fn (Project $project) => (int) $project->getId(), $projects),
         );
     }
 
@@ -127,8 +112,6 @@ final class ProjectService
     }
 
     /**
-     * Creating a project also makes its client's Client Managers project staff (work-platform's automatic rows).
-     *
      * @param array<string, mixed> $values clientId, name, description, status
      *
      * @return WriteResult<Project>
@@ -144,7 +127,6 @@ final class ProjectService
         $project->setCreatedAt(time())->setCreatedBy($actor->getId());
         $this->em->persist($project);
         $this->em->flush();
-        $this->staff->ensureAutomaticStaff($project, $actor);
 
         $this->audit->record($actor, 'project.create', $this->describe($project));
 
@@ -158,16 +140,12 @@ final class ProjectService
      */
     public function update(Project $project, array $values, User $actor): WriteResult
     {
-        $clientBefore = $project->getClient()?->getId();
         $result = $this->write($project, $values, $actor);
         if (!$result->isSaved()) {
             return $result;
         }
 
         $this->em->flush();
-        if ($project->getClient()?->getId() !== $clientBefore) {
-            $this->staff->ensureAutomaticStaff($project, $actor);
-        }
 
         $this->audit->record($actor, 'project.update', $this->describe($project));
 

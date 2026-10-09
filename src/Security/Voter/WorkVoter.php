@@ -36,7 +36,7 @@ final class WorkVoter extends Voter
     public const TASK_STATUS_DETAIL = 'TASK_STATUS_DETAIL';
     public const TASK_DELETE = 'TASK_DELETE';
     public const TASK_FEE = 'TASK_FEE';
-    /** Manages some work (admin, Client Manager or managing staff): the manager-only task pages. */
+    /** Manages work (admins, ADR-124): the manager-only task pages. */
     public const WORK_MANAGE = 'WORK_MANAGE';
 
     private const SUBJECT_CLASS = [

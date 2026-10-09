@@ -266,7 +266,6 @@ final class NoteTest extends WebTestCase
         $conn->executeStatement("DELETE FROM note WHERE author_id IN ($users)", $emails);
         $projects = 'SELECT id FROM project WHERE client_id IN (SELECT id FROM client WHERE name = ?)';
         $conn->executeStatement("DELETE FROM task WHERE project_id IN ($projects)", [self::CLIENT_NAME]);
-        $conn->executeStatement("DELETE FROM project_staff WHERE project_id IN ($projects)", [self::CLIENT_NAME]);
         $conn->executeStatement('DELETE FROM project WHERE client_id IN (SELECT id FROM client WHERE name = ?)', [self::CLIENT_NAME]);
         $conn->executeStatement('DELETE FROM client WHERE name = ?', [self::CLIENT_NAME]);
         $conn->executeStatement('DELETE FROM "user" WHERE email IN (?, ?, ?)', $emails);

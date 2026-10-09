@@ -5,8 +5,6 @@ declare(strict_types=1);
 namespace App\Entity;
 
 use App\Repository\ProjectRepository;
-use Doctrine\Common\Collections\ArrayCollection;
-use Doctrine\Common\Collections\Collection;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 
@@ -74,15 +72,6 @@ class Project
 
     #[ORM\Column(nullable: true)]
     private ?int $updatedAt = null;
-
-    /** @var Collection<int, ProjectStaff> */
-    #[ORM\OneToMany(targetEntity: ProjectStaff::class, mappedBy: 'project', orphanRemoval: true)]
-    private Collection $projectStaff;
-
-    public function __construct()
-    {
-        $this->projectStaff = new ArrayCollection();
-    }
 
     public function getId(): ?int
     {
@@ -260,13 +249,5 @@ class Project
         $this->updatedAt = $updatedAt;
 
         return $this;
-    }
-
-    /**
-     * @return Collection<int, ProjectStaff>
-     */
-    public function getProjectStaff(): Collection
-    {
-        return $this->projectStaff;
     }
 }

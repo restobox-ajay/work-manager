@@ -6,9 +6,7 @@ namespace App\Controller;
 
 use App\Entity\Note;
 use App\Entity\Project;
-use App\Entity\ProjectStaff;
 use App\Repository\TaskRepository;
-use App\Repository\UserRepository;
 use App\Security\Voter\NoteVoter;
 use App\Security\Voter\WorkVoter;
 use App\Security\Work\WorkAccess;
@@ -18,7 +16,6 @@ use App\Service\Pagination\Paginated;
 use App\Service\Project\ProjectService;
 use App\Service\Project\ProjectTaskSummary;
 use App\Service\Project\ProjectTaskGrid;
-use App\Service\Project\ProjectStaffService;
 use App\Service\Task\TaskListService;
 use App\Service\Task\TaskLookups;
 use App\Service\Validation\InputValue;
@@ -29,7 +26,7 @@ use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 use App\Service\Work\WorkDeleter;
 
-/** Projects and their staff (ADR-070). Rules: WorkAccess via WorkVoter; writes: ProjectService/ProjectStaffService. */
+/** Projects (ADR-070). Rules: WorkAccess via WorkVoter; writes: ProjectService. Project staff removed (ADR-124). */
 #[Route('/project')]
 final class ProjectController extends AbstractWorkController
 {
@@ -38,7 +35,6 @@ final class ProjectController extends AbstractWorkController
 
     public function __construct(
         private readonly ProjectService $projects,
-        private readonly ProjectStaffService $staff,
         private readonly ClientService $clients,
         private readonly ProjectTaskGrid $taskGrid,
         private readonly TaskLookups $lookups,
@@ -65,7 +61,6 @@ final class ProjectController extends AbstractWorkController
 
         return $this->render('project/index.html.twig', [
             'page'        => $page,
-            'contractors' => $this->projects->contractorsOf($page->items),
             'clients'     => $this->clients->selectable($this->viewer()),
             'filters'     => $filters,
             'status'      => $status,
@@ -186,43 +181,11 @@ final class ProjectController extends AbstractWorkController
         ], new Response(status: $errors === [] ? 200 : 422));
     }
 
-    #[Route('/{id}/staff', name: 'app_project_staff_add', requirements: ['id' => '\d+'], methods: ['POST'])]
-    #[IsGranted(WorkVoter::PROJECT_EDIT, 'project')]
-    public function addStaff(#[MapEntity(id: 'id')] Project $project, Request $request, UserRepository $users): Response
-    {
-        $this->assertCsrf($request, 'project_staff_'.$project->getId());
-        $userId = InputValue::int($request->request->get('userId'));
-        $refusal = $this->staff->add(
-            $project,
-            $userId !== null ? $users->find($userId) : null,
-            $request->request->getString('permission'),
-            $request->request->getBoolean('canAccessTaskFee'),
-            $this->viewer(),
-        );
-        $this->addFlash($refusal === null ? 'success' : 'error', $refusal ?? 'Staff member added.');
-
-        return $this->redirectToRoute('app_project_view', ['id' => $project->getId(), '_fragment' => 'staff']);
-    }
-
-    #[Route('/staff/{staffId}', name: 'app_project_staff_update', requirements: ['staffId' => '\d+'], methods: ['POST'])]
-    public function updateStaff(#[MapEntity(id: 'staffId')] ProjectStaff $row, Request $request): Response
-    {
-        $this->denyAccessUnlessGranted(WorkVoter::PROJECT_EDIT, $row->getProject());
-        $this->assertCsrf($request, 'project_staff_row_'.$row->getId());
-
-        $refusal = $request->request->has('remove')
-            ? $this->staff->remove($row, $this->viewer())
-            : $this->staff->update($row, $request->request->getString('permission'), $request->request->getBoolean('canAccessTaskFee'), $this->viewer());
-        $this->addFlash($refusal === null ? 'success' : 'error', $refusal ?? 'Staff updated.');
-
-        return $this->redirectToRoute('app_project_view', ['id' => $row->getProject()->getId(), '_fragment' => 'staff']);
-    }
-
     /**
      * @param array<string, mixed> $values
      * @param list<string>         $errors
      */
-    /** The project page: details, every one of its tasks (tasks are added on the edit page, ADR-083) and its staff. */
+    /** The project page: details and every one of its tasks (tasks are added on the edit page, ADR-083). */
     private function renderProjectPage(Project $project, TaskRepository $tasks, TaskListService $taskList, ProjectTaskSummary $summary): Response
     {
         $projectTasks = $tasks->findForProject((int) $project->getId());
@@ -232,17 +195,10 @@ final class ProjectController extends AbstractWorkController
         $currencies = $this->lookups->currencies();
 
         $canEdit = $this->isGranted(WorkVoter::PROJECT_EDIT, $project);
-        if ($canEdit) {
-            // A Client Manager granted after the project was made becomes staff the next time anyone looks.
-            $this->staff->ensureAutomaticStaff($project, $this->viewer());
-        }
 
         return $this->render('project/view.html.twig', [
             'project'         => $project,
             'archivedReasons' => $this->projects->archivedReasons($project),
-            'staff'           => $this->staff->staffOf($project),
-            'selectableUsers' => $canEdit ? $this->staff->selectableUsers($project) : [],
-            'permissions'     => ProjectStaffService::ASSIGNABLE_PERMISSIONS,
             'tasks'           => $projectTasks,
             'rows'            => $rows,
             'summary'         => $summary->summarise($projectTasks, $rows, $statuses, $currencies),

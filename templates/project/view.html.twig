@@ -39,7 +39,6 @@
             <tr><th>Project ID</th><td>#{{ project.id }}</td></tr>
             <tr><th>Created</th><td>{{ ui.ts(project.createdAt, 'M j, Y H:i') }}{% if project.createdBy %} <span class="muted">by {{ people[project.createdBy] ?? ('user #' ~ project.createdBy) }}</span>{% endif %}</td></tr>
             <tr><th>Last updated</th><td>{{ ui.ts(project.updatedAt, 'M j, Y H:i') }}{% if project.updatedBy %} <span class="muted">by {{ people[project.updatedBy] ?? ('user #' ~ project.updatedBy) }}</span>{% endif %}</td></tr>
-            <tr><th>Staff</th><td>{{ staff|length }} {{ staff|length == 1 ? 'person' : 'people' }} · <a href="#staff">see below</a></td></tr>
         </table>
     </div>
     <div class="card">
@@ -104,58 +103,6 @@
             </tbody>
         </table>
     </div>
-</div>
-
-<div class="table-card" id="staff">
-    <div class="table-header"><h2>Staff</h2><span class="grow"></span><span class="muted small">Client Managers are added automatically</span></div>
-    <div class="tscroll">
-        <table class="t">
-            <thead><tr><th>Person</th><th>Role on project</th><th>Task fee access</th>{% if canEdit %}<th></th>{% endif %}</tr></thead>
-            <tbody>
-                {% for row in staff %}
-                    {% set automatic = row.permission == 'Client Manager' %}
-                    <tr>
-                        <td>{{ row.user.name ?: row.user.email }} <span class="muted small">{{ row.user.email }}</span></td>
-                        {% if canEdit and not automatic %}
-                            <td colspan="3">
-                                <form class="mx-form btn-row" method="post" action="{{ path('app_project_staff_update', {staffId: row.id}) }}">
-                                    <input type="hidden" name="_token" value="{{ csrf_token('project_staff_row_' ~ row.id) }}">
-                                    <select name="permission" aria-label="Role on project" style="width:auto">
-                                        {% for permission in permissions %}<option {{ row.permission == permission ? 'selected' }}>{{ permission }}</option>{% endfor %}
-                                    </select>
-                                    <label class="check"><input type="checkbox" name="canAccessTaskFee" value="1" {{ row.canAccessTaskFee == 1 ? 'checked' }}> Can see task fees</label>
-                                    <span class="grow" style="flex:1"></span>
-                                    <button class="btn primary sm" type="submit">Save</button>
-                                    <button class="btn danger sm" type="submit" name="remove" value="1" onclick="return confirm('Remove this person from the project?');">Remove</button>
-                                </form>
-                            </td>
-                        {% else %}
-                            <td>{{ row.permission ?? 'Staff' }}{% if automatic %} <span class="muted small">(automatic)</span>{% endif %}</td>
-                            <td>{{ row.canAccessTaskFee == 1 ? 'Yes' : 'No' }}</td>
-                            {% if canEdit %}<td></td>{% endif %}
-                        {% endif %}
-                    </tr>
-                {% else %}
-                    <tr><td colspan="4" class="empty"><b>No staff yet.</b></td></tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-    {% if canEdit %}
-        <form class="mx-form table-foot" method="post" action="{{ path('app_project_staff_add', {id: project.id}) }}" style="flex-wrap:wrap">
-            <input type="hidden" name="_token" value="{{ csrf_token('project_staff_' ~ project.id) }}">
-            <b style="color:var(--text)">Add</b>
-            <select name="userId" required aria-label="Person" style="width:auto;max-width:260px">
-                <option value="">Choose a person</option>
-                {% for person in selectableUsers %}<option value="{{ person.id }}">{{ person.name ?: person.email }}</option>{% endfor %}
-            </select>
-            <select name="permission" aria-label="Role on project" style="width:auto">
-                {% for permission in permissions %}<option>{{ permission }}</option>{% endfor %}
-            </select>
-            <label class="check"><input type="checkbox" name="canAccessTaskFee" value="1"> Can see task fees</label>
-            <button class="btn success sm" type="submit">Add to project</button>
-        </form>
-    {% endif %}
 </div>
 
 {% import 'note/_macros.html.twig' as n %}

@@ -5,12 +5,9 @@ declare(strict_types=1);
 namespace App\Service\Client;
 
 use App\Entity\Client;
-use App\Entity\ClientAdmin;
 use App\Entity\User;
-use App\Repository\ClientAdminRepository;
 use App\Repository\ClientRepository;
 use App\Repository\ProjectRepository;
-use App\Repository\UserRepository;
 use App\Security\Work\WorkAccess;
 use App\Service\Pagination\Paginated;
 use App\Service\Validation\InputValue;
@@ -22,7 +19,7 @@ use Symfony\Component\Validator\Constraint;
 use Symfony\Component\Validator\Constraints as Assert;
 
 /**
- * Clients (ADR-070): list, create, edit, remove, and their Client Managers. Validation is work-platform's
+ * Clients (ADR-070): list, create, edit, remove. Validation is work-platform's
  * ClientWriteService, ported: same fields, limits, uniqueness rules and messages.
  */
 final class ClientService
@@ -48,9 +45,7 @@ final class ClientService
 
     public function __construct(
         private readonly ClientRepository $clients,
-        private readonly ClientAdminRepository $clientAdmins,
         private readonly ProjectRepository $projects,
-        private readonly UserRepository $users,
         private readonly WorkAccess $access,
         private readonly WriteValidator $validator,
         private readonly WorkAuditTrail $audit,
@@ -80,14 +75,13 @@ final class ClientService
      *
      * @param Client[] $clients
      *
-     * @return array{managers: array<int, User[]>, projectCounts: array<int, int>}
+     * @return array{projectCounts: array<int, int>}
      */
     public function listDetails(array $clients): array
     {
         $ids = array_map(static fn (Client $client) => (int) $client->getId(), $clients);
 
         return [
-            'managers'      => $this->clientAdmins->findManagersByClientIds($ids),
             'projectCounts' => $this->projects->countByClientIds($ids),
         ];
     }
@@ -96,12 +90,6 @@ final class ClientService
     public function selectable(User $viewer): array
     {
         return $this->clients->findSelectable($this->access->visibleClientIds($viewer));
-    }
-
-    /** @return User[] */
-    public function managersOf(Client $client): array
-    {
-        return $this->clientAdmins->findManagers($client);
     }
 
     /**
@@ -131,12 +119,11 @@ final class ClientService
     }
 
     /**
-     * @param array<string, mixed> $values     form fields (see STRING_FIELDS, plus isActive)
-     * @param int[]                $managerIds Client Managers to set
+     * @param array<string, mixed> $values form fields (see STRING_FIELDS, plus isActive)
      *
      * @return WriteResult<Client>
      */
-    public function create(array $values, array $managerIds, User $actor): WriteResult
+    public function create(array $values, User $actor): WriteResult
     {
         $client = new Client();
         $errors = $this->validate($client, $values = $this->normalize($values), true);
@@ -148,7 +135,6 @@ final class ClientService
         $client->setCreatedAt(time())->setCreatedBy($actor->getId())->setUpdatedAt(time())->setUpdatedBy($actor->getId());
         $this->em->persist($client);
         $this->em->flush();
-        $this->syncManagers($client, $managerIds);
 
         $this->audit->record($actor, 'client.create', $this->describe($client));
 
@@ -157,11 +143,10 @@ final class ClientService
 
     /**
      * @param array<string, mixed> $values
-     * @param int[]|null           $managerIds null leaves the managers alone (the editor may not change them)
      *
      * @return WriteResult<Client>
      */
-    public function update(Client $client, array $values, ?array $managerIds, User $actor): WriteResult
+    public function update(Client $client, array $values, User $actor): WriteResult
     {
         $errors = $this->validate($client, $values = $this->normalize($values), false);
         if ($errors !== []) {
@@ -171,9 +156,6 @@ final class ClientService
         $this->apply($client, $values);
         $client->setUpdatedAt(time())->setUpdatedBy($actor->getId());
         $this->em->flush();
-        if ($managerIds !== null) {
-            $this->syncManagers($client, $managerIds);
-        }
 
         $this->audit->record($actor, 'client.update', $this->describe($client));
 
@@ -190,35 +172,6 @@ final class ClientService
         $this->em->flush();
 
         $this->audit->record($actor, 'client.remove', $this->describe($client));
-    }
-
-    /**
-     * @param int[] $userIds
-     */
-    private function syncManagers(Client $client, array $userIds): void
-    {
-        $wanted = [];
-        $userIds = array_values(array_unique(array_filter($userIds)));
-        foreach ($userIds === [] ? [] : $this->users->findBy(['id' => $userIds]) as $user) {
-            $wanted[(int) $user->getId()] = $user;
-        }
-
-        foreach ($client->getClientAdmins() as $row) {
-            $userId = (int) $row->getUser()->getId();
-            if (isset($wanted[$userId])) {
-                unset($wanted[$userId]);
-            } else {
-                $client->getClientAdmins()->removeElement($row);
-                $this->em->remove($row);
-            }
-        }
-        foreach ($wanted as $user) {
-            $row = (new ClientAdmin())->setClient($client)->setUser($user);
-            $client->getClientAdmins()->add($row);
-            $this->em->persist($row);
-        }
-
-        $this->em->flush();
     }
 
     /**

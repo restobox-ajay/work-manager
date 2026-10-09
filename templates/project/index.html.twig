@@ -42,7 +42,6 @@
                     {{ ui.sortHeader('name', 'Project', sort, 'app_project_index', params) }}
                     {{ ui.sortHeader('createdAt', 'Created', sort, 'app_project_index', params) }}
                     {{ ui.sortHeader('status', 'Status', sort, 'app_project_index', params) }}
-                    <th>Contractors</th>
                     <th></th>
                 </tr>
             </thead>
@@ -53,7 +52,6 @@
                         <td><a class="bold" href="{{ path('app_dashboard', {clientId: project.client.id, projectId: project.id}) }}" title="Tasks of {{ project.name }} on the dashboard">{{ project.name }}</a></td>
                         <td class="nowrap">{{ ui.ts(project.createdAt) }}</td>
                         <td>{{ ui.activeBadge(project.active) }}</td>
-                        <td>{{ (contractors[project.id] ?? [])|map(u => u.name ?: u.email)|join(', ') ?: '—' }}</td>
                         <td class="actions">
                             <a class="btn primary xs" href="{{ path('app_project_view', {id: project.id}) }}">View</a>
                             <a class="btn info xs" href="{{ path('app_task_index', {projectId: project.id}) }}">Tasks</a>
@@ -62,7 +60,7 @@
                         </td>
                     </tr>
                 {% else %}
-                    <tr><td colspan="6" class="empty"><b>No projects found.</b></td></tr>
+                    <tr><td colspan="5" class="empty"><b>No projects found.</b></td></tr>
                 {% endfor %}
             </tbody>
         </table>

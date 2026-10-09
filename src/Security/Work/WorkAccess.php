@@ -10,10 +10,6 @@ use App\Entity\Task;
 use App\Entity\Settings\TaskStatus;
 use App\Entity\User;
 use App\Enum\Role;
-use App\Repository\ClientAdminRepository;
-use App\Repository\ProjectRepository;
-use App\Repository\ProjectStaffRepository;
-use App\Repository\TaskManagerRepository;
 use Symfony\Component\Security\Core\Role\RoleHierarchyInterface;
 use Symfony\Contracts\Service\ResetInterface;
 
@@ -21,28 +17,19 @@ use Symfony\Contracts\Service\ResetInterface;
  * Who may see and change which client, project and task (ADR-070) — the one place these rules live. The voters,
  * the list scoping and the templates all ask here, so a button and its endpoint cannot disagree.
  *
- * Ported from work-platform's TaskAccessChecker / ClientVoter / ProjectVoter, with its four roles mapped onto
- * this app's single account type:
- *  - Admin and above (ROLE_ADMIN) take work-platform's Admin/Accountant place: every record, every fee.
- *  - Everyone else is decided by their relationship to the record — work-platform's Manager rules, where the
- *    relationship row itself now says "manager": a client_admin row (Client Manager), a project_staff row that is
- *    not "Contractor", or a task_manager row. A Contractor staff row, or only being the assignee, gives
- *    work-platform's Contractor rights: see your tasks and report on them.
+ * Since ADR-124 (owner request) there are no Client Manager, project staff or Task Manager rows any more, so two
+ * kinds of user remain:
+ *  - Admin and above (ROLE_ADMIN): every client, project, task and fee.
+ *  - Everyone else: only tasks they are the assignee, creator or reviewer of — see them, report on them, correct a
+ *    Pending task they filed. No clients or projects of their own.
  */
 final class WorkAccess implements ResetInterface
 {
-    /** @var array<int, WorkRelations> */
-    private array $relations = [];
-
     /** @var array<int, bool> */
     private array $admins = [];
 
     public function __construct(
         private readonly RoleHierarchyInterface $roleHierarchy,
-        private readonly ClientAdminRepository $clientAdmins,
-        private readonly ProjectStaffRepository $projectStaff,
-        private readonly TaskManagerRepository $taskManagers,
-        private readonly ProjectRepository $projects,
     ) {
     }
 
@@ -64,19 +51,12 @@ final class WorkAccess implements ResetInterface
 
     public function canViewClient(User $user, Client $client): bool
     {
-        if ($this->isAdmin($user)) {
-            return true;
-        }
-        $relations = $this->relationsOf($user);
-
-        return $relations->managesClient($client->getId())
-            || in_array($client->getId(), $relations->staffClientIds, true);
+        return $this->isAdmin($user);
     }
 
-    /** Edit fields and status. Choosing the Client Managers and removing the client stay with admins. */
     public function canEditClient(User $user, Client $client): bool
     {
-        return $this->isAdmin($user) || $this->relationsOf($user)->managesClient($client->getId());
+        return $this->isAdmin($user);
     }
 
     public function canAdministerClient(User $user): bool
@@ -87,101 +67,51 @@ final class WorkAccess implements ResetInterface
     /** @return int[]|null the clients this user may see; null = all */
     public function visibleClientIds(User $user): ?array
     {
-        if ($this->isAdmin($user)) {
-            return null;
-        }
-        $relations = $this->relationsOf($user);
-
-        return array_values(array_unique([...$relations->managedClientIds, ...$relations->staffClientIds]));
+        return $this->isAdmin($user) ? null : [];
     }
 
     // ── Projects ─────────────────────────────────────────────────────────────
 
-    /** With no client: whether this user may create a project for at least one client. */
     public function canCreateProject(User $user, ?Client $client = null): bool
     {
-        if ($this->isAdmin($user)) {
-            return true;
-        }
-        $relations = $this->relationsOf($user);
-
-        return $client === null ? $relations->managedClientIds !== [] : $relations->managesClient($client->getId());
+        return $this->isAdmin($user);
     }
 
     public function canViewProject(User $user, Project $project): bool
     {
-        if ($this->isAdmin($user)) {
-            return true;
-        }
-        $relations = $this->relationsOf($user);
-
-        return $relations->managesClient($project->getClient()?->getId()) || $relations->isStaff($project->getId());
+        return $this->isAdmin($user);
     }
 
-    /** Edit, archive, remove, and manage staff. */
+    /** Edit, archive, remove. */
     public function canEditProject(User $user, Project $project): bool
     {
-        if ($this->isAdmin($user)) {
-            return true;
-        }
-        $relations = $this->relationsOf($user);
-
-        return $relations->managesClient($project->getClient()?->getId()) || $relations->isProjectManager($project->getId());
+        return $this->isAdmin($user);
     }
 
-    /** @return int[]|null the projects this user may see; null = all. Client Managers see their clients' projects. */
+    /** @return int[]|null the projects this user may see; null = all */
     public function visibleProjectIds(User $user): ?array
     {
-        if ($this->isAdmin($user)) {
-            return null;
-        }
-        $relations = $this->relationsOf($user);
-
-        return array_values(array_unique([
-            ...$relations->staffProjectIds(),
-            ...$this->projects->findIdsByClientIds($relations->managedClientIds),
-        ]));
+        return $this->isAdmin($user) ? null : [];
     }
 
     // ── Tasks ────────────────────────────────────────────────────────────────
 
-    /**
-     * Whether this user may file tasks at all: an admin, a Client Manager or anyone on a project's staff. Every task
-     * is regular work as soon as it is filed (no authorization queue, ADR-084).
-     */
+    /** Filing tasks is for admins (every task is regular work as soon as it is filed, ADR-084). */
     public function canCreateTask(User $user): bool
     {
-        if ($this->isAdmin($user)) {
-            return true;
-        }
-        $relations = $this->relationsOf($user);
-
-        return $relations->managedClientIds !== [] || $relations->staffProjectIds() !== [];
+        return $this->isAdmin($user);
     }
 
     /** Whether a task may be filed under this project (null = no project) by this user. */
     public function canAddTaskTo(User $user, ?Project $project): bool
     {
-        if ($this->isAdmin($user)) {
-            return true;
-        }
-        if ($project === null) {
-            return false;
-        }
-        $relations = $this->relationsOf($user);
-
-        return $relations->managesClient($project->getClient()?->getId()) || $relations->isStaff($project->getId());
+        return $this->isAdmin($user);
     }
 
-    /** Someone who manages work (client manager or managing staff): the manager dashboard, priority pages. */
+    /** Someone who manages work: the manager dashboard, priority pages. */
     public function managesAnyWork(User $user): bool
     {
-        if ($this->isAdmin($user)) {
-            return true;
-        }
-        $relations = $this->relationsOf($user);
-
-        return $relations->managedClientIds !== [] || $relations->managingStaffProjectIds() !== [];
+        return $this->isAdmin($user);
     }
 
     public function canViewTask(User $user, Task $task): bool
@@ -189,13 +119,13 @@ final class WorkAccess implements ResetInterface
         return $this->isAdmin($user)
             || $this->isAssignee($user, $task)
             || $task->getCreatedBy() === $user->getId()
-            || $this->managesTask($user, $task);
+            || $this->isReviewer($user, $task);
     }
 
     /** work-platform's canUpdate(). */
     public function canUpdateTask(User $user, Task $task): bool
     {
-        if ($this->isAdmin($user) || $this->managesTask($user, $task)) {
+        if ($this->isAdmin($user) || $this->isReviewer($user, $task)) {
             return true;
         }
 
@@ -209,10 +139,7 @@ final class WorkAccess implements ResetInterface
         return $this->canUpdateTask($user, $task) || $this->isAssignee($user, $task);
     }
 
-    /**
-     * work-platform's canManageTask(): the structural actions (delete). Never on a paid task — that is payment
-     * history.
-     */
+    /** The structural action (delete). Never on a paid task — that is payment history. */
     public function canDeleteTask(User $user, Task $task): bool
     {
         if ($task->getTaskStatusId() === TaskStatus::PAID_ID) {
@@ -222,38 +149,29 @@ final class WorkAccess implements ResetInterface
         return $this->isAdmin($user)
             || $this->isAssignee($user, $task)
             || $task->getCreatedBy() === $user->getId()
-            || $this->managesTask($user, $task);
+            || $this->isReviewer($user, $task);
     }
 
-    /** work-platform's canAccessFee(): see the payout, time budget, billable date and currency. */
+    /** See the payout and currency: admins, and the assignee for their own task. */
     public function canAccessFee(User $user, Task $task): bool
     {
-        if ($this->isAdmin($user) || $this->isAssignee($user, $task)) {
-            return true;
-        }
-        $relations = $this->relationsOf($user);
-
-        return $relations->hasTaskManagerFeeAccess($task->getId())
-            || $relations->hasStaffFeeAccess($task->getProject()?->getId());
+        return $this->isAdmin($user) || $this->isAssignee($user, $task);
     }
 
-    /**
-     * The fee gate when writing: no assignee leg, so an assignee cannot set their own payout. A null project
-     * leaves only admins.
-     */
+    /** The fee gate when writing: no assignee leg, so an assignee cannot set their own payout. */
     public function canSetFees(User $user, ?Project $project): bool
     {
-        return $this->isAdmin($user) || $this->relationsOf($user)->hasStaffFeeAccess($project?->getId());
+        return $this->isAdmin($user);
     }
 
     /** Whether canSetFees() could say yes for some project — decides if a create form renders the fee fields. */
     public function canSetFeesForAnyProject(User $user): bool
     {
-        return $this->isAdmin($user) || $this->relationsOf($user)->hasAnyStaffFeeAccess();
+        return $this->isAdmin($user);
     }
 
     /**
-     * The task-list scope for TaskRepository: null = every task.
+     * The task-list scope for TaskRepository: null = every task; otherwise the user's own tasks only.
      *
      * @return array{userId: int, taskIds: int[], projectIds: int[], clientIds: int[]}|null
      */
@@ -262,65 +180,22 @@ final class WorkAccess implements ResetInterface
         if ($this->isAdmin($user)) {
             return null;
         }
-        $relations = $this->relationsOf($user);
 
-        return [
-            'userId'     => (int) $user->getId(),
-            'taskIds'    => array_keys($relations->taskManagerFee),
-            'projectIds' => $relations->managingStaffProjectIds(),
-            'clientIds'  => $relations->managedClientIds,
-        ];
+        return ['userId' => (int) $user->getId(), 'taskIds' => [], 'projectIds' => [], 'clientIds' => []];
     }
 
     public function reset(): void
     {
-        $this->relations = [];
         $this->admins = [];
     }
 
-    /**
-     * Manager of this task through any relationship: reviewer, task manager, managing staff on its project, or
-     * Client Manager of its project's client (or of the client a project-less task names directly).
-     */
-    private function managesTask(User $user, Task $task): bool
+    private function isReviewer(User $user, Task $task): bool
     {
-        if ($task->getReviewerUserId() === $user->getId()) {
-            return true;
-        }
-        $relations = $this->relationsOf($user);
-        $projectId = $task->getProject()?->getId();
-
-        return $relations->isTaskManager($task->getId())
-            || $relations->isManagingStaff($projectId)
-            || $relations->managesClient($task->getProject()?->getClient()?->getId())
-            || $relations->managesClient($task->getClientId());
+        return $task->getReviewerUserId() !== null && $task->getReviewerUserId() === $user->getId();
     }
 
     private function isAssignee(User $user, Task $task): bool
     {
         return $task->getAssignee() !== null && $task->getAssignee()->getId() === $user->getId();
-    }
-
-    private function relationsOf(User $user): WorkRelations
-    {
-        $userId = (int) $user->getId();
-        if (isset($this->relations[$userId])) {
-            return $this->relations[$userId];
-        }
-
-        $staffByProject = [];
-        $staffClientIds = [];
-        foreach ($this->projectStaff->findRowsForUser($userId) as $row) {
-            $staffByProject[$row['project_id']] = ['permission' => $row['permission'], 'fee' => $row['fee']];
-            $staffClientIds[] = $row['client_id'];
-        }
-
-        return $this->relations[$userId] = new WorkRelations(
-            $userId,
-            $this->clientAdmins->findClientIdsForUser($userId),
-            $staffByProject,
-            $this->taskManagers->findFeeAccessByTaskForUser($userId),
-            array_values(array_unique($staffClientIds)),
-        );
     }
 }

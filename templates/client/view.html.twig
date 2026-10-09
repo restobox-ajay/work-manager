@@ -58,14 +58,6 @@
                 <dt>Created</dt><dd>{{ ui.ts(client.createdAt) }}</dd>
             </dl>
         </div>
-        <div class="card">
-            <h2>Client Managers</h2>
-            {% for manager in managers %}
-                <div class="note-item">{{ manager.name ?: manager.email }} <span class="muted small">{{ manager.email }}</span></div>
-            {% else %}
-                <p class="muted small">No one manages this client yet{{ is_granted('CLIENT_ADMINISTER') ? ' — choose managers on the Edit page' }}.</p>
-            {% endfor %}
-        </div>
         {% if is_granted('CLIENT_ADMINISTER') and not client.deleted %}
             <form class="mx-form" method="post" action="{{ path('app_client_remove', {id: client.id}) }}"
                   onsubmit="return confirm('Archive this client and remove it from the list? This cannot be undone here.');">

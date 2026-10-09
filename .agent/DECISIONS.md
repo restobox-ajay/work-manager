@@ -2910,3 +2910,21 @@ and the main pages load.
 Picking a tenant narrows every figure on the page — the KPI cards, the month table and the dues — to that tenancy
 (`RentSummary::forMonth($month, $tenantId)`); changing month keeps the tenant and a "Clear" button returns to all.
 An unknown or malformed `tenantId` is ignored (shows all). Moved-out tenants are listed, tagged.
+
+## ADR-124: Client Managers, project staff and Task Managers removed (owner request, 2026-10-09)
+
+**Decision.** The owner runs the app alone, so the three relationship tables that let non-admins manage work are
+gone: `client_admin` (Client Managers), `project_staff` (Project Manager / Contractor roles, fee access) and
+`task_manager`. Removed with them: their entities and repositories, `ProjectStaffService`, `WorkRelations`, the
+Client Managers field/column/card on the client pages, the Staff section and Contractors column on the project
+pages, the staff routes, automatic staff rows, and the demo staff. Migration `Version20261014090000` drops the
+tables (its `down()` recreates them empty).
+
+**Access now** (`WorkAccess`): admins see and manage everything; anyone else sees only tasks they are the assignee,
+creator or reviewer of (report on them; correct a Pending task they filed; the assignee sees their own payout).
+Non-admins have no clients or projects and cannot file tasks. This supersedes the relationship rules of ADR-070.
+
+**Verified.** Schema in sync; migration down/up round trip; client/project/task/note/invoice/rent tests green
+(the remaining suite failures — DB console, .htaccess lock, 2FA, missing `App\Entity\Admin`, ADR/ledger
+tripwires, `AdminApiUserController::detail` — exist independently of this change); browser: all work pages,
+client create/edit, project create/view, permanent client delete; demo data seed and purge.

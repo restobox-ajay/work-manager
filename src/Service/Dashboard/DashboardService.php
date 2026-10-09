@@ -14,7 +14,7 @@ use App\Security\Work\WorkAccess;
 /**
  * The dashboard (ADR-070), ported from work-platform's DashboardController/DashboardService.
  *
- * Two views, as there: people who manage work (admins, Client Managers, Project Managers) get the manager view —
+ * Two views, as there: people who manage work (admins, ADR-124) get the manager view —
  * pick a client and project in the side list, filter by status, see the newest tasks. Everyone else gets the
  * contractor view — their own to-do, what is waiting for review, and what is approved but not yet paid.
  * A manager can switch to the contractor view for their own tasks (?view=mine), as work-platform's Contractor View.

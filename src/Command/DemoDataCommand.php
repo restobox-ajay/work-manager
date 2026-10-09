@@ -60,7 +60,7 @@ final class DemoDataCommand extends Command
         $result = $this->demo->seed($actor, $assignees);
         $io->success('Added: '.self::describe($result['counts']).'.');
         if ($assignees === []) {
-            $io->note('There are no contractor accounts, so the demo tasks have no assignee and the projects no staff.');
+            $io->note('There are no contractor accounts, so the demo tasks have no assignee.');
         }
         if ($result['problems'] !== []) {
             $io->warning(['Some demo records were refused:', ...$result['problems']]);

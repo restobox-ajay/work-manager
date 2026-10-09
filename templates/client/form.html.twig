@@ -60,18 +60,6 @@
         {{ f.text('zipCode', 'Zip Code', values, 'maxlength="10"') }}
         {{ f.text('country', 'Country', values, 'maxlength="50"') }}
 
-        {% if canSetManagers %}
-            <div class="section-label">Client Managers</div>
-            <div class="field span-all">
-                <label for="f-managers">People who manage this client's projects and tasks</label>
-                <select id="f-managers" name="managers[]" multiple size="{{ min(8, max(3, people|length)) }}">
-                    {% for person in people %}
-                        <option value="{{ person.id }}" {{ person.id in managerIds ? 'selected' }}>{{ person.name ?: person.email }} — {{ person.email }}</option>
-                    {% endfor %}
-                </select>
-                <small>Hold Ctrl (Cmd on a Mac) to pick more than one.</small>
-            </div>
-        {% endif %}
     </div>
     <div class="form-actions" style="margin-top:10px">
         <a class="btn secondary" href="{{ client ? path('app_client_view', {id: client.id}) : path('app_client_index') }}">Cancel</a>

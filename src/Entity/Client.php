@@ -5,8 +5,6 @@ declare(strict_types=1);
 namespace App\Entity;
 
 use App\Repository\ClientRepository;
-use Doctrine\Common\Collections\ArrayCollection;
-use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 
 /**
@@ -82,15 +80,6 @@ class Client
 
     #[ORM\Column(nullable: true)]
     private ?int $updatedBy = null;
-
-    /** @var Collection<int, ClientAdmin> */
-    #[ORM\OneToMany(targetEntity: ClientAdmin::class, mappedBy: 'client', orphanRemoval: true)]
-    private Collection $clientAdmins;
-
-    public function __construct()
-    {
-        $this->clientAdmins = new ArrayCollection();
-    }
 
     public function getId(): ?int
     {
@@ -333,13 +322,5 @@ class Client
         $this->updatedBy = $updatedBy;
 
         return $this;
-    }
-
-    /**
-     * @return Collection<int, ClientAdmin>
-     */
-    public function getClientAdmins(): Collection
-    {
-        return $this->clientAdmins;
     }
 }

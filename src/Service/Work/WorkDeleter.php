@@ -15,7 +15,7 @@ use Doctrine\ORM\EntityManagerInterface;
 
 /**
  * Permanent deletion of a client or a project with everything under it (ADR-109, owner's choice): projects, tasks,
- * their notes, staff, task managers and priority rows, and — for a client — the invoices that were never emailed.
+ * their notes and priority rows, and — for a client — the invoices that were never emailed.
  * Invoices already sent are financial records someone has received: they stay, unlinked from the deleted client
  * (they keep the billed-to name printed on them). One transaction; audited with what was removed.
  */
@@ -66,7 +66,6 @@ final class WorkDeleter
             $this->removeTasks($db, $this->clientTaskIds($id, $projectIds));
             if ($projectIds !== []) {
                 $db->executeStatement('DELETE FROM note WHERE project_id IN (?)', [$projectIds], [$ints]);
-                $db->executeStatement('DELETE FROM project_staff WHERE project_id IN (?)', [$projectIds], [$ints]);
                 $db->executeStatement('DELETE FROM project WHERE id IN (?)', [$projectIds], [$ints]);
             }
             [$unsent, $sent] = $this->invoiceIds($id);
@@ -78,7 +77,6 @@ final class WorkDeleter
                 $db->executeStatement('UPDATE invoice SET client_id = NULL WHERE id IN (?)', [$sent], [$ints]);
             }
             $db->executeStatement('DELETE FROM note WHERE client_id = ?', [$id]);
-            $db->executeStatement('DELETE FROM client_admin WHERE client_id = ?', [$id]);
             $db->executeStatement('DELETE FROM client WHERE id = ?', [$id]);
         });
         $this->audit->record($actor, 'client.delete', sprintf('%s permanently deleted: %d projects, %d tasks, %d notes, %d unsent invoices (%d sent invoices kept)',
@@ -97,7 +95,6 @@ final class WorkDeleter
         $this->connection->transactional(function (Connection $db) use ($id): void {
             $this->removeTasks($db, $this->projectTaskIds([$id]));
             $db->executeStatement('DELETE FROM note WHERE project_id = ?', [$id]);
-            $db->executeStatement('DELETE FROM project_staff WHERE project_id = ?', [$id]);
             $db->executeStatement('DELETE FROM project WHERE id = ?', [$id]);
         });
         $this->audit->record($actor, 'project.delete', sprintf('%s permanently deleted: %d tasks, %d notes', $label, $impact['tasks'], $impact['notes']));
@@ -112,7 +109,7 @@ final class WorkDeleter
             return;
         }
         $ints = ArrayParameterType::INTEGER;
-        foreach (['note', 'task_manager', 'task_priority_order'] as $table) {
+        foreach (['note', 'task_priority_order'] as $table) {
             $db->executeStatement(sprintf('DELETE FROM %s WHERE task_id IN (?)', $table), [$taskIds], [$ints]);
         }
         // Invoice lines keep their name and amount; only their link to the task goes.

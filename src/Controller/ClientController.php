@@ -5,9 +5,7 @@ declare(strict_types=1);
 namespace App\Controller;
 
 use App\Entity\Client;
-use App\Entity\User;
 use App\Repository\ProjectRepository;
-use App\Repository\UserRepository;
 use App\Security\Voter\WorkVoter;
 use App\Service\Client\ClientCodeGenerator;
 use App\Service\Client\ClientService;
@@ -62,17 +60,15 @@ final class ClientController extends AbstractWorkController
 
     #[Route('/new', name: 'app_client_create', methods: ['GET', 'POST'])]
     #[IsGranted(WorkVoter::CLIENT_CREATE)]
-    public function create(Request $request, UserRepository $users): Response
+    public function create(Request $request): Response
     {
         $values = ['isActive' => Client::STATUS_ACTIVE];
-        $managerIds = [];
         $errors = [];
 
         if ($request->isMethod('POST')) {
             $this->assertCsrf($request, 'client_form');
             $values = $this->posted($request);
-            $managerIds = InputValue::ints($request->request->all()['managers'] ?? []);
-            $result = $this->clients->create($values, $managerIds, $this->viewer());
+            $result = $this->clients->create($values, $this->viewer());
             if ($result->isSaved()) {
                 $this->addFlash('success', 'Client created.');
 
@@ -82,12 +78,9 @@ final class ClientController extends AbstractWorkController
         }
 
         return $this->render('client/form.html.twig', [
-            'client'         => null,
-            'values'         => $values,
-            'managerIds'     => $managerIds,
-            'canSetManagers' => true,
-            'people'         => $users->findActiveOrderedByName(),
-            'errors'         => $errors,
+            'client' => null,
+            'values' => $values,
+            'errors' => $errors,
         ], new Response(status: $errors === [] ? 200 : 422));
     }
 
@@ -107,7 +100,6 @@ final class ClientController extends AbstractWorkController
     {
         return $this->render('client/view.html.twig', [
             'client'   => $client,
-            'managers' => $this->clients->managersOf($client),
             'projects' => $projects->findForClient((int) $client->getId()),
             'notes'    => $notes->forSubject($client),
         ]);
@@ -115,34 +107,27 @@ final class ClientController extends AbstractWorkController
 
     #[Route('/{id}/edit', name: 'app_client_edit', requirements: ['id' => '\d+'], methods: ['GET', 'POST'])]
     #[IsGranted(WorkVoter::CLIENT_EDIT, 'client')]
-    public function edit(#[MapEntity(id: 'id')] Client $client, Request $request, UserRepository $users): Response
+    public function edit(#[MapEntity(id: 'id')] Client $client, Request $request): Response
     {
-        $canSetManagers = $this->isGranted(WorkVoter::CLIENT_ADMINISTER);
         $values = $this->clients->valuesFrom($client);
-        $managerIds = array_map(static fn (User $user) => (int) $user->getId(), $this->clients->managersOf($client));
         $errors = [];
 
         if ($request->isMethod('POST')) {
             $this->assertCsrf($request, 'client_form');
             $values = $this->posted($request);
-            $posted = $canSetManagers ? InputValue::ints($request->request->all()['managers'] ?? []) : null;
-            $result = $this->clients->update($client, $values, $posted, $this->viewer());
+            $result = $this->clients->update($client, $values, $this->viewer());
             if ($result->isSaved()) {
                 $this->addFlash('success', 'Client updated.');
 
                 return $this->redirectToRoute('app_client_view', ['id' => $client->getId()]);
             }
             $errors = $result->errors;
-            $managerIds = $posted ?? $managerIds;
         }
 
         return $this->render('client/form.html.twig', [
-            'client'         => $client,
-            'values'         => $values,
-            'managerIds'     => $managerIds,
-            'canSetManagers' => $canSetManagers,
-            'people'         => $canSetManagers ? $users->findActiveOrderedByName() : [],
-            'errors'         => $errors,
+            'client' => $client,
+            'values' => $values,
+            'errors' => $errors,
         ], new Response(status: $errors === [] ? 200 : 422));
     }
 
