@@ -36,7 +36,7 @@
                             <td{{ loop.first ? ' class="bold"' }}>
                                 {%- if field.type == 'checkbox' -%}{{ ui.activeBadge(value) }}
                                 {%- elseif field.type == 'choice' -%}{{ field.choices[value.value ?? value] ?? (value.value ?? value) }}
-                                {%- elseif field.type == 'user' -%}{{ value ? (people[value] ?? '#' ~ value) : '—' }}
+                                {%- elseif field.type == 'user' -%}{{ value ? (people[value] ?? ('#' ~ value)) : '—' }}
                                 {%- else -%}{{ value is same as(null) or value is same as('') ? '—' : ui.short(value ~ '', 80) }}
                                 {%- endif -%}
                             </td>

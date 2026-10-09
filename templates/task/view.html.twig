@@ -49,18 +49,31 @@
         </div>
     </div>
     <div>
+        {# ADR-121: every detail of the task (contractor, reviewer and billable fields stay hidden, ADR-100). #}
         <div class="card">
             <h2>Details</h2>
             <dl class="kv">
+                <dt>Task</dt><dd>#{{ task.id }}</dd>
+                <dt>Client</dt><dd>{% if task.project %}<a href="{{ path('app_client_view', {id: task.project.client.id}) }}">{{ task.project.client.name }}</a>{% else %}—{% endif %}</dd>
+                <dt>Project</dt><dd>{% if task.project %}<a href="{{ path('app_project_view', {id: task.project.id}) }}">{{ task.project.name }}</a> {{ ui.archivedTag(archivedReasons) }}{% else %}—{% endif %}</dd>
+                <dt>Status</dt><dd>{{ ui.statusBadge(task.taskStatusId, statuses) }}</dd>
                 <dt>Task type</dt><dd>{{ types[task.taskTypeId] ?? '—' }}</dd>
-                {% if task.docUrl %}
+                <dt>Doc / Specs</dt><dd style="overflow-wrap:anywhere">
                     {# Only an http(s) value becomes a link, so a stored "javascript:" can never be clicked. #}
-                    <dt>Doc / Specs</dt><dd style="overflow-wrap:anywhere">{% if task.docUrl starts with 'http://' or task.docUrl starts with 'https://' %}<a href="{{ task.docUrl }}" rel="noopener noreferrer" target="_blank">{{ task.docUrl }}</a>{% else %}{{ task.docUrl }}{% endif %}</dd>
-                {% endif %}
-                <dt>Due</dt><dd>{{ ui.ts(task.dueDate) }}</dd>
-                <dt>Created</dt><dd>{{ task.creationDate ? task.creationDate|date('Y-m-d') : ui.ts(task.createdAt) }}{% if task.createdBy %} by {{ people[task.createdBy] ?? '#' ~ task.createdBy }}{% endif %}</dd>
-                <dt>Updated</dt><dd>{{ ui.ts(task.updatedAt, 'Y-m-d H:i') }}</dd>
-                {% if task.approvedDate %}<dt>Approved</dt><dd>{{ ui.ts(task.approvedDate) }}{% if task.approvedBy %} by {{ people[task.approvedBy] ?? '#' ~ task.approvedBy }}{% endif %}</dd>{% endif %}
+                    {% if not task.docUrl %}—{% elseif task.docUrl starts with 'http://' or task.docUrl starts with 'https://' %}<a href="{{ task.docUrl }}" rel="noopener noreferrer" target="_blank">{{ task.docUrl }}</a>{% else %}{{ task.docUrl }}{% endif %}
+                </dd>
+                <dt>Notes</dt><dd>{{ notes|length }}</dd>
+            </dl>
+        </div>
+        <div class="card">
+            <h2>Dates</h2>
+            <dl class="kv">
+                <dt>Due</dt><dd>{{ ui.ts(task.dueDate) }}{% if task.dueDate and task.dueDate < date().timestamp and task.taskStatusId == constant('App\\Entity\\Settings\\TaskStatus::PENDING_ID') %} <span class="badge danger">Overdue</span>{% endif %}</dd>
+                <dt>Creation date</dt><dd>{{ task.creationDate ? task.creationDate|date('Y-m-d') : '—' }}</dd>
+                <dt>Entered</dt><dd>{{ ui.ts(task.createdAt, 'Y-m-d H:i') }}{% if task.createdBy %} by {{ people[task.createdBy] ?? ('#' ~ task.createdBy) }}{% endif %}</dd>
+                <dt>Last updated</dt><dd>{{ ui.ts(task.updatedAt, 'Y-m-d H:i') }}{% if task.updatedBy %} by {{ people[task.updatedBy] ?? ('#' ~ task.updatedBy) }}{% endif %}</dd>
+                <dt>Approved</dt><dd>{{ ui.ts(task.approvedDate) }}{% if task.approvedDate and task.approvedBy %} by {{ people[task.approvedBy] ?? ('#' ~ task.approvedBy) }}{% endif %}</dd>
+                <dt>Paid</dt><dd>{{ ui.ts(task.paidDate) }}{% if task.paidDate and task.paidBy %} by {{ people[task.paidBy] ?? ('#' ~ task.paidBy) }}{% endif %}</dd>
             </dl>
         </div>
         {% if is_granted('TASK_FEE', task) %}
@@ -68,7 +81,7 @@
                 <h2>Payout</h2>
                 <dl class="kv">
                     <dt>Amount</dt><dd>{{ task.totalAmount ?? '0.00' }} {{ currencies[task.currencyId] ?? '' }}</dd>
-                    {% if task.paymentId %}<dt>Payment</dt><dd>{{ task.paymentId }}</dd>{% endif %}
+                    <dt>Payment</dt><dd>{{ task.paymentId ?: '—' }}</dd>
                 </dl>
             </div>
         {% endif %}

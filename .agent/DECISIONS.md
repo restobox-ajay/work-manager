@@ -2867,3 +2867,37 @@ Unit-tested (`RichTextTest`).
 expectation was updated to the owner's decision.
 
 **Addendum (layout).** The fields column is fixed at 640px; Description takes all the remaining width (the form has no max width) and stretches to the fields column's height.
+
+## ADR-120: Task descriptions in every task list (owner request, 2026-10-08)
+
+**Decision.** `ui.taskDescription(task)` shows the description under the task name — formatted like the task page
+(through `|rich_text`), clamped to about three lines with a "Show more"/"Show less" toggle added by `public/js/app.js`
+only where text is cut off. Used on the Dashboard tables (`_work/task_rows`), the task list (also "By Client/Project"
+and "By Contractor"), Task By Date, Task Priority and the project page's task table. Billing pages (Request Payment,
+invoice task picker) are left as they are.
+
+## ADR-121: Task page shows all its details (owner request, 2026-10-08)
+
+**Decision.** The task page's side column has three cards: Details (task #, client and project links, status, type,
+doc link, number of notes), Dates (due — with an Overdue tag for a pending task past due —, creation date, entered
+and last-updated time with who, approved and paid with who) and Payout (amount and payment id, fee-gated as before).
+Contractor, reviewer and billable fields stay hidden (ADR-100).
+
+**Fix.** `people[id] ?? '#' ~ id` parses in Twig as `(people[id] ?? '#') ~ id`, so names printed with the user id
+appended ("Superadmin2"). Parenthesised as `people[id] ?? ('#' ~ id)` on the task page, the invoice log and the
+config list.
+
+## ADR-122: Fresh-install reset that keeps one account (owner request, 2026-10-08)
+
+**Decision.** `php bin/console app:reset-database <email> [--force]` drops every table of the current database,
+re-runs all migrations (so statuses, types, currencies, config and other seeded defaults are back to their install
+values) and writes back the kept account's rows with their ids: `user`, `password_meta`, `password_history`,
+`two_factor_settings`, `user_ip_whitelist`, `vault_key`, `vault_entry` — so the owner logs in as before and the
+Password Manager entries (encrypted with their master password, unrecoverable if lost) survive. Everything else goes:
+clients, projects, tasks, notes, invoices, rent, expenses, subscriptions, other users, sessions, tokens, logs.
+Refused when APP_ENV=prod; asks for the email to be typed back unless --force. The connection is reopened after the
+migrations because their implicit DDL commits leave DBAL's savepoint bookkeeping out of step.
+
+**Verified** on a copy of the development database: declined confirmation and unknown email change nothing; a run
+leaves one user, zero work rows, seeded lookups, schema in sync and migrations up to date; the kept account logs in
+and the main pages load.

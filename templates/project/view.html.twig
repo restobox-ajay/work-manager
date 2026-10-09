@@ -84,7 +84,7 @@
                     {% set row = rows[task.id] %}
                     <tr>
                         <td class="muted nowrap">#{{ task.id }}</td>
-                        <td><a class="bold" href="{{ path('app_task_view', {id: task.id}) }}">{{ ui.short(task.name) }}</a>{% if task.statusDetail %}<div class="muted small">{{ ui.short(task.statusDetail, 70) }}</div>{% endif %}</td>
+                        <td><a class="bold" href="{{ path('app_task_view', {id: task.id}) }}">{{ ui.short(task.name) }}</a>{{ ui.taskDescription(task) }}{% if task.statusDetail %}<div class="muted small">{{ ui.short(task.statusDetail, 70) }}</div>{% endif %}</td>
                         <td>{{ task.assignee ? (task.assignee.name ?: task.assignee.email) : '—' }}</td>
                         <td>{{ types[task.taskTypeId] ?? '—' }}</td>
                         <td>{{ ui.statusBadge(task.taskStatusId, statuses) }}</td>

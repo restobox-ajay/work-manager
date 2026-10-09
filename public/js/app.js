@@ -133,3 +133,26 @@
         report('Unhandled promise rejection: ' + (reason && reason.message ? reason.message : String(reason)), null, null, reason && reason.stack);
     });
 })();
+
+// Clamped task descriptions (ADR-120): add "Show more" only where the text is actually cut off.
+(function () {
+    'use strict';
+    function init() {
+        document.querySelectorAll('[data-desc-clamp]').forEach(function (box) {
+            if (box.dataset.clampReady || box.scrollHeight <= box.clientHeight + 2) { return; }
+            box.dataset.clampReady = '1';
+            var toggle = document.createElement('button');
+            toggle.type = 'button';
+            toggle.className = 'desc-more';
+            toggle.textContent = 'Show more';
+            toggle.setAttribute('aria-expanded', 'false');
+            toggle.addEventListener('click', function () {
+                var open = box.classList.toggle('open');
+                toggle.textContent = open ? 'Show less' : 'Show more';
+                toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+            });
+            box.parentNode.insertBefore(toggle, box.nextSibling);
+        });
+    }
+    if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', init); } else { init(); }
+})();

@@ -42,7 +42,7 @@
                         <tr>
                             <td>{{ task.project ? task.project.client.name : '—' }}</td>
                             <td>{{ task.project ? task.project.name : '—' }}</td>
-                            <td><a class="bold" href="{{ path('app_task_view', {id: task.id}) }}">{{ ui.short(task.name, 80) }}</a></td>
+                            <td><a class="bold" href="{{ path('app_task_view', {id: task.id}) }}">{{ ui.short(task.name, 80) }}</a>{{ ui.taskDescription(task) }}</td>
                             <td>{{ types[task.taskTypeId] ?? '—' }}</td>
                             <td>{{ ui.statusBadge(task.taskStatusId, statuses) }}</td>
                             <td class="right nowrap">{{ fee[task.id] ? (task.totalAmount ?? '0.00') ~ ' ' ~ (currencies[task.currencyId] ?? '') : '—' }}</td>

@@ -60,7 +60,7 @@
                     <tr>
                         <td class="nowrap">{{ log.createdAt|date('Y-m-d H:i') }}</td>
                         <td>{{ actions[log.action] ?? log.action }}</td>
-                        <td>{{ log.userId ? (people[log.userId] ?? '#' ~ log.userId) : '—' }}</td>
+                        <td>{{ log.userId ? (people[log.userId] ?? ('#' ~ log.userId)) : '—' }}</td>
                         <td>{{ log.detail ?? '' }}</td>
                     </tr>
                 {% else %}

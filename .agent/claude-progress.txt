@@ -4241,3 +4241,6 @@ ADR-117 (2026-10-08): Created column on dashboard task tables; task list Created
 ADR-117 addendum (2026-10-08): Created column also on Task Priority. Browser-checked.
 ADR-118 (2026-10-08): task form two columns, Description rich-text editor with server-side allowlist (RichText + |rich_text). Unit tests 9/9; Task functional tests green (TaskHiddenFieldsTest updated for ADR-114). Browser-checked create/view/edit/legacy text/narrow layout.
 ADR-118 addendum (2026-10-08): task form fields fixed at 640px, Description fills the remaining width and the full height. Browser-checked.
+ADR-120 (2026-10-08): task descriptions (formatted, clamped, Show more) on dashboard, task list, by-date, priority, project page. Browser-checked.
+ADR-121 (2026-10-08): task page Details/Dates/Payout cards; fixed name+id concatenation (Twig ?? precedence) in 3 templates. Task/Invoice tests 24/24 green. Browser-checked.
+ADR-122 (2026-10-08): app:reset-database <email> — drop all, migrate, restore one account (+2FA, Password Manager). Verified on a DB copy incl. login.

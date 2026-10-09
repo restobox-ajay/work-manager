@@ -59,7 +59,7 @@
                             <td class="muted" data-prio-pos>{{ loop.index }}</td>
                             <td>{{ task.project ? task.project.client.name : '—' }}</td>
                             <td>{{ task.project ? task.project.name : '—' }}</td>
-                            <td><a class="bold" href="{{ path('app_task_view', {id: task.id}) }}">{{ ui.short(task.name, 80) }}</a></td>
+                            <td><a class="bold" href="{{ path('app_task_view', {id: task.id}) }}">{{ ui.short(task.name, 80) }}</a>{{ ui.taskDescription(task) }}</td>
                             <td class="nowrap">{{ ui.ts(task.dueDate) }}</td>
                             <td class="nowrap">{{ task.creationDate ? task.creationDate|date('Y-m-d') : ui.ts(task.createdAt) }}</td>
                             <td>{{ ui.statusBadge(task.taskStatusId, statuses) }}</td>

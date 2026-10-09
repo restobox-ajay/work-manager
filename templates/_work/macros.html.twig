@@ -64,6 +64,10 @@
 {# Text cut to $length characters with an ellipsis (task names run to 5000 characters). #}
 {% macro short(text, length = 90) %}{{ text|length > length ? text|slice(0, length) ~ '…' : text }}{% endmacro %}
 
+{# ADR-120: a task's description in a list row — formatted like the task page (allowlisted HTML), clamped to a few
+   lines; public/js/app.js adds "Show more" when it is cut off. #}
+{% macro taskDescription(task) %}{% if task.description %}<div class="rich-text desc-clamp" data-desc-clamp>{{ task.description|rich_text }}</div>{% endif %}{% endmacro %}
+
 {# A task status as a badge: Pending red, Approved/Paid green, Reviewing amber, the rest grey (work-platform's colours). #}
 {% macro statusBadge(statusId, statuses) %}
     {%- set tone = {

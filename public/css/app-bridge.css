@@ -938,3 +938,9 @@ tr.prio-dragging{opacity:.5;background:var(--line-light)}
 .rte-area p,.rich-text p{margin:0 0 .6em}.rte-area ul,.rte-area ol,.rich-text ul,.rich-text ol{margin:0 0 .6em;padding-left:1.4em}
 .rte-area h3,.rich-text h3{font-size:1.05em;margin:.6em 0 .4em}.rte-area blockquote,.rich-text blockquote{margin:0 0 .6em;padding-left:10px;border-left:3px solid var(--line);color:var(--muted)}
 .rich-text>:last-child{margin-bottom:0}
+/* ADR-120: task descriptions in dashboard rows — a few lines, "Show more" opens the rest. */
+.desc-clamp{min-width:220px;max-width:560px;margin-top:4px;font-size:.8rem;color:var(--muted);line-height:1.45;max-height:4.4em;overflow:hidden;white-space:normal}
+.desc-clamp.open{max-height:none}
+.desc-clamp p,.desc-clamp ul,.desc-clamp ol,.desc-clamp blockquote{margin:0 0 .3em}.desc-clamp h3,.desc-clamp h4{font-size:1em;margin:0 0 .2em}
+.page-body button.desc-more.desc-more{all:unset;box-sizing:border-box;cursor:pointer;display:inline-block;margin-top:4px;padding:2px 8px;border-radius:4px;font-size:.72rem;font-weight:600;line-height:1.4;background:var(--primary);color:#fff}
+.page-body button.desc-more.desc-more:hover,.page-body button.desc-more.desc-more:focus-visible{background:var(--primary-hover);color:#fff}
