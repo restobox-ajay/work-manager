@@ -1,0 +1,14 @@
+{# Work order helpers (ADR-125). #}
+{% macro status(status, label) %}
+    {%- set map = {draft: 'plain', active: 'success', on_hold: 'warn', completed: 'num', cancelled: 'danger'} -%}
+    <span class="badge {{ map[status] ?? 'plain' }}">{{ label }}</span>
+{%- endmacro %}
+{# An end date with how close it is, for open work orders. #}
+{% macro deadline(w) %}
+    {%- if w.endDate -%}
+        <span class="nowrap">{{ w.endDate|date('M j, Y') }}</span>
+        {%- if w.open %}{% set d = w.daysLeft %}
+            {% if d < 0 %} <span class="badge danger">{{ -d }}d late</span>{% elseif d <= 14 %} <span class="badge warn">{{ d == 0 ? 'Today' : d ~ 'd left' }}</span>{% endif %}
+        {%- endif -%}
+    {%- else -%}<span class="muted">—</span>{%- endif -%}
+{% endmacro %}

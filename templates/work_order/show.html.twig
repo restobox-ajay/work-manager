@@ -1,0 +1,131 @@
+{% extends 'base.html.twig' %}
+{% import '_work/macros.html.twig' as ui %}
+{% import 'work_order/_macros.html.twig' as wm %}
+
+{% block title %}{{ w.number }} · Work order{% endblock %}
+
+{% block body %}
+{% set done = milestones|filter(m => m.done)|length %}
+<div class="page-head">
+    <div class="ph-main">
+        <div class="eyebrow">Work orders · {{ w.number }}</div>
+        <div class="ph-title"><h1 style="text-transform:none;letter-spacing:0;font-size:1.05rem">{{ w.title }}</h1> {{ wm.status(w.status, w.statusLabel) }}</div>
+        <p class="lead">{{ w.customerName ?? 'No client' }}{% if w.value is not null %} · {{ w.value|invoice_money(w.currency) }}{% endif %}{% if w.reference %} · Ref. {{ w.reference }}{% endif %}</p>
+    </div>
+    <div class="ph-actions">
+        <a class="btn secondary back" href="{{ path('app_work_order_index') }}">Work orders</a>
+        <a class="btn warning" href="{{ path('app_work_order_edit', {id: w.id}) }}">Edit</a>
+        {% if w.project %}
+            <a class="btn info" href="{{ path('app_project_view', {id: w.project.id}) }}">Open project</a>
+        {% else %}
+            <form class="mx-form" method="post" action="{{ path('app_work_order_convert', {id: w.id}) }}" style="display:inline"
+                  onsubmit="return confirm('Create a project for {{ (w.customerName ?? 'this client')|e('js') }} from this work order?');">
+                <input type="hidden" name="_token" value="{{ csrf_token('work_order_convert_' ~ w.id) }}">
+                <button class="btn success" type="submit" {{ w.client ? '' : 'disabled title="Link a client first (Edit)"' }}>Convert to project</button>
+            </form>
+        {% endif %}
+    </div>
+</div>
+{{ ui.flashes() }}
+{{ ui.errors(errors) }}
+
+<div class="kpis rent-kpis">
+    <div class="kpi"><span>Contract value</span><b>{{ w.value is not null ? w.value|invoice_money(w.currency) : '—' }}</b><small>{{ w.paymentTerms ?: 'No payment terms recorded' }}</small></div>
+    <div class="kpi"><span>Advance received</span><b>{{ w.advanceReceived is not null ? w.advanceReceived|invoice_money(w.currency) : '—' }}</b>
+        <small>{% if w.value is not null %}To receive {{ ((w.value * 100)|round - ((w.advanceReceived ?? 0) * 100)|round)|invoice_money(w.currency) }}{% else %}&nbsp;{% endif %}</small></div>
+    <div class="kpi"><span>Deadline</span><b>{{ wm.deadline(w) }}</b><small>{{ w.startDate ? 'Started ' ~ w.startDate|date('M j, Y') : 'No start date' }}</small></div>
+    <div class="kpi"><span>Milestones</span><b>{{ done }} / {{ milestones|length }}</b><small>{{ milestones is empty ? 'None yet' : (done == milestones|length ? 'All done' : (milestones|length - done) ~ ' to go') }}</small></div>
+</div>
+
+<div class="detail" style="margin-top:16px">
+    <div>
+        <div class="card">
+            <h2>Scope of work</h2>
+            {% if w.description %}<div class="rich-text">{{ w.description|rich_text }}</div>{% else %}<p class="muted">No description yet — <a href="{{ path('app_work_order_edit', {id: w.id}) }}">add one</a>.</p>{% endif %}
+        </div>
+
+        <div class="card" id="milestones">
+            <h2>Milestones</h2>
+            {% if milestones is not empty %}
+                <div class="tscroll">
+                    <table class="t">
+                        <thead><tr><th style="width:36px"></th><th>Milestone</th><th>Due</th><th class="num">Amount</th><th></th></tr></thead>
+                        <tbody>
+                            {% for m in milestones %}
+                                <tr class="{{ m.done ? 'muted' }}">
+                                    <td>
+                                        <form class="mx-form" method="post" action="{{ path('app_work_order_milestone_toggle', {id: m.id}) }}">
+                                            <input type="hidden" name="_token" value="{{ csrf_token('work_order_milestone_row_' ~ m.id) }}">
+                                            <button class="btn {{ m.done ? 'success' : 'light' }} xs" type="submit" title="{{ m.done ? 'Mark not done' : 'Mark done' }}" aria-label="{{ m.done ? 'Mark not done' : 'Mark done' }}">{{ m.done ? '✓' : '○' }}</button>
+                                        </form>
+                                    </td>
+                                    <td>{% if m.done %}<s>{{ m.title }}</s> <span class="small">done {{ m.doneOn ? m.doneOn|date('M j') }}</span>{% else %}{{ m.title }}{% endif %}</td>
+                                    <td class="nowrap">{{ m.dueDate ? m.dueDate|date('M j, Y') : '—' }}{% if m.overdue %} <span class="badge danger">Overdue</span>{% endif %}</td>
+                                    <td class="num nowrap">{{ m.amount is not null ? m.amount|invoice_money(w.currency) : '—' }}</td>
+                                    <td class="actions">
+                                        <form class="mx-form" method="post" action="{{ path('app_work_order_milestone_delete', {id: m.id}) }}" style="display:inline" onsubmit="return confirm('Remove this milestone?');">
+                                            <input type="hidden" name="_token" value="{{ csrf_token('work_order_milestone_row_' ~ m.id) }}">
+                                            <button class="btn danger xs" type="submit">Delete</button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <p class="muted" style="margin:0 0 8px">No milestones yet.</p>
+            {% endif %}
+            <form class="mx-form btn-row" method="post" action="{{ path('app_work_order_milestone_add', {id: w.id}) }}" style="flex-wrap:wrap;margin-top:10px;align-items:flex-end">
+                <input type="hidden" name="_token" value="{{ csrf_token('work_order_milestone_' ~ w.id) }}">
+                <div class="field" style="flex:2;min-width:200px"><label for="m-title">Milestone</label><input type="text" id="m-title" name="title" value="{{ milestoneValues.title ?? '' }}" maxlength="200" required placeholder="e.g. Design approved"></div>
+                <div class="field"><label for="m-due">Due</label><input type="date" id="m-due" name="dueDate" value="{{ milestoneValues.dueDate ?? '' }}"></div>
+                <div class="field" style="max-width:140px"><label for="m-amount">Amount</label><input type="text" inputmode="decimal" id="m-amount" name="amount" value="{{ milestoneValues.amount ?? '' }}" placeholder="optional"></div>
+                <div class="field"><button class="btn success" type="submit">Add milestone</button></div>
+            </form>
+        </div>
+
+        {% include '_files/panel.html.twig' with {
+            attachments: attachments, uploadAction: path('app_work_order_files', {id: w.id}), uploadToken: 'work_order_files_' ~ w.id,
+            title: 'Documents', labelHint: 'e.g. Signed contract, Purchase order, Quote'} only %}
+    </div>
+    <div>
+        <div class="card">
+            <h2>Client</h2>
+            <dl class="kv">
+                <dt>Client</dt><dd>{% if w.client %}<a href="{{ path('app_client_view', {id: w.client.id}) }}">{{ w.client.name }}</a>{% else %}{{ w.clientName ?: '—' }}{% if w.clientName %} <span class="muted small">(not in Clients)</span>{% endif %}{% endif %}</dd>
+                <dt>Contact</dt><dd>{{ w.contactName ?: '—' }}</dd>
+                <dt>Phone</dt><dd>{% if w.contactPhone %}<a href="tel:{{ w.contactPhone|replace({' ': ''}) }}">{{ w.contactPhone }}</a>{% else %}—{% endif %}</dd>
+                <dt>Email</dt><dd style="overflow-wrap:anywhere">{% if w.contactEmail %}<a href="mailto:{{ w.contactEmail }}">{{ w.contactEmail }}</a>{% else %}—{% endif %}</dd>
+                <dt>Reference</dt><dd>{{ w.reference ?: '—' }}</dd>
+            </dl>
+        </div>
+        <div class="card">
+            <h2>Dates</h2>
+            <dl class="kv">
+                <dt>Signed</dt><dd>{{ w.signedDate ? w.signedDate|date('M j, Y') : '—' }}</dd>
+                <dt>Start</dt><dd>{{ w.startDate ? w.startDate|date('M j, Y') : '—' }}</dd>
+                <dt>Deadline</dt><dd>{{ wm.deadline(w) }}</dd>
+                <dt>Created</dt><dd>{{ w.createdAt|date('Y-m-d H:i') }}</dd>
+                <dt>Updated</dt><dd>{{ w.updatedAt|date('Y-m-d H:i') }}</dd>
+            </dl>
+        </div>
+        <div class="card">
+            <h2>Project</h2>
+            {% if w.project %}
+                <p style="margin:0"><a class="bold" href="{{ path('app_project_view', {id: w.project.id}) }}">{{ w.project.name }}</a></p>
+                <p class="muted small" style="margin:4px 0 0">Tasks for this work go on the project.</p>
+            {% else %}
+                <p class="muted small" style="margin:0">Not a project yet. {{ w.client ? 'Use "Convert to project" above to plan tasks.' : 'Link a client (Edit), then "Convert to project".' }}</p>
+            {% endif %}
+        </div>
+        {% if w.notes %}
+            <div class="card"><h2>Internal notes</h2><div style="white-space:pre-line">{{ w.notes }}</div></div>
+        {% endif %}
+        <form class="mx-form" method="post" action="{{ path('app_work_order_delete', {id: w.id}) }}" onsubmit="return confirm('Delete work order {{ w.number }} with its milestones and documents? This cannot be undone.');">
+            <input type="hidden" name="_token" value="{{ csrf_token('work_order_delete_' ~ w.id) }}">
+            <button class="btn danger block" type="submit">Delete work order</button>
+        </form>
+    </div>
+</div>
+{% endblock %}

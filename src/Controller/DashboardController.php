@@ -8,6 +8,7 @@ use App\Repository\TaskRepository;
 use App\Service\Client\ClientService;
 use App\Service\Dashboard\DashboardService;
 use App\Service\Project\ProjectService;
+use App\Service\Event\EventService;
 use App\Service\Subscription\SubscriptionService;
 use App\Service\Task\TaskListService;
 use App\Service\Task\TaskLookups;
@@ -29,6 +30,7 @@ final class DashboardController extends AbstractWorkController
         ClientService $clients,
         ProjectService $projects,
         SubscriptionService $subscriptions,
+        EventService $events,
     ): Response {
         $viewer = $this->viewer();
         $lookupMaps = [
@@ -57,6 +59,8 @@ final class DashboardController extends AbstractWorkController
         return $this->render('dashboard/index.html.twig', $lookupMaps + [
             'renewing'       => $renewing,
             'renewingStates' => $subscriptions->renewalStates($renewing),
+            // ADR-126: the next 30 days of events, for admins.
+            'upcomingEvents' => $this->isGranted('ROLE_ADMIN') ? $events->upcoming(EventService::WINDOWS[0]) : [],
             'page'     => $page,
             'rows'     => $taskList->rowDetails($viewer, $page->items),
             'filters'  => $filters,

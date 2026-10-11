@@ -36,6 +36,19 @@
     </div>
 {% endif %}
 
+{% if upcomingEvents is defined and upcomingEvents is not empty %}
+    {% import 'event/_macros.html.twig' as em %}
+    <div class="card renew-alert events-alert" role="status">
+        <div class="ra-head"><b>{{ upcomingEvents|length }} event{{ upcomingEvents|length == 1 ? '' : 's' }} in the next 30 days</b>
+            <a class="btn info xs" href="{{ path('app_event_upcoming') }}">View all</a></div>
+        <ul>
+            {% for r in upcomingEvents|slice(0, 5) %}
+                <li><a href="{{ path('app_event_show', {id: r.event.id}) }}">{{ r.event.title }}</a> · {{ r.date|date('D, M j') }} {{ em.when(r.daysAway) }} {{ em.years(r.event, r.years) }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+{% endif %}
+
 <div class="split dash-split">
     <nav class="card" aria-label="Clients" style="padding:12px 0">
         <div class="section-label" style="padding:0 14px 4px;margin:0 0 4px">Select client</div>

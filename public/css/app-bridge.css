@@ -944,3 +944,8 @@ tr.prio-dragging{opacity:.5;background:var(--line-light)}
 .desc-clamp p,.desc-clamp ul,.desc-clamp ol,.desc-clamp blockquote{margin:0 0 .3em}.desc-clamp h3,.desc-clamp h4{font-size:1em;margin:0 0 .2em}
 .page-body button.desc-more.desc-more{all:unset;box-sizing:border-box;cursor:pointer;display:inline-block;margin-top:4px;padding:2px 8px;border-radius:4px;font-size:.72rem;font-weight:600;line-height:1.4;background:var(--primary);color:#fff}
 .page-body button.desc-more.desc-more:hover,.page-body button.desc-more.desc-more:focus-visible{background:var(--primary-hover);color:#fff}
+/* ADR-125/126: attachments panel, events alert. */
+.events-alert{border-left-color:var(--primary)}
+.files-upload{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:flex-end;margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}
+.files-upload .field{margin:0;flex:1;min-width:220px}.files-upload .files-upload-btn{flex:0 0 auto;min-width:0}
+.files-table td{vertical-align:middle}

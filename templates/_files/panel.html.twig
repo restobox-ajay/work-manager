@@ -1,0 +1,52 @@
+{#
+    Files on a work order or event (ADR-125). Expects: attachments, uploadAction (POST url), uploadToken (CSRF id),
+    optional title, labelHint.
+#}
+<div class="card" id="files">
+    <div class="btn-row" style="justify-content:space-between;margin-bottom:8px">
+        <h2 style="margin:0">{{ title ?? 'Documents' }}{% if attachments is not empty %} <span class="badge num">{{ attachments|length }}</span>{% endif %}</h2>
+    </div>
+    {% if attachments is not empty %}
+        <div class="tscroll">
+            <table class="t files-table">
+                <thead><tr><th>File</th><th>Type</th><th class="right">Size</th><th>Uploaded</th><th></th></tr></thead>
+                <tbody>
+                    {% for a in attachments %}
+                        <tr>
+                            <td>
+                                <a class="bold" href="{{ path('app_attachment_download', {id: a.id}) }}" target="_blank" rel="noopener">{{ a.displayName }}</a>
+                                {% if a.label %}<div class="muted small">{{ a.originalName }}</div>{% endif %}
+                            </td>
+                            <td class="muted small">{{ a.originalName|split('.')|last|upper }}</td>
+                            <td class="right nowrap">{{ a.size|file_size }}</td>
+                            <td class="nowrap">{{ a.uploadedAt|date('M j, Y') }}</td>
+                            <td class="actions">
+                                <a class="btn primary xs" href="{{ path('app_attachment_download', {id: a.id}) }}" target="_blank" rel="noopener">{{ a.viewableInline ? 'Open' : 'Download' }}</a>
+                                {% if a.viewableInline %}<a class="btn info xs" href="{{ path('app_attachment_download', {id: a.id, download: 1}) }}">Download</a>{% endif %}
+                                <form class="mx-form" method="post" action="{{ path('app_attachment_delete', {id: a.id}) }}" style="display:inline" onsubmit="return confirm('Remove this file? It cannot be recovered.');">
+                                    <input type="hidden" name="_token" value="{{ csrf_token('attachment_delete_' ~ a.id) }}">
+                                    <button class="btn danger xs" type="submit">Delete</button>
+                                </form>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <p class="muted" style="margin:0 0 8px">No files yet.</p>
+    {% endif %}
+    <form class="mx-form files-upload" method="post" action="{{ uploadAction }}" enctype="multipart/form-data">
+        <input type="hidden" name="_token" value="{{ csrf_token(uploadToken) }}">
+        <div class="field">
+            <label for="f-files">Add files</label>
+            <input type="file" id="f-files" name="files[]" multiple required accept="{{ upload_accept() }}">
+            <small class="muted">PDF, Word, Excel, images, ZIP… up to {{ upload_limit() }} each, 10 at a time.</small>
+        </div>
+        <div class="field">
+            <label for="f-file-label">Label <small class="muted">(optional)</small></label>
+            <input type="text" id="f-file-label" name="label" maxlength="120" placeholder="{{ labelHint ?? 'e.g. Signed contract' }}">
+        </div>
+        <div class="field files-upload-btn"><button class="btn success" type="submit">Upload</button></div>
+    </form>
+</div>

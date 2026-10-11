@@ -103,6 +103,23 @@ final class InputValue
         return $timestamp !== false ? $timestamp : null;
     }
 
+    /**
+     * A form's Y-m-d date, strictly (no "2026-02-31" rolling into March): [date, ok]. Blank is [null, true];
+     * anything that is not a real date is [null, false].
+     *
+     * @return array{0: ?\DateTimeImmutable, 1: bool}
+     */
+    public static function ymd(mixed $value): array
+    {
+        $text = self::text($value);
+        if ($text === null) {
+            return [null, true];
+        }
+        $date = \DateTimeImmutable::createFromFormat('!Y-m-d', $text);
+
+        return $date !== false && $date->format('Y-m-d') === $text ? [$date, true] : [null, false];
+    }
+
     public static function date(mixed $value): ?\DateTimeInterface
     {
         if ($value instanceof \DateTimeInterface) {

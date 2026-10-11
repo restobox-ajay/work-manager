@@ -4247,3 +4247,4 @@ ADR-122 (2026-10-08): app:reset-database <email> — drop all, migrate, restore 
 ADR-106 addendum (2026-10-09): View button to the tenant page on the Tenants list and both Rent summary tables. Browser-checked.
 ADR-123 (2026-10-09): /rent tenant dropdown (All tenants default), filters KPIs/month/dues; month nav keeps it. Rent tests 17/17; browser-checked.
 ADR-124 (2026-10-09): removed client_admin, project_staff, task_manager (+ code, UI, routes); WorkAccess is admin vs own-tasks. Migration Version20261014090000. Work tests green; browser-checked.
+ADR-125/126 (2026-10-11): Work Orders (milestones, documents, convert to project), Events (yearly, upcoming, dashboard, email reminders via app:events:remind), private attachments. Migration Version20261015090000. 25 new tests green; browser-checked.

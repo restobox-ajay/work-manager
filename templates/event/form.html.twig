@@ -1,0 +1,77 @@
+{% extends 'base.html.twig' %}
+{% import '_work/macros.html.twig' as ui %}
+
+{% block title %}{{ e ? 'Edit ' ~ e.title : 'New event' }}{% endblock %}
+
+{% block body %}
+{% set back = e ? path('app_event_show', {id: e.id}) : path('app_event_upcoming') %}
+{% set v = values %}
+<div class="page-head">
+    <div class="ph-main">
+        <div class="eyebrow">Events</div>
+        <div class="ph-title"><h1>{{ e ? 'Edit event' : 'New event' }}</h1></div>
+        <p class="lead">A birth, a death, an anniversary, a legal or health record — any date worth keeping. Files (certificates, photos) are added on the next page.</p>
+    </div>
+    <div class="ph-actions"><a class="btn secondary back" href="{{ back }}">Back</a></div>
+</div>
+{{ ui.errors(errors) }}
+<form class="mx-form task-form" method="post">
+    <input type="hidden" name="_token" value="{{ csrf_token('event_form') }}">
+    <div class="task-form-cols">
+        <div class="card task-form-main">
+            <div class="form-grid">
+                <div class="field span-all"><label for="f-title">Title <span class="req">*</span></label><input type="text" id="f-title" name="title" value="{{ v.title ?? '' }}" maxlength="200" required placeholder="e.g. Mom's birthday, Grandfather passed away, Car insurance renewed" {{ e ? '' : 'autofocus' }}></div>
+                <div class="field">
+                    <label for="f-category">Category</label>
+                    <select id="f-category" name="categoryId">
+                        <option value="">None</option>
+                        {% for c in categories %}<option value="{{ c.id }}" data-name="{{ c.name|lower }}" {{ (v.categoryId ?? '') == c.id ? 'selected' }}>{{ c.name }}</option>{% endfor %}
+                    </select>
+                </div>
+                <div class="field"><label for="f-people">People</label><input type="text" id="f-people" name="people" value="{{ v.people ?? '' }}" maxlength="255" placeholder="Who it is about"></div>
+                <div class="field"><label for="f-date">Date <span class="req">*</span></label><input type="date" id="f-date" name="eventDate" value="{{ v.eventDate ?? '' }}" required></div>
+                <div class="field"><label for="f-time">Time</label><input type="time" id="f-time" name="eventTime" value="{{ v.eventTime ?? '' }}"></div>
+                <div class="field"><label for="f-end">End date</label><input type="date" id="f-end" name="endDate" value="{{ v.endDate ?? '' }}"><small class="muted">For something lasting several days.</small></div>
+                <div class="field"><label for="f-place">Place</label><input type="text" id="f-place" name="place" value="{{ v.place ?? '' }}" maxlength="255"></div>
+            </div>
+            <div class="section-label" style="margin-top:18px">Repeat and remind</div>
+            <div class="form-grid">
+                <div class="field"><label class="check"><input type="checkbox" id="f-yearly" name="repeatsYearly" value="1" {{ (v.repeatsYearly ?? false) ? 'checked' }}> Repeats every year</label>
+                    <small class="muted">Birthdays, anniversaries, remembrance days. Shows the years it marks.</small></div>
+                <div class="field">
+                    <label for="f-remind">Email me a reminder</label>
+                    <select id="f-remind" name="remindDaysBefore">
+                        <option value="">No reminder</option>
+                        {% for days, label in remindChoices %}<option value="{{ days }}" {{ (v.remindDaysBefore ?? '') ~ '' == days ~ '' ? 'selected' }}>{{ label }}</option>{% endfor %}
+                    </select>
+                    <small class="muted">Sent by the daily reminder task (app:events:remind).</small>
+                </div>
+            </div>
+        </div>
+        <div class="card task-form-side">
+            <div class="field">
+                <label for="f-description">Details</label>
+                <textarea id="f-description" name="description" rows="14" data-rich-editor placeholder="What happened, certificate numbers, who to inform…">{{ v.description ?? '' }}</textarea>
+            </div>
+        </div>
+    </div>
+    <div class="form-actions" style="margin-top:10px">
+        <a class="btn secondary" href="{{ back }}">Cancel</a>
+        <button class="btn primary" type="submit">{{ e ? 'Save' : 'Add event' }}</button>
+    </div>
+</form>
+<script src="{{ versioned('/js/rich-editor.js') }}" defer></script>
+<script>
+    // Picking a yearly kind of category ticks "Repeats every year" — unless the box was touched by hand.
+    (function () {
+        var select = document.getElementById('f-category'), box = document.getElementById('f-yearly'), touched = {{ e ? 'true' : 'false' }};
+        var yearly = ['birth', 'birthday', 'anniversary', 'marriage', 'death'];
+        box.addEventListener('change', function () { touched = true; });
+        select.addEventListener('change', function () {
+            if (touched) { return; }
+            var opt = select.options[select.selectedIndex];
+            box.checked = yearly.indexOf(opt && opt.dataset.name || '') !== -1;
+        });
+    })();
+</script>
+{% endblock %}

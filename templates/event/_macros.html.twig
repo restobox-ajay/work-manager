@@ -1,0 +1,13 @@
+{# Events helpers (ADR-126). #}
+{# "Today" / "Tomorrow" / "In 5 days" #}
+{% macro when(daysAway) %}
+    {%- if daysAway == 0 %}<span class="badge danger">Today</span>{% elseif daysAway == 1 %}<span class="badge warn">Tomorrow</span>{% elseif daysAway <= 7 %}<span class="badge warn">In {{ daysAway }} days</span>{% else %}<span class="muted small">in {{ daysAway }} days</span>{% endif -%}
+{% endmacro %}
+{% macro category(e) %}{% if e.category %}<span class="badge plain">{{ e.category.name }}</span>{% endif %}{% endmacro %}
+{# "turns 60" for births/birthdays, "60 years" otherwise #}
+{% macro years(e, years) %}
+    {%- if years -%}
+        {% set name = (e.category.name ?? '')|lower %}
+        <span class="badge num">{{ name in ['birth', 'birthday'] ? 'turns ' ~ years : years ~ (years == 1 ? ' year' : ' years') }}</span>
+    {%- endif -%}
+{% endmacro %}

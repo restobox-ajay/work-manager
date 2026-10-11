@@ -2928,3 +2928,41 @@ Non-admins have no clients or projects and cannot file tasks. This supersedes th
 (the remaining suite failures — DB console, .htaccess lock, 2FA, missing `App\Entity\Admin`, ADR/ledger
 tripwires, `AdminApiUserController::detail` — exist independently of this change); browser: all work pages,
 client create/edit, project create/view, permanent client delete; demo data seed and purge.
+
+## ADR-125: Work Orders module and private file attachments (owner request, 2026-10-11)
+
+**Decision.** Menu "Work Orders": one record per contract or job won — number WO-YYYY-NNN (per year, unique index),
+title, status (Draft / Active / On hold / Completed / Cancelled; the list shows the open three by default), a client
+from the Clients list or a typed name, contact person/phone/email, their reference/PO no., contract value, currency,
+payment terms, advance received, signed/start/deadline dates, scope of work (rich text, RichText allowlist) and
+internal notes; milestones (title, due date, optional amount, done/not); documents. The list totals value, advance and
+still-to-receive per currency. "Convert to project" creates a project for the linked client (title → name, scope →
+description) and links it; refused without a client. Deleting removes milestones (FK cascade) and files. Admins only.
+Internal notes are a field rather than the Notes module: extending Note to a fourth subject type touches its entity,
+voter, service and every template; a converted project uses the normal Notes panel.
+
+**Attachments.** One `attachment` table (owner_type work_order|event + owner_id) and `AttachmentStorage`: files go to
+`%app.upload_dir%` (var/uploads — outside public/, git-ignored; back it up with the database) under a random name;
+allowed: PDF, Office/ODF, text/CSV, PNG/JPEG/GIF/WebP/HEIC, ZIP, EML/MSG; content is sniffed too, so HTML, SVG, PHP,
+scripts and executables are refused whatever the extension. Limit: the smaller of 20 MB and PHP's
+upload_max_filesize/post_max_size (shown on the form). Download only via `/attachment/{id}` (ROLE_ADMIN): PDFs and
+safe images inline, everything else as an octet-stream attachment; `nosniff`; images also get a sandbox CSP.
+
+**Verified.** WorkOrderModuleTest (9), AttachmentStorageHelpersTest (4); browser walkthrough of every page and flow.
+
+## ADR-126: Events module with yearly repeats and email reminders (owner request, 2026-10-11)
+
+**Decision.** Menu "Events": important dates — title, category (Config › Event Categories; migration seeds Birth,
+Birthday, Death, Anniversary, Marriage, Health, Legal / Document, Financial, Meeting, Other), date, optional time and
+end date, people, place, details (rich text), files (attachments), "Repeats every year" and an optional email
+reminder (on the day … 1 month before). Upcoming (30/60/90/365 days) rolls yearly events forward and shows the
+years they mark ("turns 60", "25 years"); 29 February falls on 28 February in other years (EventCalendar). The
+dashboard shows the next 30 days to admins. Table `life_event` (EVENT is a MySQL keyword).
+
+**Reminders.** `php bin/console app:events:remind` (daily from a scheduled task; `--dry-run`, `--date=Y-m-d`) emails
+every active admin except hidden tech-support accounts. A reminder is due from N days before an occurrence up to the
+day itself (a missed day still sends it) and once per occurrence (`last_reminded_for`); changing an event's date
+resets it.
+
+**Verified.** EventCalendarTest (7), EventModuleTest (5); browser walkthrough; command dry-run/send/rerun checked.
+Full suite: no new failures (the same pre-existing 107 as before, in unrelated areas).

@@ -13,7 +13,7 @@
     <div class="ph-actions"><a class="btn secondary back" href="{{ back }}">Back</a></div>
 </div>
 {{ ui.errors(errors) }}
-{% if properties is empty %}<div class="alert warning">Add a property first: <a href="{{ path('app_rent_property_new') }}">New property</a>.</div>{% endif %}
+{% if properties is empty %}<div class="alert warning" style="max-width:900px">Add a property first: <a href="{{ path('app_rent_property_new') }}">New property</a>.</div>{% endif %}
 <form class="card mx-form" method="post" style="max-width:900px" id="tenant-form">
     <input type="hidden" name="_token" value="{{ csrf_token('rent_tenant') }}">
     <div class="form-grid">

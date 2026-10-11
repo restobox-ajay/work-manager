@@ -1,0 +1,91 @@
+{% extends 'base.html.twig' %}
+{% import '_work/macros.html.twig' as ui %}
+
+{% block title %}{{ w ? 'Edit ' ~ w.number : 'New work order' }}{% endblock %}
+
+{% block body %}
+{% set back = w ? path('app_work_order_show', {id: w.id}) : path('app_work_order_index') %}
+{% set v = values %}
+<div class="page-head">
+    <div class="ph-main">
+        <div class="eyebrow">Work orders</div>
+        <div class="ph-title"><h1>{{ w ? 'Edit ' ~ w.number : 'New work order' }}</h1></div>
+        <p class="lead">{% if w %}{{ w.title }}{% else %}It will be numbered {{ nextNumber }}. Documents and milestones are added on the next page.{% endif %}</p>
+    </div>
+    <div class="ph-actions"><a class="btn secondary back" href="{{ back }}">Back</a></div>
+</div>
+{{ ui.errors(errors) }}
+{# ADR-125: details on the left, the scope of work on the right (stacked on narrow screens), like the task form. #}
+<form class="mx-form task-form" method="post">
+    <input type="hidden" name="_token" value="{{ csrf_token('work_order_form') }}">
+    <div class="task-form-cols">
+        <div class="card task-form-main">
+            <div class="section-label" style="margin-top:0">Work order</div>
+            <div class="form-grid">
+                <div class="field span-all"><label for="f-title">Title <span class="req">*</span></label><input type="text" id="f-title" name="title" value="{{ v.title ?? '' }}" maxlength="200" required placeholder="e.g. E-commerce website for Acme Retail" {{ w ? '' : 'autofocus' }}></div>
+                <div class="field">
+                    <label for="f-status">Status <span class="req">*</span></label>
+                    <select id="f-status" name="status" required>{% for k, label in statuses %}<option value="{{ k }}" {{ (v.status ?? '') == k ? 'selected' }}>{{ label }}</option>{% endfor %}</select>
+                </div>
+                <div class="field"><label for="f-reference">Their reference / PO no.</label><input type="text" id="f-reference" name="reference" value="{{ v.reference ?? '' }}" maxlength="80"></div>
+            </div>
+
+            <div class="section-label" style="margin-top:18px">Client</div>
+            <div class="form-grid">
+                <div class="field">
+                    <label for="f-client">Client</label>
+                    <select id="f-client" name="clientId">
+                        <option value="">— Not in my Clients list —</option>
+                        {% for c in clients %}<option value="{{ c.id }}" {{ (v.clientId ?? '') == c.id ? 'selected' }}>{{ c.name }}</option>{% endfor %}
+                        {% if w and w.client and w.client not in clients %}<option value="{{ w.client.id }}" selected>{{ w.client.name }} (archived)</option>{% endif %}
+                    </select>
+                    <small class="muted">Needed to turn this into a project later.</small>
+                </div>
+                <div class="field" id="client-name-field"><label for="f-client-name">Or client name</label><input type="text" id="f-client-name" name="clientName" value="{{ v.clientName ?? '' }}" maxlength="150" placeholder="When they are not a client yet"></div>
+                <div class="field"><label for="f-contact">Contact person</label><input type="text" id="f-contact" name="contactName" value="{{ v.contactName ?? '' }}" maxlength="120"></div>
+                <div class="field"><label for="f-phone">Contact phone</label><input type="tel" id="f-phone" name="contactPhone" value="{{ v.contactPhone ?? '' }}" maxlength="40"></div>
+                <div class="field span-all"><label for="f-email">Contact email</label><input type="email" id="f-email" name="contactEmail" value="{{ v.contactEmail ?? '' }}" maxlength="180"></div>
+            </div>
+
+            <div class="section-label" style="margin-top:18px">Money</div>
+            <div class="form-grid">
+                <div class="field"><label for="f-value">Contract value</label><input type="text" inputmode="decimal" id="f-value" name="value" value="{{ v.value ?? '' }}" placeholder="0.00"></div>
+                <div class="field">
+                    <label for="f-currency">Currency <span class="req">*</span></label>
+                    <select id="f-currency" name="currency" required>{% for c in currencies %}<option value="{{ c }}" {{ (v.currency ?? '') == c ? 'selected' }}>{{ c }}</option>{% endfor %}</select>
+                </div>
+                <div class="field"><label for="f-advance">Advance received</label><input type="text" inputmode="decimal" id="f-advance" name="advanceReceived" value="{{ v.advanceReceived ?? '' }}" placeholder="0.00"></div>
+                <div class="field"><label for="f-terms">Payment terms</label><input type="text" id="f-terms" name="paymentTerms" value="{{ v.paymentTerms ?? '' }}" maxlength="255" placeholder="e.g. 50% advance, 50% on delivery"></div>
+            </div>
+
+            <div class="section-label" style="margin-top:18px">Dates</div>
+            <div class="form-grid three">
+                <div class="field"><label for="f-signed">Signed / awarded</label><input type="date" id="f-signed" name="signedDate" value="{{ v.signedDate ?? '' }}"></div>
+                <div class="field"><label for="f-start">Start</label><input type="date" id="f-start" name="startDate" value="{{ v.startDate ?? '' }}"></div>
+                <div class="field"><label for="f-end">Deadline / end</label><input type="date" id="f-end" name="endDate" value="{{ v.endDate ?? '' }}"></div>
+            </div>
+
+            <div class="field" style="margin-top:18px"><label for="f-notes">Internal notes <small class="muted">(only you see these)</small></label><textarea id="f-notes" name="notes" rows="4" placeholder="Anything to remember — not shown to anyone else">{{ v.notes ?? '' }}</textarea></div>
+        </div>
+        <div class="card task-form-side">
+            <div class="field">
+                <label for="f-description">Scope of work / description</label>
+                <textarea id="f-description" name="description" rows="18" data-rich-editor placeholder="What is to be delivered, exclusions, acceptance criteria…">{{ v.description ?? '' }}</textarea>
+            </div>
+        </div>
+    </div>
+    <div class="form-actions" style="margin-top:10px">
+        <a class="btn secondary" href="{{ back }}">Cancel</a>
+        <button class="btn primary" type="submit">{{ w ? 'Save' : 'Create work order' }}</button>
+    </div>
+</form>
+<script src="{{ versioned('/js/rich-editor.js') }}" defer></script>
+<script>
+    // The typed client name is only for someone not in the Clients list: hide it once one is picked.
+    (function () {
+        var select = document.getElementById('f-client'), field = document.getElementById('client-name-field');
+        function sync() { field.hidden = select.value !== ''; }
+        select.addEventListener('change', sync); sync();
+    })();
+</script>
+{% endblock %}

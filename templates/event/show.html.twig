@@ -1,0 +1,59 @@
+{% extends 'base.html.twig' %}
+{% import '_work/macros.html.twig' as ui %}
+{% import 'event/_macros.html.twig' as em %}
+
+{% block title %}{{ e.title }} · Event{% endblock %}
+
+{% block body %}
+<div class="page-head">
+    <div class="ph-main">
+        <div class="eyebrow">Events{{ e.category ? ' · ' ~ e.category.name : '' }}</div>
+        <div class="ph-title"><h1 style="text-transform:none;letter-spacing:0;font-size:1.05rem">{{ e.title }}</h1></div>
+        <p class="lead">{{ e.eventDate|date('l, F j, Y') }}{% if e.eventTime %} at {{ e.eventTime|date('H:i') }}{% endif %}{% if e.endDate %} – {{ e.endDate|date('F j, Y') }}{% endif %}{% if e.place %} · {{ e.place }}{% endif %}</p>
+    </div>
+    <div class="ph-actions">
+        <a class="btn secondary back" href="{{ path('app_event_upcoming') }}">Events</a>
+        <a class="btn warning" href="{{ path('app_event_edit', {id: e.id}) }}">Edit</a>
+    </div>
+</div>
+{{ ui.flashes() }}
+
+<div class="kpis rent-kpis">
+    <div class="kpi"><span>{{ e.repeatsYearly ? 'Next on' : 'Date' }}</span>
+        <b>{{ next ? next|date('M j, Y') : e.eventDate|date('M j, Y') }}</b>
+        <small>{% if next %}{{ em.when(daysAway) }} {{ em.years(e, nextYears) }}{% else %}{{ sinceDays }} days ago{% endif %}</small></div>
+    <div class="kpi"><span>Repeats</span><b>{{ e.repeatsYearly ? 'Every year' : 'No' }}</b><small>{{ e.repeatsYearly ? 'since ' ~ e.eventDate|date('Y') : 'one-off' }}</small></div>
+    <div class="kpi"><span>Reminder</span><b>{{ e.remindDaysBefore is not null ? remindChoices[e.remindDaysBefore] ?? (e.remindDaysBefore ~ ' days before') : 'None' }}</b>
+        <small>{{ e.lastRemindedFor ? 'Last emailed for ' ~ e.lastRemindedFor|date('M j, Y') : 'by email' }}</small></div>
+</div>
+
+<div class="detail" style="margin-top:16px">
+    <div>
+        <div class="card">
+            <h2>Details</h2>
+            {% if e.description %}<div class="rich-text">{{ e.description|rich_text }}</div>{% else %}<p class="muted">No details yet — <a href="{{ path('app_event_edit', {id: e.id}) }}">add some</a>.</p>{% endif %}
+        </div>
+        {% include '_files/panel.html.twig' with {
+            attachments: attachments, uploadAction: path('app_event_files', {id: e.id}), uploadToken: 'event_files_' ~ e.id,
+            title: 'Files', labelHint: 'e.g. Birth certificate, Photo'} only %}
+    </div>
+    <div>
+        <div class="card">
+            <h2>About</h2>
+            <dl class="kv">
+                <dt>Category</dt><dd>{{ e.category ? e.category.name : '—' }}</dd>
+                <dt>People</dt><dd>{{ e.people ?: '—' }}</dd>
+                <dt>Place</dt><dd>{{ e.place ?: '—' }}</dd>
+                <dt>Date</dt><dd>{{ e.eventDate|date('M j, Y') }}{% if e.eventTime %} {{ e.eventTime|date('H:i') }}{% endif %}</dd>
+                {% if e.endDate %}<dt>Until</dt><dd>{{ e.endDate|date('M j, Y') }}</dd>{% endif %}
+                <dt>Added</dt><dd>{{ e.createdAt|date('Y-m-d H:i') }}</dd>
+                <dt>Updated</dt><dd>{{ e.updatedAt|date('Y-m-d H:i') }}</dd>
+            </dl>
+        </div>
+        <form class="mx-form" method="post" action="{{ path('app_event_delete', {id: e.id}) }}" onsubmit="return confirm('Delete this event and its files? This cannot be undone.');">
+            <input type="hidden" name="_token" value="{{ csrf_token('event_delete_' ~ e.id) }}">
+            <button class="btn danger block" type="submit">Delete event</button>
+        </form>
+    </div>
+</div>
+{% endblock %}
