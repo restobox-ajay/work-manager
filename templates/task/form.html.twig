@@ -33,9 +33,9 @@
             <textarea id="f-name" name="name" rows="2" required maxlength="5000" style="min-height:0">{{ input.name }}</textarea>
         </div>
         <div class="field span-2">
-            <label for="f-project">Project <span class="req">*</span></label>
+            <label for="f-project">Project{% if not is_granted('ROLE_ADMIN') %} <span class="req">*</span>{% endif %}</label>
             <select id="f-project" name="projectId" {{ is_granted('ROLE_ADMIN') ? '' : 'required' }}>
-                <option value="">{{ is_granted('ROLE_ADMIN') ? '(no project)' : 'Choose a project' }}</option>
+                <option value="">{{ is_granted('ROLE_ADMIN') ? 'No project' : 'Choose a project' }}</option>
                 {% for project in projects %}
                     <option value="{{ project.id }}" {{ input.projectId == project.id ? 'selected' }}>{{ project.client ? project.client.name ~ ' › ' }}{{ project.name }}{{ project.active ? '' : ' (Archive)' }}</option>
                 {% endfor %}

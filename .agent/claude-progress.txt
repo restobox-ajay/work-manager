@@ -4252,3 +4252,4 @@ ADR-127 (2026-10-12): Config lists drag-to-reorder (Order/Sort Order lists), no 
 ADR-128 (2026-10-12): project client optional (nullable client_id, templates/queries null-safe, (no client) filter includes client-less projects). Browser-checked; no new test failures.
 ADR-129 (2026-10-12): project links as a list (project_link: name, URL, description) replacing local/dev/prod/doc/mockup columns; migration Version20261017090000 carries old values over. Browser-checked; no new test failures.
 ADR-130 (2026-10-12): link URL validation (http(s) + localhost/IP/dotted host; live check in the form) and coloured name labels on the project page. Ken Tam vhost import SQL in var/. 18 link tests green; browser-checked.
+ADR-131 (2026-10-13): tasks may be filed with no client/project from the task form and Quick Add (template-only; server already allowed it). TaskWithoutProjectTest 2/2.

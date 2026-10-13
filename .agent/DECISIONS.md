@@ -3022,3 +3022,12 @@ Re-runnable: existing client/projects/links are kept.
 
 **Verified.** ProjectLinksTest 18 tests (13 URL cases); browser: inline error, blocked save, labels; the SQL run twice
 on the strict-mode test database (62 projects, 64 links, one client).
+
+## ADR-131: A task may have no client or project (owner request, 2026-10-13)
+
+**Decision.** The task form's Project select is optional for admins (no "*" marker; first option "No project"), and
+Quick Add's per-row project select starts at "No project" instead of "Choose a project". The server already accepted
+a null project for anyone allowed to add tasks (`WorkAccess::canAddTaskTo`, admin-only), and `task.project_id` /
+`client_id` were already nullable; the task page shows "No project" and every list shows "—".
+
+**Verified.** TaskWithoutProjectTest (form + Quick Add, 2 tests); Task functional tests 11/11.
