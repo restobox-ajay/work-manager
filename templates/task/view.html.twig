@@ -8,7 +8,7 @@
     <div class="ph-main">
         <div class="eyebrow">
             {% if task.project %}
-                <a href="{{ path('app_client_view', {id: task.project.client.id}) }}" style="color:inherit">{{ task.project.client.name }}</a> ›
+                {% if task.project.client %}<a href="{{ path('app_client_view', {id: task.project.client.id}) }}" style="color:inherit">{{ task.project.client.name }}</a> ›{% endif %}
                 <a href="{{ path('app_project_view', {id: task.project.id}) }}" style="color:inherit">{{ task.project.name }}</a>
             {% else %}No project{% endif %}
             · Task #{{ task.id }}
@@ -54,7 +54,7 @@
             <h2>Details</h2>
             <dl class="kv">
                 <dt>Task</dt><dd>#{{ task.id }}</dd>
-                <dt>Client</dt><dd>{% if task.project %}<a href="{{ path('app_client_view', {id: task.project.client.id}) }}">{{ task.project.client.name }}</a>{% else %}—{% endif %}</dd>
+                <dt>Client</dt><dd>{% if task.project and task.project.client %}<a href="{{ path('app_client_view', {id: task.project.client.id}) }}">{{ task.project.client.name }}</a>{% else %}—{% endif %}</dd>
                 <dt>Project</dt><dd>{% if task.project %}<a href="{{ path('app_project_view', {id: task.project.id}) }}">{{ task.project.name }}</a> {{ ui.archivedTag(archivedReasons) }}{% else %}—{% endif %}</dd>
                 <dt>Status</dt><dd>{{ ui.statusBadge(task.taskStatusId, statuses) }}</dd>
                 <dt>Task type</dt><dd>{{ types[task.taskTypeId] ?? '—' }}</dd>

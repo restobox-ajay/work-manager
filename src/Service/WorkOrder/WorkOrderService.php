@@ -216,7 +216,7 @@ final class WorkOrderService
     }
 
     /**
-     * Creates a project for the work order's client from its title and scope, and links the two.
+     * Creates a project (for the work order's client, if it has one) from its title and scope, and links the two.
      *
      * @return WriteResult<Project>
      */
@@ -225,13 +225,10 @@ final class WorkOrderService
         if ($workOrder->getProject() !== null) {
             return WriteResult::failed(['This work order already has a project.']);
         }
-        if ($workOrder->getClient() === null) {
-            return WriteResult::failed(['Link a client from your Clients list first (Edit the work order): a project always belongs to a client.']);
-        }
         $description = $workOrder->getDescription() === null ? null
             : trim(html_entity_decode(strip_tags(str_replace(['</p>', '<br>', '</li>', '</h3>', '</h4>'], "\n", $workOrder->getDescription())), \ENT_QUOTES | \ENT_HTML5, 'UTF-8'));
         $result = $this->projects->create([
-            'clientId'    => $workOrder->getClient()->getId(),
+            'clientId'    => $workOrder->getClient()?->getId(), // none is fine (ADR-128)
             'name'        => mb_substr($workOrder->getTitle(), 0, self::PROJECT_NAME_MAX),
             'description' => trim(sprintf("From work order %s.\n\n%s", $workOrder->getNumber(), $description ?? '')),
             'status'      => Project::STATUS_ACTIVE,

@@ -38,4 +38,20 @@ final class ConfigListDefinition
     {
         return array_values(array_filter($this->fields, static fn (ConfigField $field) => $field->listed));
     }
+
+    /**
+     * The whole-number field the list is ordered by first (Order / Sort Order), when there is one: such a list is
+     * reordered by dragging its rows (ADR-127). Null for lists ordered by name, module and so on.
+     */
+    public function sortField(): ?ConfigField
+    {
+        $first = array_key_first($this->order);
+        foreach ($this->fields as $field) {
+            if ($field->name === $first && $field->type === ConfigField::INTEGER) {
+                return $field;
+            }
+        }
+
+        return null;
+    }
 }

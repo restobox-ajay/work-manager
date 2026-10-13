@@ -20,9 +20,9 @@
     <input type="hidden" name="_token" value="{{ csrf_token('project_form') }}">
     <div class="form-grid">
         <div class="field">
-            <label for="f-client">Client <span class="req">*</span></label>
-            <select id="f-client" name="clientId" required>
-                <option value="">Choose a client</option>
+            <label for="f-client">Client</label>
+            <select id="f-client" name="clientId">
+                <option value="">No client</option>
                 {% for client in clients %}
                     <option value="{{ client.id }}" {{ (values.clientId ?? '') == client.id ? 'selected' }}>{{ client.name }}{{ client.active ? '' : ' (Archive)' }}</option>
                 {% endfor %}
@@ -39,13 +39,25 @@
             <label for="f-name">Name <span class="req">*</span></label>
             <input type="text" id="f-name" name="name" value="{{ values.name ?? '' }}" required maxlength="100" {{ project ? '' : 'autofocus' }}>
         </div>
-        {# type="text", not "url": a link typed without "http://" is completed server-side, not refused by the browser. #}
-        {% for field, label in constant('App\\Service\\Project\\ProjectService::LINK_FIELDS') %}
-            <div class="field">
-                <label for="f-{{ field }}">{{ label }}</label>
-                <input type="text" inputmode="url" id="f-{{ field }}" name="{{ field }}" value="{{ values[field] ?? '' }}" maxlength="255" placeholder="example.com">
+        {# ADR-129: any number of named links. type="text", not "url": a link typed without "http://" is completed
+           server-side, not refused by the browser. #}
+        {% set linkRows = values.links ?? [] %}
+        <div class="field span-all project-links">
+            <label>Links</label>
+            <div class="pl-rows" data-pl-rows>
+                {% for link in linkRows|merge(linkRows is empty ? [{name: '', url: '', description: ''}] : []) %}
+                    <div class="pl-row" data-pl-row>
+                        <input type="text" name="links[{{ loop.index0 }}][name]" value="{{ link.name ?? '' }}" maxlength="60" list="pl-names" placeholder="Name (Local, Dev, Prod…)" aria-label="Link name">
+                        <input type="text" inputmode="url" name="links[{{ loop.index0 }}][url]" value="{{ link.url ?? '' }}" maxlength="255" placeholder="https://example.com" aria-label="URL">
+                        <input type="text" name="links[{{ loop.index0 }}][description]" value="{{ link.description ?? '' }}" maxlength="255" placeholder="Description (optional)" aria-label="Description">
+                        <button class="btn light sm" type="button" data-pl-remove title="Remove this link" aria-label="Remove this link">✕</button>
+                        <div class="pl-error" data-pl-error role="alert" hidden></div>
+                    </div>
+                {% endfor %}
             </div>
-        {% endfor %}
+            <div><button class="btn info sm" type="button" data-pl-add>+ Add link</button> <small class="muted">e.g. Local, Dev, Staging, Prod, Figma, Repository — up to {{ constant('App\\Service\\Project\\ProjectService::MAX_LINKS') }}.</small></div>
+            <datalist id="pl-names">{% for n in constant('App\\Service\\Project\\ProjectService::LINK_NAMES') %}<option value="{{ n }}">{% endfor %}</datalist>
+        </div>
         <div class="field span-all">
             <label for="f-description">Description</label>
             <textarea id="f-description" name="description" rows="5">{{ values.description ?? '' }}</textarea>
@@ -60,4 +72,60 @@
         <button class="btn primary" type="submit">{{ project ? 'Save' : 'Create project' }}</button>
     </div>
 </form>
+<script>
+    // Project links (ADR-129): add a row; remove a row (the last one is only emptied). Rows are renumbered on submit.
+    // ADR-130: each URL is checked as you leave it and on submit, by the same rule as ProjectService::isWebHost();
+    // the server still checks everything.
+    (function () {
+        var box = document.querySelector('[data-pl-rows]');
+        if (!box) { return; }
+        var BAD = 'Not a valid URL. Enter a web address such as https://example.com or http://localhost:8000.';
+        var DOMAIN = /^(?:[\p{L}\p{N}](?:[\p{L}\p{N}-]*[\p{L}\p{N}])?\.)+\p{L}[\p{L}\p{N}-]*[\p{L}\p{N}]$/u;
+        function urlProblem(row) {
+            var value = row.querySelector('input[name$="[url]"]').value.trim();
+            var other = Array.prototype.some.call(row.querySelectorAll('input:not([name$="[url]"])'), function (i) { return i.value.trim() !== ''; });
+            if (value === '') { return other ? 'Enter the URL for this link.' : ''; }
+            if (/\s/.test(value)) { return BAD; }
+            if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(value)) { value = 'http://' + value; }
+            var url;
+            try { url = new URL(value); } catch (e) { return BAD; }
+            if (url.protocol !== 'http:' && url.protocol !== 'https:') { return BAD; }
+            var host = url.hostname.replace(/^\[|\]$/g, '');
+            var ok = host === 'localhost' || /^\d{1,3}(\.\d{1,3}){3}$/.test(host) || host.indexOf(':') !== -1 || DOMAIN.test(host);
+            return ok ? '' : BAD;
+        }
+        function check(row) {
+            var problem = urlProblem(row), input = row.querySelector('input[name$="[url]"]'), note = row.querySelector('[data-pl-error]');
+            input.classList.toggle('pl-invalid', problem !== '');
+            input.setAttribute('aria-invalid', problem !== '' ? 'true' : 'false');
+            note.textContent = problem; note.hidden = problem === '';
+            return problem === '';
+        }
+        function renumber() {
+            box.querySelectorAll('[data-pl-row]').forEach(function (row, i) {
+                row.querySelectorAll('input').forEach(function (input) { input.name = input.name.replace(/links\[\d+\]/, 'links[' + i + ']'); });
+            });
+        }
+        document.querySelector('[data-pl-add]').addEventListener('click', function () {
+            var first = box.querySelector('[data-pl-row]'), row = first.cloneNode(true);
+            row.querySelectorAll('input').forEach(function (input) { input.value = ''; });
+            box.appendChild(row); renumber(); check(row); row.querySelector('input').focus();
+        });
+        box.addEventListener('click', function (e) {
+            var btn = e.target.closest('[data-pl-remove]');
+            if (!btn) { return; }
+            var rows = box.querySelectorAll('[data-pl-row]'), row = btn.closest('[data-pl-row]');
+            if (rows.length > 1) { row.remove(); renumber(); } else { row.querySelectorAll('input').forEach(function (i) { i.value = ''; }); check(row); }
+        });
+        // Checked when you leave a field; once a row shows an error it is re-checked as you type, so it clears at once.
+        box.addEventListener('focusout', function (e) { var row = e.target.closest('[data-pl-row]'); if (row && e.target.matches('input')) { check(row); } });
+        box.addEventListener('input', function (e) { var row = e.target.closest('[data-pl-row]'); if (row && !row.querySelector('[data-pl-error]').hidden) { check(row); } });
+        box.closest('form').addEventListener('submit', function (e) {
+            var firstBad = null;
+            box.querySelectorAll('[data-pl-row]').forEach(function (row) { if (!check(row) && !firstBad) { firstBad = row; } });
+            if (firstBad) { e.preventDefault(); firstBad.querySelector('input[name$="[url]"]').focus(); return; }
+            renumber();
+        });
+    })();
+</script>
 {% endblock %}

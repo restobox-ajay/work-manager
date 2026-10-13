@@ -67,7 +67,7 @@
         <select name="projectId" aria-label="Project" style="width:auto;max-width:200px">
             <option value="">All projects</option>
             <option value="{{ noneId }}" {{ filters.projectId == noneId ? 'selected' }}>(no project)</option>
-            {% for project in projects %}<option value="{{ project.id }}" {{ filters.projectId == project.id ? 'selected' }}>{{ project.client.name }} › {{ project.name }}</option>{% endfor %}
+            {% for project in projects %}<option value="{{ project.id }}" {{ filters.projectId == project.id ? 'selected' }}>{{ project.client ? project.client.name ~ ' › ' }}{{ project.name }}</option>{% endfor %}
         </select>
         {# No contractor filter (ADR-100); a contractor picked in the side list or a dashboard link survives filtering. #}
         {% if filters.assigneeId is not null %}<input type="hidden" name="assigneeId" value="{{ filters.assigneeId }}">{% endif %}
@@ -103,8 +103,8 @@
                 {% for task in page.items %}
                     {% set row = rows[task.id] %}
                     <tr>
-                        <td>{% if task.project %}<a href="{{ path('app_dashboard', {clientId: task.project.client.id}) }}">{{ task.project.client.name }}</a>{% else %}—{% endif %}</td>
-                        <td>{% if task.project %}<a href="{{ path('app_dashboard', {clientId: task.project.client.id, projectId: task.project.id}) }}">{{ task.project.name }}</a> {{ ui.archivedTag(row.archived) }}{% else %}—{% endif %}</td>
+                        <td>{% if task.project and task.project.client %}<a href="{{ path('app_dashboard', {clientId: task.project.client.id}) }}">{{ task.project.client.name }}</a>{% else %}—{% endif %}</td>
+                        <td>{% if task.project %}<a href="{{ path('app_dashboard', {clientId: task.project.client.id ?? null, projectId: task.project.id}) }}">{{ task.project.name }}</a> {{ ui.archivedTag(row.archived) }}{% else %}—{% endif %}</td>
                         <td><a class="bold" href="{{ path('app_task_view', {id: task.id}) }}">{{ ui.short(task.name, 80) }}</a>{{ ui.taskDescription(task) }}</td>
                         <td class="small">{{ task.statusDetail ? ui.short(task.statusDetail, 60) : '—' }}</td>
                         <td>{{ types[task.taskTypeId] ?? '—' }}</td>

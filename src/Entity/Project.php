@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Entity;
 
 use App\Repository\ProjectRepository;
+use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\Common\Collections\Collection;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 
@@ -31,7 +33,8 @@ class Project
     private ?int $id = null;
 
     #[ORM\ManyToOne(targetEntity: Client::class)]
-    #[ORM\JoinColumn(name: 'client_id', referencedColumnName: 'id', nullable: false)]
+    // A project may have no client (ADR-128): internal work, or a job for someone not in the Clients list yet.
+    #[ORM\JoinColumn(name: 'client_id', referencedColumnName: 'id', nullable: true)]
     private ?Client $client = null;
 
     #[ORM\Column(length: 100)]
@@ -40,20 +43,20 @@ class Project
     #[ORM\Column(type: Types::TEXT, nullable: true)]
     private ?string $description = null;
 
-    #[ORM\Column(length: 255, nullable: true)]
-    private ?string $localUrl = null;
+    /** @var Collection<int, ProjectLink> named URLs (ADR-129) */
+    #[ORM\OneToMany(targetEntity: ProjectLink::class, mappedBy: 'project', cascade: ['persist'], orphanRemoval: true)]
+    #[ORM\OrderBy(['sortOrder' => 'ASC', 'id' => 'ASC'])]
+    private Collection $links;
 
-    #[ORM\Column(length: 255, nullable: true)]
-    private ?string $devUrl = null;
+    public function __construct()
+    {
+        $this->links = new ArrayCollection();
+    }
 
-    #[ORM\Column(length: 255, nullable: true)]
-    private ?string $prodUrl = null;
 
-    #[ORM\Column(length: 255, nullable: true)]
-    private ?string $docUrl = null;
 
-    #[ORM\Column(length: 255, nullable: true)]
-    private ?string $mockupUrl = null;
+
+
 
     #[ORM\Column(type: Types::SMALLINT)]
     private int $status = self::STATUS_ACTIVE;
@@ -83,7 +86,7 @@ class Project
         return $this->client;
     }
 
-    public function setClient(Client $client): static
+    public function setClient(?Client $client): static
     {
         $this->client = $client;
 
@@ -114,65 +117,10 @@ class Project
         return $this;
     }
 
-    public function getLocalUrl(): ?string
-    {
-        return $this->localUrl;
-    }
 
-    public function setLocalUrl(?string $localUrl): static
-    {
-        $this->localUrl = $localUrl;
 
-        return $this;
-    }
 
-    public function getDevUrl(): ?string
-    {
-        return $this->devUrl;
-    }
 
-    public function setDevUrl(?string $devUrl): static
-    {
-        $this->devUrl = $devUrl;
-
-        return $this;
-    }
-
-    public function getProdUrl(): ?string
-    {
-        return $this->prodUrl;
-    }
-
-    public function setProdUrl(?string $prodUrl): static
-    {
-        $this->prodUrl = $prodUrl;
-
-        return $this;
-    }
-
-    public function getDocUrl(): ?string
-    {
-        return $this->docUrl;
-    }
-
-    public function setDocUrl(?string $docUrl): static
-    {
-        $this->docUrl = $docUrl;
-
-        return $this;
-    }
-
-    public function getMockupUrl(): ?string
-    {
-        return $this->mockupUrl;
-    }
-
-    public function setMockupUrl(?string $mockupUrl): static
-    {
-        $this->mockupUrl = $mockupUrl;
-
-        return $this;
-    }
 
     public function getStatus(): int
     {
@@ -247,6 +195,27 @@ class Project
     public function setUpdatedAt(?int $updatedAt): static
     {
         $this->updatedAt = $updatedAt;
+
+        return $this;
+    }
+
+    /** @return Collection<int, ProjectLink> */
+    public function getLinks(): Collection
+    {
+        return $this->links;
+    }
+
+    /**
+     * Swaps the whole list for these links, in this order (the form edits them all at once).
+     *
+     * @param list<ProjectLink> $links
+     */
+    public function replaceLinks(array $links): static
+    {
+        $this->links->clear();
+        foreach (array_values($links) as $i => $link) {
+            $this->links->add($link->setProject($this)->setSortOrder(($i + 1) * 10));
+        }
 
         return $this;
     }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Service\Project;
 
 use App\Entity\Project;
+use App\Entity\ProjectLink;
 use App\Entity\User;
 use App\Repository\ClientRepository;
 use App\Repository\ProjectRepository;
@@ -26,14 +27,12 @@ final class ProjectService
     private const NAME_MAX_LENGTH = 100;
     private const URL_MAX_LENGTH = 255;
 
-    /** The project's links, field => label (form, view and validation messages share the wording). */
-    public const LINK_FIELDS = [
-        'localUrl'  => 'Local URL',
-        'devUrl'    => 'Dev URL',
-        'prodUrl'   => 'Prod URL',
-        'docUrl'    => 'Doc / Specs link',
-        'mockupUrl' => 'Mockup URL',
-    ];
+    /** Names offered for a project's links (ADR-129); any other name may be typed. */
+    public const LINK_NAMES = ['Local', 'Dev', 'Staging', 'Prod', 'Doc / Specs', 'Mockup', 'Repository', 'Admin panel'];
+    public const MAX_LINKS = 30;
+    private const LINK_NAME_MAX = 60;
+    private const LINK_DESCRIPTION_MAX = 255;
+    private const LINK_PROTOCOLS = ['http', 'https'];
 
     public function __construct(
         private readonly ProjectRepository $projects,
@@ -95,7 +94,7 @@ final class ProjectService
         return $reasons;
     }
 
-    /** @return array{clientId: ?int, name: string, description: ?string, status: int, localUrl: ?string, devUrl: ?string, prodUrl: ?string, docUrl: ?string, mockupUrl: ?string} */
+    /** @return array{clientId: ?int, name: string, description: ?string, status: int, links: list<array{name: string, url: string, description: ?string}>} */
     public function valuesFrom(Project $project): array
     {
         return [
@@ -103,11 +102,7 @@ final class ProjectService
             'name'        => $project->getName(),
             'description' => $project->getDescription(),
             'status'      => $project->getStatus(),
-            'localUrl'    => $project->getLocalUrl(),
-            'devUrl'      => $project->getDevUrl(),
-            'prodUrl'     => $project->getProdUrl(),
-            'docUrl'      => $project->getDocUrl(),
-            'mockupUrl'   => $project->getMockupUrl(),
+            'links'       => array_values(array_map(static fn (ProjectLink $l) => ['name' => $l->getName(), 'url' => $l->getUrl(), 'description' => $l->getDescription()], $project->getLinks()->toArray())),
         ];
     }
 
@@ -181,21 +176,15 @@ final class ProjectService
             ],
             'status' => [new Assert\Choice(choices: [Project::STATUS_ACTIVE, Project::STATUS_ARCHIVE], message: 'Status must be Active or Archive.')],
         ];
-        foreach (self::LINK_FIELDS as $field => $label) {
-            $input[$field] = InputValue::url($values[$field] ?? null);
-            // requireTld off: a local URL is often http://localhost or a bare dev hostname.
-            $rules[$field] = [
-                new Assert\Url(message: "$label is not a valid URL.", requireTld: false),
-                new Assert\Length(max: self::URL_MAX_LENGTH, maxMessage: "$label cannot be longer than {{ limit }} characters."),
-            ];
-        }
-
         $errors = $this->validator->checkFields($input, $rules);
+        [$links, $linkErrors] = $this->linksFrom($values['links'] ?? null);
+        $errors = [...$errors, ...$linkErrors];
 
+        // The client is optional (ADR-128); one that is chosen must exist and not be removed.
         $client = $input['clientId'] !== null ? $this->clients->find($input['clientId']) : null;
-        if ($client === null || $client->isDeleted()) {
-            $errors[] = 'Client is required.';
-        } elseif ($client->getId() !== $project->getClient()?->getId() && !$this->access->canCreateProject($actor, $client)) {
+        if ($input['clientId'] !== null && ($client === null || ($client->isDeleted() && $client->getId() !== $project->getClient()?->getId()))) {
+            $errors[] = 'Choose a client from the list, or none.';
+        } elseif ($client !== null && $client->getId() !== $project->getClient()?->getId() && !$this->access->canCreateProject($actor, $client)) {
             // Moving a project to, or creating one under, a client you do not manage would hand it to someone else.
             $errors[] = 'You cannot add projects to this client.';
         }
@@ -208,15 +197,74 @@ final class ProjectService
             ->setName($input['name'])
             ->setDescription($input['description'])
             ->setStatus($input['status'])
-            ->setLocalUrl($input['localUrl'])
-            ->setDevUrl($input['devUrl'])
-            ->setProdUrl($input['prodUrl'])
-            ->setDocUrl($input['docUrl'])
-            ->setMockupUrl($input['mockupUrl'])
+            ->replaceLinks($links)
             ->setUpdatedAt(time())
             ->setUpdatedBy($actor->getId());
 
         return WriteResult::saved($project);
+    }
+
+    /**
+     * The form's link rows (ADR-129) → links, in order. A row left wholly blank is skipped; a row with anything in it
+     * needs a URL ("http://" is added when typed without a scheme); a blank name becomes "Link".
+     *
+     * @return array{0: list<ProjectLink>, 1: list<string>}
+     */
+    private function linksFrom(mixed $rows): array
+    {
+        $links = [];
+        $errors = [];
+        foreach (is_array($rows) ? array_values($rows) : [] as $n => $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $name = InputValue::text($row['name'] ?? null);
+            $url = InputValue::url($row['url'] ?? null);
+            $description = InputValue::text($row['description'] ?? null);
+            if ($name === null && $url === null && $description === null) {
+                continue;
+            }
+            $label = sprintf('Link %d%s', $n + 1, $name !== null ? ' ("'.$name.'")' : '');
+            if ($url === null) {
+                $errors[] = "$label: enter its URL.";
+                continue;
+            }
+            $invalidUrl = "$label is not a valid URL. Enter a web address such as https://example.com or http://localhost:8000.";
+            $urlErrors = $this->validator->checkFields(['url' => $url], ['url' => [
+                new Assert\Url(message: $invalidUrl, protocols: self::LINK_PROTOCOLS, requireTld: false),
+                new Assert\Length(max: self::URL_MAX_LENGTH, maxMessage: "$label: the URL cannot be longer than {{ limit }} characters."),
+            ]]);
+            if ($urlErrors === [] && !self::isWebHost((string) parse_url($url, \PHP_URL_HOST))) {
+                $urlErrors[] = $invalidUrl;
+            }
+            array_push($errors, ...$urlErrors);
+            foreach ($this->validator->checkFields(['name' => $name, 'description' => $description], [
+                'name'        => [new Assert\Length(max: self::LINK_NAME_MAX, maxMessage: "$label: the name cannot be longer than {{ limit }} characters.")],
+                'description' => [new Assert\Length(max: self::LINK_DESCRIPTION_MAX, maxMessage: "$label: the description cannot be longer than {{ limit }} characters.")],
+            ]) as $error) {
+                $errors[] = $error;
+            }
+            $links[] = (new ProjectLink())->setName($name ?? 'Link')->setUrl($url)->setDescription($description);
+        }
+        if (count($links) > self::MAX_LINKS) {
+            $errors[] = sprintf('A project can have at most %d links.', self::MAX_LINKS);
+        }
+
+        return [$links, $errors];
+    }
+
+    /**
+     * A host someone can open: localhost, an IP address, or a dotted domain name ending in a real-looking TLD — so a
+     * stray word ("abc" → http://abc) is refused. requireTld alone cannot do this: it would refuse localhost and IPs.
+     * The form's script applies the same rule as you type (templates/project/form.html.twig).
+     */
+    private static function isWebHost(string $host): bool
+    {
+        $host = trim($host, '[]');
+
+        return strcasecmp($host, 'localhost') === 0
+            || filter_var($host, \FILTER_VALIDATE_IP) !== false
+            || preg_match('/^(?:[\p{L}\p{N}](?:[\p{L}\p{N}-]*[\p{L}\p{N}])?\.)+\p{L}[\p{L}\p{N}-]*[\p{L}\p{N}]$/u', $host) === 1;
     }
 
     private function describe(Project $project): string

@@ -57,7 +57,7 @@
                         <tr data-task-id="{{ task.id }}" {% if canReorder and tab.tasks|length > 1 %}class="prio-row" draggable="true" title="Drag to reorder"{% endif %}>
                             {% if canReorder %}<td class="prio-handle" aria-hidden="true">{{ icons.icon('bars') }}</td>{% endif %}
                             <td class="muted" data-prio-pos>{{ loop.index }}</td>
-                            <td>{{ task.project ? task.project.client.name : '—' }}</td>
+                            <td>{{ task.project and task.project.client ? task.project.client.name : '—' }}</td>
                             <td>{{ task.project ? task.project.name : '—' }}</td>
                             <td><a class="bold" href="{{ path('app_task_view', {id: task.id}) }}">{{ ui.short(task.name, 80) }}</a>{{ ui.taskDescription(task) }}</td>
                             <td class="nowrap">{{ ui.ts(task.dueDate) }}</td>

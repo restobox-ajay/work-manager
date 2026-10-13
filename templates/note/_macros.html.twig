@@ -8,7 +8,7 @@
     {%- if type == 'client' -%}
         <span class="badge plain">Client</span> <a href="{{ path('app_client_view', {id: subject.id}) }}">{{ subject.name }}</a>
     {%- elseif type == 'project' -%}
-        <span class="badge plain">Project</span> <a href="{{ path('app_project_view', {id: subject.id}) }}">{{ subject.client.name }} › {{ subject.name }}</a>
+        <span class="badge plain">Project</span> <a href="{{ path('app_project_view', {id: subject.id}) }}">{{ subject.client ? subject.client.name ~ ' › ' }}{{ subject.name }}</a>
     {%- elseif type == 'task' -%}
         <span class="badge plain">Task</span> <a href="{{ path('app_task_view', {id: subject.id}) }}">#{{ subject.id }} {{ subject.name|length > 60 ? subject.name|slice(0, 60) ~ '…' : subject.name }}</a>
     {%- else -%}

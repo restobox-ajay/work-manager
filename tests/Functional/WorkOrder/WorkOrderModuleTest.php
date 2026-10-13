@@ -144,17 +144,20 @@ final class WorkOrderModuleTest extends WebTestCase
         self::assertSame($clientId, $workOrder->getProject()->getClient()?->getId());
     }
 
-    public function testConvertingWithoutAClientIsRefused(): void
+    public function testConvertingWithoutAClientMakesAProjectWithNoClient(): void
     {
         $id = $this->create('No client', ['clientName' => 'Someone new']);
         $page = $this->client->request('GET', "/work-order/$id");
-        $token = $page->filter('form[action$="/convert"] input[name="_token"]')->attr('value');
-        $this->client->request('POST', "/work-order/$id/convert", ['_token' => $token]);
+        $this->client->submit($page->selectButton('Convert to project')->form());
 
-        $page = $this->client->followRedirect();
-        self::assertStringContainsString('Link a client', $page->filter('.alert')->text());
+        self::assertResponseRedirects();
         $this->em->clear();
-        self::assertNull($this->em->find(WorkOrder::class, $id)?->getProject());
+        $project = $this->em->find(WorkOrder::class, $id)?->getProject();
+        self::assertNotNull($project, 'ADR-128: a project needs no client.');
+        self::assertNull($project->getClient());
+        $projectId = $project->getId();
+        $this->em->getConnection()->executeStatement('UPDATE work_order SET project_id = NULL WHERE id = ?', [$id]);
+        $this->em->getConnection()->executeStatement('DELETE FROM project WHERE id = ?', [$projectId]);
     }
 
     public function testDeletingRemovesItsMilestonesAndFiles(): void

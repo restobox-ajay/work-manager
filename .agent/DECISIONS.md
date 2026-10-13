@@ -2966,3 +2966,59 @@ resets it.
 
 **Verified.** EventCalendarTest (7), EventModuleTest (5); browser walkthrough; command dry-run/send/rerun checked.
 Full suite: no new failures (the same pre-existing 107 as before, in unrelated areas).
+
+## ADR-127: Config lists — drag to reorder, no ID column (owner request, 2026-10-12)
+
+**Decision.** Config lists no longer show the ID column. A list ordered first by a whole-number field
+(`ConfigListDefinition::sortField()`: Task Statuses' Order; Countries, Expense, Subscription and Event Categories'
+Sort Order) hides that column too and is reordered by dragging any row (bars icon as the cue); the new order is
+posted to `POST /config/{kind}/sort` (CSRF `config_sort_<kind>`), saved as 10, 20, 30… by `ConfigCrudService::
+reorder()` (unknown ids ignored, rows left out keep their place after), audited, and confirmed with an "Order saved"
+message. Lists ordered by name/module (task types, currencies…) keep their order and are not draggable; their sort
+endpoint answers 404. The Order field stays on the edit form.
+
+## ADR-128: A project's client is optional (owner request, 2026-10-12)
+
+**Decision.** `project.client_id` is nullable (migration Version20261016090000); the project form's Client select
+starts at "No client" and is not required; a chosen client must exist and not be removed. Everything that showed a
+project's client now copes with none: project list ("No client"), project page, task list/dashboard rows, task page,
+task/quick-add/filter project options ("Project" alone instead of "Client › Project"), by-date, priority, notes.
+Queries left-join the client; the "archived work is hidden" rule treats a client-less project as live when the
+project itself is active; the "(no client)" filter now also shows tasks of client-less projects. A work order with
+no linked client can now be converted (its project has no client). down() fails while client-less projects exist.
+
+**Verified.** Browser: create/edit with and without a client, task on such a project, every task/project page and
+filter; full PHPUnit run — no new failures (WorkOrderModuleTest's convert-without-client test now expects success).
+
+## ADR-129: A project's links are one list of name + URL + description (owner request, 2026-10-12)
+
+**Decision.** The five fixed URL columns on `project` (local, dev, prod, doc/specs, mockup) are replaced by a
+`project_link` table (name, url, description, sort order; deleted with the project). The project form shows the same
+row of fields for every link — name (free text, with suggestions such as Local, Dev, Staging, Prod), URL, optional
+description — with "+ Add link" and a remove button; only the name tells links apart, so there is no dedicated
+Specs/Doc or Mockup field any more. Blank rows are skipped, a row with anything in it needs a URL (a missing scheme
+gets http://), a blank name becomes "Link", at most 30 links. The project page's Links card shows name → URL (both
+open the URL in a new tab, only for http/https) and the description. Migration Version20261017090000 copies the old
+columns into links named Local, Dev, Prod, Doc / Specs and Mockup (no data lost), then drops the columns; down()
+restores them from the first link of each name.
+
+**Verified.** ProjectLinksTest (4 tests); browser: add/remove rows, save, view page; full PHPUnit run — no new failures.
+
+## ADR-130: Project link URLs are checked; link names are coloured labels (owner request, 2026-10-12)
+
+**Decision.** A link's URL must be an http(s) web address whose host is `localhost`, an IP address, or a dotted
+domain name (`ProjectService::isWebHost()`), so a stray word ("abc"), spaces, `ftp://` or `javascript:` are refused
+with "Link N ("name") is not a valid URL. Enter a web address such as https://example.com or http://localhost:8000."
+The project form applies the same rule in the browser: a message under the row when you leave the URL field (or a
+row with a name but no URL), cleared as you fix it, and Save is held until every row is valid — the server still
+checks everything. On the project page each link's name is a Bootstrap-style label, white text on a colour:
+fixed colours for the usual names (Local grey, Dev blue, Staging/UAT/QA orange, Prod/Live green, Doc/Specs teal,
+Mockup/Figma/Design purple, Repo/Git dark, Admin red), and any other name a stable colour from its text
+(`ProjectLink::getTone()`, CSS `.pl-tone-0…7`).
+
+**Data.** `var/ken-tam-vhost-projects.sql` (one-off, not committed) creates client "Ken Tam" and one project per
+WAMP vhost (62; the default localhost skipped), each with a "Local" link (and "Local admin" for admin.* aliases).
+Re-runnable: existing client/projects/links are kept.
+
+**Verified.** ProjectLinksTest 18 tests (13 URL cases); browser: inline error, blocked save, labels; the SQL run twice
+on the strict-mode test database (62 projects, 64 links, one client).

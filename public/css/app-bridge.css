@@ -949,3 +949,15 @@ tr.prio-dragging{opacity:.5;background:var(--line-light)}
 .files-upload{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:flex-end;margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}
 .files-upload .field{margin:0;flex:1;min-width:220px}.files-upload .files-upload-btn{flex:0 0 auto;min-width:0}
 .files-table td{vertical-align:middle}
+/* ADR-129: project link rows. */
+.project-links .pl-rows{display:flex;flex-direction:column;gap:6px;margin-bottom:8px}
+.project-links .pl-row{display:grid;grid-template-columns:minmax(120px,1fr) minmax(200px,2fr) minmax(160px,2fr) auto;gap:6px;align-items:center}
+@media (max-width:800px){.project-links .pl-row{grid-template-columns:1fr}}
+.project-links-table td{padding-top:6px;padding-bottom:6px}
+/* ADR-130: a link's name as a coloured label (white text, Bootstrap-like); URL errors under the row as you type. */
+.pl-label{display:inline-block;padding:3px 9px;border-radius:4px;font-size:12px;font-weight:600;line-height:1.4;color:#fff;white-space:nowrap;text-decoration:none}
+a.pl-label:hover,a.pl-label:focus{color:#fff;text-decoration:none;filter:brightness(.9)}
+.pl-tone-0{background:#6c757d}.pl-tone-1{background:#0d6efd}.pl-tone-2{background:#d9480f}.pl-tone-3{background:#198754}
+.pl-tone-4{background:#0b7285}.pl-tone-5{background:#6f42c1}.pl-tone-6{background:#343a40}.pl-tone-7{background:#c92a2a}
+.project-links .pl-row input.pl-invalid{border-color:#dc3545;box-shadow:0 0 0 2px rgba(220,53,69,.15)}
+.project-links .pl-error{grid-column:1/-1;color:#c92a2a;font-size:12px;margin-top:-2px}

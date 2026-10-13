@@ -16,8 +16,8 @@
             {% for task in tasks %}
                 {% set row = rows[task.id] %}
                 <tr>
-                    <td>{% if task.project %}<a href="{{ path('app_dashboard', {clientId: task.project.client.id}) }}">{{ task.project.client.name }}</a>{% else %}—{% endif %}</td>
-                    <td>{% if task.project %}<a href="{{ path('app_dashboard', {clientId: task.project.client.id, projectId: task.project.id}) }}">{{ task.project.name }}</a> {{ ui.archivedTag(row.archived) }}{% else %}—{% endif %}</td>
+                    <td>{% if task.project and task.project.client %}<a href="{{ path('app_dashboard', {clientId: task.project.client.id}) }}">{{ task.project.client.name }}</a>{% else %}—{% endif %}</td>
+                    <td>{% if task.project %}<a href="{{ path('app_dashboard', {clientId: task.project.client.id ?? null, projectId: task.project.id}) }}">{{ task.project.name }}</a> {{ ui.archivedTag(row.archived) }}{% else %}—{% endif %}</td>
                     <td><a class="bold" href="{{ path('app_task_view', {id: task.id}) }}">{{ ui.short(task.name, 70) }}</a>
                         {{ ui.taskDescription(task) }}
                     </td>

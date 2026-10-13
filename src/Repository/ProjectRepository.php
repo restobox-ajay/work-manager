@@ -79,7 +79,7 @@ class ProjectRepository extends ServiceEntityRepository
 
         $qb = $this->createQueryBuilder('p')
             ->addSelect('c')
-            ->join('p.client', 'c')
+            ->leftJoin('p.client', 'c') // a project may have no client (ADR-128)
             ->andWhere('p.isDeleted = 0')
             ->orderBy('c.name', 'ASC')
             ->addOrderBy('p.name', 'ASC');
@@ -148,7 +148,7 @@ class ProjectRepository extends ServiceEntityRepository
     {
         $qb = $this->createQueryBuilder('p')
             ->addSelect('c')
-            ->join('p.client', 'c')
+            ->leftJoin('p.client', 'c') // a project may have no client (ADR-128)
             ->andWhere('p.isDeleted = 0');
 
         if ($visibleIds !== null) {

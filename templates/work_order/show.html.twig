@@ -21,7 +21,7 @@
             <form class="mx-form" method="post" action="{{ path('app_work_order_convert', {id: w.id}) }}" style="display:inline"
                   onsubmit="return confirm('Create a project for {{ (w.customerName ?? 'this client')|e('js') }} from this work order?');">
                 <input type="hidden" name="_token" value="{{ csrf_token('work_order_convert_' ~ w.id) }}">
-                <button class="btn success" type="submit" {{ w.client ? '' : 'disabled title="Link a client first (Edit)"' }}>Convert to project</button>
+                <button class="btn success" type="submit">Convert to project</button>
             </form>
         {% endif %}
     </div>
@@ -116,7 +116,7 @@
                 <p style="margin:0"><a class="bold" href="{{ path('app_project_view', {id: w.project.id}) }}">{{ w.project.name }}</a></p>
                 <p class="muted small" style="margin:4px 0 0">Tasks for this work go on the project.</p>
             {% else %}
-                <p class="muted small" style="margin:0">Not a project yet. {{ w.client ? 'Use "Convert to project" above to plan tasks.' : 'Link a client (Edit), then "Convert to project".' }}</p>
+                <p class="muted small" style="margin:0">Not a project yet. Use "Convert to project" above to plan tasks.</p>
             {% endif %}
         </div>
         {% if w.notes %}

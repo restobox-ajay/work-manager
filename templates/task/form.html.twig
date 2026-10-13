@@ -37,7 +37,7 @@
             <select id="f-project" name="projectId" {{ is_granted('ROLE_ADMIN') ? '' : 'required' }}>
                 <option value="">{{ is_granted('ROLE_ADMIN') ? '(no project)' : 'Choose a project' }}</option>
                 {% for project in projects %}
-                    <option value="{{ project.id }}" {{ input.projectId == project.id ? 'selected' }}>{{ project.client.name }} › {{ project.name }}{{ project.active ? '' : ' (Archive)' }}</option>
+                    <option value="{{ project.id }}" {{ input.projectId == project.id ? 'selected' }}>{{ project.client ? project.client.name ~ ' › ' }}{{ project.name }}{{ project.active ? '' : ' (Archive)' }}</option>
                 {% endfor %}
             </select>
         </div>

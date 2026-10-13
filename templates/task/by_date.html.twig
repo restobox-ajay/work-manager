@@ -40,7 +40,7 @@
                 <tbody>
                     {% for task in group.tasks %}
                         <tr>
-                            <td>{{ task.project ? task.project.client.name : '—' }}</td>
+                            <td>{{ task.project and task.project.client ? task.project.client.name : '—' }}</td>
                             <td>{{ task.project ? task.project.name : '—' }}</td>
                             <td><a class="bold" href="{{ path('app_task_view', {id: task.id}) }}">{{ ui.short(task.name, 80) }}</a>{{ ui.taskDescription(task) }}</td>
                             <td>{{ types[task.taskTypeId] ?? '—' }}</td>

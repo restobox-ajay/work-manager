@@ -94,6 +94,38 @@ final class ConfigCrudService
         return [];
     }
 
+    /**
+     * Saves a dragged order (ADR-127): the rows get 10, 20, 30… in the posted order. Ids that are not rows of this
+     * list are ignored; rows left out keep their place after the posted ones.
+     *
+     * @param list<int> $ids
+     *
+     * @return int how many rows were renumbered
+     */
+    public function reorder(ConfigListDefinition $list, array $ids, User $actor): int
+    {
+        $field = $list->sortField() ?? throw new \LogicException(sprintf('%s cannot be reordered.', $list->plural));
+        $byId = [];
+        foreach ($this->rows($list) as $row) {
+            $byId[(int) $row->getId()] = $row;
+        }
+        $ordered = [];
+        foreach (array_unique($ids) as $id) {
+            if (isset($byId[$id])) {
+                $ordered[] = $byId[$id];
+                unset($byId[$id]);
+            }
+        }
+        $position = 0;
+        foreach ([...$ordered, ...array_values($byId)] as $row) {
+            $row->{$field->setter}(++$position * 10);
+        }
+        $this->em->flush();
+        $this->audit->record($actor, sprintf('config.%s_reorder', $list->kind), sprintf('%s reordered (%d rows)', $list->plural, $position));
+
+        return count($ordered);
+    }
+
     public function delete(ConfigListDefinition $list, object $row, User $actor): void
     {
         $description = $this->describe($list, $row);

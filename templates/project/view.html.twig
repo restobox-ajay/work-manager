@@ -6,7 +6,7 @@
 {% block body %}
 <div class="page-head">
     <div class="ph-main">
-        <div class="eyebrow"><a href="{{ path('app_client_view', {id: project.client.id}) }}" style="color:inherit">{{ project.client.name }}</a> · Project</div>
+        <div class="eyebrow">{% if project.client %}<a href="{{ path('app_client_view', {id: project.client.id}) }}" style="color:inherit">{{ project.client.name }}</a>{% else %}No client{% endif %} · Project</div>
         <div class="ph-title"><h1>{{ project.name }}</h1> {{ ui.activeBadge(project.active) }}</div>
     </div>
     <div class="ph-actions">
@@ -33,8 +33,9 @@
     <div class="card">
         <h2>Project details</h2>
         <table class="t v-kv">
-            <tr><th>Client</th><td><a href="{{ path('app_client_view', {id: client.id}) }}">{{ client.name }}</a>{% if client.companyName %} <span class="muted">· {{ client.companyName }}</span>{% endif %}{% if client.clientCode %} <span class="badge plain">{{ client.clientCode }}</span>{% endif %}</td></tr>
+            {% if client %}<tr><th>Client</th><td><a href="{{ path('app_client_view', {id: client.id}) }}">{{ client.name }}</a>{% if client.companyName %} <span class="muted">· {{ client.companyName }}</span>{% endif %}{% if client.clientCode %} <span class="badge plain">{{ client.clientCode }}</span>{% endif %}</td></tr>
             <tr><th>Client contact</th><td>{{ client.email ?: '—' }}{% if client.phone %} · {{ client.phone }}{% endif %}</td></tr>
+            {% else %}<tr><th>Client</th><td class="muted">No client</td></tr>{% endif %}
             <tr><th>Status</th><td>{{ ui.activeBadge(project.active) }}{% if project.isDeleted %} <span class="badge danger">Removed from list</span>{% endif %}</td></tr>
             <tr><th>Project ID</th><td>#{{ project.id }}</td></tr>
             <tr><th>Created</th><td>{{ ui.ts(project.createdAt, 'M j, Y H:i') }}{% if project.createdBy %} <span class="muted">by {{ people[project.createdBy] ?? ('user #' ~ project.createdBy) }}</span>{% endif %}</td></tr>
@@ -62,15 +63,27 @@
     <div class="card"><h2>Description</h2><div style="white-space:pre-line">{{ project.description }}</div></div>
 {% endif %}
 
-<div class="card">
-    <h2>Links</h2>
-    <dl class="kv">
-        {% for field, label in constant('App\\Service\\Project\\ProjectService::LINK_FIELDS') %}
-            {% set url = attribute(project, field) %}
-            {# Only an http(s) value becomes a link, so a stored "javascript:" can never be clicked. #}
-            <dt>{{ label }}</dt><dd>{% if url and (url starts with 'http://' or url starts with 'https://') %}<a href="{{ url }}" rel="noopener noreferrer" target="_blank">{{ url }}</a>{% else %}{{ url ?? '—' }}{% endif %}</dd>
-        {% endfor %}
-    </dl>
+<div class="card" id="links">
+    <div class="btn-row" style="justify-content:space-between;margin-bottom:6px">
+        <h2 style="margin:0">Links{% if project.links is not empty %} <span class="badge num">{{ project.links|length }}</span>{% endif %}</h2>
+        {% if canEdit %}<a class="btn warning xs" href="{{ path('app_project_edit', {id: project.id}) }}">Edit links</a>{% endif %}
+    </div>
+    {% if project.links is not empty %}
+        <table class="t project-links-table">
+            <tbody>
+                {% for link in project.links %}
+                    {# ADR-129: the name opens the URL. Only an http(s) value becomes a link, so a stored "javascript:" can never be clicked. #}
+                    <tr>
+                        <td class="nowrap">{% if link.clickable %}<a class="pl-label pl-tone-{{ link.tone }}" href="{{ link.url }}" rel="noopener noreferrer" target="_blank">{{ link.name }}</a>{% else %}<span class="pl-label pl-tone-{{ link.tone }}">{{ link.name }}</span>{% endif %}</td>
+                        <td style="overflow-wrap:anywhere">{% if link.clickable %}<a href="{{ link.url }}" rel="noopener noreferrer" target="_blank">{{ link.url }}</a>{% else %}{{ link.url }}{% endif %}</td>
+                        <td class="muted">{{ link.description ?: '' }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p class="muted" style="margin:0">No links yet.{% if canEdit %} <a href="{{ path('app_project_edit', {id: project.id}) }}">Add some</a>.{% endif %}</p>
+    {% endif %}
 </div>
 
 <div class="table-card" id="tasks">

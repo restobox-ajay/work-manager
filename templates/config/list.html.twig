@@ -5,32 +5,37 @@
 {% block title %}{{ list.plural }}{% endblock %}
 
 {% block body %}
-{% set columns = list.listedFields %}
+{# ADR-127: no ID column; a list ordered by an Order field is reordered by dragging rows instead of showing the number. #}
+{% set sortField = list.sortField %}
+{% set sortable = sortField is not null and rows|length > 1 %}
+{% set columns = sortField is null ? list.listedFields : list.listedFields|filter(f => f.name != sortField.name) %}
+{% import 'layout/_icons.html.twig' as icons %}
 <div class="page-head">
     <div class="ph-main">
         <div class="eyebrow">Config</div>
         <div class="ph-title"><h1>{{ list.plural }}</h1></div>
-        <p class="lead">{{ list.lead }}</p>
+        <p class="lead">{{ list.lead }}{% if sortable %} Drag a row to change the order — it is saved straight away.{% endif %}</p>
     </div>
     <div class="ph-actions"><a class="btn success" href="{{ path('app_config_new', {kind: list.kind}) }}">+ Add {{ list.singular|lower }}</a></div>
 </div>
 
 {{ ui.flashes() }}
+<div class="alert success prio-saved" data-sort-saved role="status" hidden></div>
 
 <div class="table-card">
     <div class="tscroll">
         <table class="t">
             <thead>
                 <tr>
-                    <th style="width:60px">ID</th>
+                    {% if sortField is not null %}<th style="width:36px"></th>{% endif %}
                     {% for field in columns %}<th>{{ field.label }}</th>{% endfor %}
                     <th></th>
                 </tr>
             </thead>
-            <tbody>
+            <tbody {% if sortable %}data-sort-list data-action="{{ path('app_config_sort', {kind: list.kind}) }}" data-token="{{ csrf_token('config_sort_' ~ list.kind) }}"{% endif %}>
                 {% for row in rows %}
-                    <tr>
-                        <td class="muted">{{ row.id }}</td>
+                    <tr data-id="{{ row.id }}" {% if sortable %}class="prio-row" draggable="true" title="Drag to reorder"{% endif %}>
+                        {% if sortField is not null %}<td class="prio-handle" aria-hidden="true">{{ sortable ? icons.icon('bars') }}</td>{% endif %}
                         {% for field in columns %}
                             {% set value = attribute(row, field.getter) %}
                             <td{{ loop.first ? ' class="bold"' }}>
@@ -54,11 +59,60 @@
                         </td>
                     </tr>
                 {% else %}
-                    <tr><td colspan="{{ columns|length + 2 }}" class="empty"><b>Nothing here yet.</b> <a href="{{ path('app_config_new', {kind: list.kind}) }}">Add the first one</a>.</td></tr>
+                    <tr><td colspan="{{ columns|length + (sortField is null ? 1 : 2) }}" class="empty"><b>Nothing here yet.</b> <a href="{{ path('app_config_new', {kind: list.kind}) }}">Add the first one</a>.</td></tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
     <div class="table-foot"><span>{{ rows|length }} {{ rows|length == 1 ? list.singular|lower : list.plural|lower }}</span></div>
 </div>
+{% if sortable %}
+<script>
+    // Drag and drop (ADR-127): drag any row; on drop the new order is posted in the background and confirmed.
+    (function () {
+        var body = document.querySelector('[data-sort-list]');
+        var notice = document.querySelector('[data-sort-saved]');
+        var dragged = null, before = '', hideTimer = null;
+        function ids() { return Array.prototype.map.call(body.querySelectorAll('tr[data-id]'), function (r) { return r.dataset.id; }); }
+        function show(text, ok) {
+            notice.textContent = text;
+            notice.className = 'alert prio-saved ' + (ok ? 'success' : 'danger');
+            notice.hidden = false;
+            clearTimeout(hideTimer);
+            if (ok) { hideTimer = setTimeout(function () { notice.hidden = true; }, 4000); }
+        }
+        function save() {
+            var data = new FormData();
+            data.append('_token', body.dataset.token);
+            ids().forEach(function (id) { data.append('ids[]', id); });
+            fetch(body.dataset.action, { method: 'POST', body: data, credentials: 'same-origin', headers: { 'X-Requested-With': 'fetch' } })
+                .then(function (r) { r.ok ? show('Order saved.', true) : show('Could not save the order — reload the page and try again.', false); })
+                .catch(function () { show('Could not save the order — check your connection.', false); });
+        }
+        body.addEventListener('dragstart', function (e) {
+            var row = e.target.closest && e.target.closest('tr.prio-row');
+            if (!row) { return; }
+            dragged = row; before = ids().join(',');
+            row.classList.add('prio-dragging');
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', row.dataset.id);
+        });
+        body.addEventListener('dragover', function (e) {
+            if (!dragged) { return; }
+            e.preventDefault();
+            var over = e.target.closest('tr[data-id]');
+            if (!over || over === dragged) { return; }
+            var box = over.getBoundingClientRect();
+            body.insertBefore(dragged, e.clientY > box.top + box.height / 2 ? over.nextSibling : over);
+        });
+        body.addEventListener('drop', function (e) { if (dragged) { e.preventDefault(); } });
+        body.addEventListener('dragend', function () {
+            if (!dragged) { return; }
+            dragged.classList.remove('prio-dragging');
+            dragged = null;
+            if (ids().join(',') !== before) { save(); }
+        });
+    })();
+</script>
+{% endif %}
 {% endblock %}

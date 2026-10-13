@@ -39,7 +39,6 @@
                         {% for c in clients %}<option value="{{ c.id }}" {{ (v.clientId ?? '') == c.id ? 'selected' }}>{{ c.name }}</option>{% endfor %}
                         {% if w and w.client and w.client not in clients %}<option value="{{ w.client.id }}" selected>{{ w.client.name }} (archived)</option>{% endif %}
                     </select>
-                    <small class="muted">Needed to turn this into a project later.</small>
                 </div>
                 <div class="field" id="client-name-field"><label for="f-client-name">Or client name</label><input type="text" id="f-client-name" name="clientName" value="{{ v.clientName ?? '' }}" maxlength="150" placeholder="When they are not a client yet"></div>
                 <div class="field"><label for="f-contact">Contact person</label><input type="text" id="f-contact" name="contactName" value="{{ v.contactName ?? '' }}" maxlength="120"></div>

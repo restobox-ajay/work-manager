@@ -45,6 +45,26 @@ final class ConfigListController extends AbstractWorkController
         ]);
     }
 
+    /** Saves a dragged row order (ADR-127): 204 for the page's background request, else back to the list. */
+    #[Route('/sort', name: 'app_config_sort', methods: ['POST'])]
+    public function sort(string $kind, Request $request): Response
+    {
+        $list = $this->registry->get($kind);
+        if ($list->sortField() === null) {
+            throw $this->createNotFoundException(sprintf('%s are not ordered by hand.', $list->plural));
+        }
+        $this->assertCsrf($request, 'config_sort_'.$kind);
+        $ids = array_map('intval', array_filter((array) $request->request->all()['ids'] ?? [], 'is_numeric'));
+        $this->crud->reorder($list, array_values($ids), $this->viewer());
+
+        if ($request->headers->get('X-Requested-With') === 'fetch') {
+            return new Response(null, Response::HTTP_NO_CONTENT);
+        }
+        $this->addFlash('success', 'Order saved.');
+
+        return $this->redirectToRoute('app_config_list', ['kind' => $kind]);
+    }
+
     #[Route('/new', name: 'app_config_new', methods: ['GET', 'POST'])]
     public function new(string $kind, Request $request, UserRepository $users): Response
     {

@@ -41,7 +41,7 @@
                         <td>
                             <select name="rows[{{ i }}][projectId]" aria-label="Project, row {{ loop.index }}" style="min-width:180px">
                                 <option value="">Choose a project</option>
-                                {% for project in projects %}<option value="{{ project.id }}" {{ (row.projectId ?? '') == project.id ? 'selected' }}>{{ project.client.name }} › {{ project.name }}</option>{% endfor %}
+                                {% for project in projects %}<option value="{{ project.id }}" {{ (row.projectId ?? '') == project.id ? 'selected' }}>{{ project.client ? project.client.name ~ ' › ' }}{{ project.name }}</option>{% endfor %}
                             </select>
                         </td>
                         <td><select name="rows[{{ i }}][taskTypeId]" aria-label="Task type, row {{ loop.index }}">{{ f.options(types, row.taskTypeId ?? null, '—') }}</select></td>

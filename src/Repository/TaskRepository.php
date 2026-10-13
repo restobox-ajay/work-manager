@@ -215,7 +215,7 @@ class TaskRepository extends ServiceEntityRepository
         foreach ($this->createQueryBuilder('t')
             ->addSelect('p', 'c', 'a')
             ->join('t.project', 'p')
-            ->join('p.client', 'c')
+            ->leftJoin('p.client', 'c')
             ->join('t.assignee', 'a')
             ->andWhere('a.id IN (:ids)')
             ->andWhere('t.isActive = 1 AND t.isDeleted = 0')
@@ -253,7 +253,7 @@ class TaskRepository extends ServiceEntityRepository
             ->setMaxResults($limit);
 
         if (!$includeArchived) {
-            $qb->andWhere('(p.id IS NULL) OR (c.isDeleted = 0 AND c.isActive = 1 AND p.isDeleted = 0 AND p.status = 1)');
+            $qb->andWhere('(p.id IS NULL) OR ((c.id IS NULL OR (c.isDeleted = 0 AND c.isActive = 1)) AND p.isDeleted = 0 AND p.status = 1)');
         }
 
         return match ($orderBy) {
@@ -300,7 +300,7 @@ class TaskRepository extends ServiceEntityRepository
 
         // includeArchived: the by-date report is a billing report — archiving a project does not cancel what is owed.
         if (!$named && !($criteria['includeArchived'] ?? false)) {
-            $qb->andWhere('(p.id IS NULL) OR (c.isDeleted = 0 AND c.isActive = 1 AND p.isDeleted = 0 AND p.status = 1)');
+            $qb->andWhere('(p.id IS NULL) OR ((c.id IS NULL OR (c.isDeleted = 0 AND c.isActive = 1)) AND p.isDeleted = 0 AND p.status = 1)');
         }
 
         if (($criteria['visibility'] ?? null) !== null) {
@@ -312,8 +312,11 @@ class TaskRepository extends ServiceEntityRepository
                 ->setParameter('term', '%'.addcslashes((string) $criteria['term'], '%_').'%');
         }
 
-        if ($clientId === self::NO_CLIENT_ID || $projectId === self::NO_PROJECT_ID) {
+        if ($projectId === self::NO_PROJECT_ID) {
             $qb->andWhere('t.project IS NULL');
+        } elseif ($clientId === self::NO_CLIENT_ID) {
+            // "(no client)": tasks with no project, and tasks of projects with no client (ADR-128).
+            $qb->andWhere('t.project IS NULL OR p.client IS NULL');
         }
         if ($clientId !== null && $clientId !== self::NO_CLIENT_ID) {
             $qb->andWhere('c.id = :clientId OR t.clientId = :clientId')->setParameter('clientId', $clientId);

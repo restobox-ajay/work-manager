@@ -4248,3 +4248,7 @@ ADR-106 addendum (2026-10-09): View button to the tenant page on the Tenants lis
 ADR-123 (2026-10-09): /rent tenant dropdown (All tenants default), filters KPIs/month/dues; month nav keeps it. Rent tests 17/17; browser-checked.
 ADR-124 (2026-10-09): removed client_admin, project_staff, task_manager (+ code, UI, routes); WorkAccess is admin vs own-tasks. Migration Version20261014090000. Work tests green; browser-checked.
 ADR-125/126 (2026-10-11): Work Orders (milestones, documents, convert to project), Events (yearly, upcoming, dashboard, email reminders via app:events:remind), private attachments. Migration Version20261015090000. 25 new tests green; browser-checked.
+ADR-127 (2026-10-12): Config lists drag-to-reorder (Order/Sort Order lists), no ID column, saved message. Browser-checked all 13 lists; Config tests unchanged.
+ADR-128 (2026-10-12): project client optional (nullable client_id, templates/queries null-safe, (no client) filter includes client-less projects). Browser-checked; no new test failures.
+ADR-129 (2026-10-12): project links as a list (project_link: name, URL, description) replacing local/dev/prod/doc/mockup columns; migration Version20261017090000 carries old values over. Browser-checked; no new test failures.
+ADR-130 (2026-10-12): link URL validation (http(s) + localhost/IP/dotted host; live check in the form) and coloured name labels on the project page. Ken Tam vhost import SQL in var/. 18 link tests green; browser-checked.
