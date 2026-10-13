@@ -963,3 +963,6 @@ a.pl-label:hover,a.pl-label:focus{color:#fff;text-decoration:none;filter:brightn
 .project-links .pl-error{grid-column:1/-1;color:#c92a2a;font-size:12px;margin-top:-2px}
 /* Config add/edit forms: one field per line, lined up (ADR-134) */
 .form-grid.cf-stack{grid-template-columns:1fr}
+/* Column filter row under a grid's labels (ADR-136) */
+table.t tr.col-filters th{background:var(--filter-bg);padding:5px 8px;text-transform:none;letter-spacing:0;font-weight:400}
+table.t tr.col-filters input,table.t tr.col-filters select{font-size:.78rem;padding:4px 7px;min-width:90px}

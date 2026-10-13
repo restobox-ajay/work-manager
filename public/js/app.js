@@ -156,3 +156,14 @@
     }
     if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', init); } else { init(); }
 })();
+
+// Column filter rows (ADR-136): a dropdown applies its filter as soon as it changes; text boxes apply on Enter.
+document.addEventListener('change', function (event) {
+    var field = event.target;
+    if (field.matches && field.matches('select[data-autosubmit]') && field.form) {
+        // e.g. a new client clears the project, which may belong to the old one
+        var dependent = field.dataset.reset && field.form.elements[field.dataset.reset];
+        if (dependent) { dependent.value = ''; }
+        field.form.requestSubmit();
+    }
+});

@@ -35,6 +35,7 @@ final class DashboardController extends AbstractWorkController
         $viewer = $this->viewer();
         $lookupMaps = [
             'statuses'   => $lookups->statuses(),
+            'types'      => $lookups->types(),
             'currencies' => $lookups->currencies(),
             'people'     => $lookups->people(),
         ];
@@ -66,6 +67,8 @@ final class DashboardController extends AbstractWorkController
             'filters'  => $filters,
             'clients'  => $dashboard->liveClients($clients->selectable($viewer)),
             'projects' => $clientId > 0 ? $projects->selectable($viewer, $clientId) : [],
+            // The grid's Project filter (ADR-136): the chosen client's projects, or every project.
+            'projectChoices' => $projects->selectable($viewer, $clientId > 0 ? $clientId : null),
             'noneId'   => TaskRepository::NO_PROJECT_ID,
         ]);
     }

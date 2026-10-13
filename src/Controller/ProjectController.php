@@ -49,6 +49,7 @@ final class ProjectController extends AbstractWorkController
         $status = $request->query->getString('status');
         $filters = [
             'term'     => InputValue::text($request->query->get('q')),
+            'name'     => InputValue::text($request->query->get('name')),
             'clientId' => InputValue::int($request->query->get('clientId')),
             'status'   => match ($status) {
                 'active'   => Project::STATUS_ACTIVE,

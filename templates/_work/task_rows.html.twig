@@ -1,16 +1,51 @@
 {#
     A compact task table for the dashboard widgets (ADR-070).
-    Expects: tasks, rows (TaskListService::rowDetails), statuses, currencies, people; optional showContractor.
+    Expects: tasks, rows (TaskListService::rowDetails), statuses, types, currencies, people; optional showContractor.
+    Optional filterForm (a form id): adds a filter row under the labels (ADR-136) — then also filters, clients,
+    projectChoices and noneId.
 #}
 {% import '_work/macros.html.twig' as ui %}
 <div class="tscroll">
     <table class="t">
         <thead>
             <tr>
-                <th>Client</th><th>Project</th><th>Task</th>
+                <th>Client</th><th>Project</th><th>Task</th><th>Task Type</th>
                 {% if showContractor ?? false %}<th>Contractor</th>{% endif %}
                 <th>Status</th><th>Due</th><th>Created</th><th class="right">Payout</th>
             </tr>
+            {% if filterForm is defined %}
+                <tr class="col-filters">
+                    <th>
+                        <select name="clientId" form="{{ filterForm }}" data-autosubmit data-reset="projectId" aria-label="Filter by client">
+                            <option value="">All</option>
+                            <option value="{{ noneId }}" {{ filters.clientId == noneId ? 'selected' }}>(no client)</option>
+                            {% for client in clients %}<option value="{{ client.id }}" {{ filters.clientId == client.id ? 'selected' }}>{{ client.name }}</option>{% endfor %}
+                        </select>
+                    </th>
+                    <th>
+                        <select name="projectId" form="{{ filterForm }}" data-autosubmit aria-label="Filter by project">
+                            <option value="">All</option>
+                            <option value="{{ noneId }}" {{ filters.projectId == noneId ? 'selected' }}>(no project)</option>
+                            {% for project in projectChoices %}<option value="{{ project.id }}" {{ filters.projectId == project.id ? 'selected' }}>{{ project.name }}</option>{% endfor %}
+                        </select>
+                    </th>
+                    <th><input type="search" name="q" form="{{ filterForm }}" value="{{ filters.q }}" placeholder="Search task name" aria-label="Filter by task name"></th>
+                    <th>
+                        <select name="taskTypeId" form="{{ filterForm }}" data-autosubmit aria-label="Filter by task type">
+                            <option value="">All</option>
+                            {% for id, name in types %}<option value="{{ id }}" {{ filters.taskTypeId == id ? 'selected' }}>{{ name }}</option>{% endfor %}
+                        </select>
+                    </th>
+                    {% if showContractor ?? false %}<th></th>{% endif %}
+                    <th>
+                        <select name="taskStatusId" form="{{ filterForm }}" data-autosubmit aria-label="Filter by status">
+                            <option value="all">All</option>
+                            {% for id, name in statuses %}<option value="{{ id }}" {{ filters.taskStatusId == id ? 'selected' }}>{{ name }}</option>{% endfor %}
+                        </select>
+                    </th>
+                    <th></th><th></th><th></th>
+                </tr>
+            {% endif %}
         </thead>
         <tbody>
             {% for task in tasks %}
@@ -21,6 +56,7 @@
                     <td><a class="bold" href="{{ path('app_task_view', {id: task.id}) }}">{{ ui.short(task.name, 70) }}</a>
                         {{ ui.taskDescription(task) }}
                     </td>
+                    <td>{{ types[task.taskTypeId] ?? '—' }}</td>
                     {% if showContractor ?? false %}<td>{{ task.assignee ? (task.assignee.name ?: task.assignee.email) : '—' }}</td>{% endif %}
                     <td>{{ ui.statusBadge(task.taskStatusId, statuses) }}</td>
                     <td class="nowrap">{{ ui.ts(task.dueDate) }}</td>
@@ -28,7 +64,7 @@
                     <td class="right nowrap">{{ row.canSeeFee ? (task.totalAmount ?? '0.00') ~ ' ' ~ (currencies[task.currencyId] ?? '') : '—' }}</td>
                 </tr>
             {% else %}
-                <tr><td colspan="{{ (showContractor ?? false) ? 8 : 7 }}" class="empty">{{ empty ?? 'Nothing here.' }}</td></tr>
+                <tr><td colspan="{{ (showContractor ?? false) ? 9 : 8 }}" class="empty">{{ empty ?? 'Nothing here.' }}</td></tr>
             {% endfor %}
         </tbody>
     </table>

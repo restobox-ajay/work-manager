@@ -4257,3 +4257,4 @@ ADR-132 (2026-10-13): task status form — Name first, Name/Order/Active on one 
 ADR-133 (2026-10-13): task status form — Order removed (set only by dragging; new status goes last), Name/Active stacked one per line. ConfigFormLayoutTest 4/4; not browser-checked.
 ADR-134 (2026-10-13): all Config forms stacked one field per line; order/sort-order fields removed from every form (drag only, new rows last). ConfigFormLayoutTest 4/4; not browser-checked.
 ADR-135 (2026-10-13): one-off migration Version20261018090000 — existing project names: dashes → spaces, ucwords. Dev+test DB migrated (0 dashed names left). Unit test 10/10.
+ADR-136 (2026-10-13): column filter rows — Projects (client/name/status), Clients (name/status), top filter bars removed; dashboard task grid filters (client/project/task name/type/status) + Task Type column. GridColumnFiltersTest 3/3; related suites green; not browser-checked.

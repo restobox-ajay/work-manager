@@ -4,7 +4,7 @@
 {% block title %}Clients{% endblock %}
 
 {% block body %}
-{% set params = {q: q, status: status, sort: sort} %}
+{% set params = {name: name, status: status, sort: sort} %}
 <div class="page-head">
     <div class="ph-main">
         <div class="eyebrow">Work</div>
@@ -19,16 +19,10 @@
 {{ ui.flashes() }}
 
 <div class="table-card">
-    <form class="table-header mx-form" method="get" action="{{ path('app_client_index') }}">
-        <input type="search" name="q" value="{{ q }}" placeholder="Name, company, email or code" aria-label="Search clients">
-        <select name="status" aria-label="Status" style="width:auto">
-            <option value="">All statuses</option>
-            <option value="active" {{ status == 'active' ? 'selected' }}>Active</option>
-            <option value="archived" {{ status == 'archived' ? 'selected' }}>Archive</option>
-        </select>
-        <button class="btn primary sm" type="submit">Filter</button>
-        {% if q or status %}<a class="btn secondary sm" href="{{ path('app_client_index') }}">Reset</a>{% endif %}
-        <span class="grow"></span>
+    {# The filter row under the column labels (ADR-136) belongs to this form; Enter in the name box submits it. #}
+    <form id="client-filters" method="get" action="{{ path('app_client_index') }}">
+        {% if sort %}<input type="hidden" name="sort" value="{{ sort }}">{% endif %}
+        <button type="submit" hidden>Filter</button>
     </form>
     <div class="tscroll">
         <table class="t">
@@ -41,6 +35,21 @@
                     {{ ui.sortHeader('isActive', 'Status', sort, 'app_client_index', params) }}
                     {{ ui.sortHeader('createdAt', 'Created', sort, 'app_client_index', params) }}
                     <th></th>
+                </tr>
+                <tr class="col-filters">
+                    <th><input type="search" name="name" form="client-filters" value="{{ name }}" placeholder="Search name" aria-label="Filter by client name"></th>
+                    <th></th>
+                    <th></th>
+                    <th></th>
+                    <th>
+                        <select name="status" form="client-filters" data-autosubmit aria-label="Filter by status">
+                            <option value="">All</option>
+                            <option value="active" {{ status == 'active' ? 'selected' }}>Active</option>
+                            <option value="archived" {{ status == 'archived' ? 'selected' }}>Archive</option>
+                        </select>
+                    </th>
+                    <th></th>
+                    <th>{% if name or status %}<a class="btn secondary xs" href="{{ path('app_client_index', {sort: sort ?: null}) }}">Reset</a>{% endif %}</th>
                 </tr>
             </thead>
             <tbody>
@@ -63,7 +72,7 @@
                         </td>
                     </tr>
                 {% else %}
-                    <tr><td colspan="7" class="empty"><b>No clients found.</b>{% if q or status %} Try clearing the filters.{% endif %}</td></tr>
+                    <tr><td colspan="7" class="empty"><b>No clients found.</b>{% if name or status %} Try clearing the filters.{% endif %}</td></tr>
                 {% endfor %}
             </tbody>
         </table>

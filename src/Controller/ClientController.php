@@ -40,6 +40,7 @@ final class ClientController extends AbstractWorkController
         $status = $request->query->getString('status');
         $filters = [
             'term'     => InputValue::text($request->query->get('q')),
+            'name'     => InputValue::text($request->query->get('name')),
             'isActive' => match ($status) {
                 'active'   => Client::STATUS_ACTIVE,
                 'archived' => Client::STATUS_ARCHIVE,
@@ -53,6 +54,7 @@ final class ClientController extends AbstractWorkController
             'page'    => $page,
             'details' => $this->clients->listDetails($page->items),
             'q'       => $filters['term'],
+            'name'    => $filters['name'],
             'status'  => $status,
             'sort'    => $sort,
         ]);

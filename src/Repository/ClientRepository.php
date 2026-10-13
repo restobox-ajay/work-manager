@@ -32,7 +32,7 @@ class ClientRepository extends ServiceEntityRepository
     }
 
     /**
-     * @param array{term?: ?string, isActive?: ?int} $filters
+     * @param array{term?: ?string, name?: ?string, isActive?: ?int} $filters
      * @param int[]|null                             $visibleIds null = every client
      *
      * @return Client[]
@@ -51,7 +51,7 @@ class ClientRepository extends ServiceEntityRepository
     }
 
     /**
-     * @param array{term?: ?string, isActive?: ?int} $filters
+     * @param array{term?: ?string, name?: ?string, isActive?: ?int} $filters
      * @param int[]|null                             $visibleIds
      */
     public function countSearch(array $filters, ?array $visibleIds): int
@@ -121,7 +121,7 @@ class ClientRepository extends ServiceEntityRepository
     }
 
     /**
-     * @param array{term?: ?string, isActive?: ?int} $filters
+     * @param array{term?: ?string, name?: ?string, isActive?: ?int} $filters
      * @param int[]|null                             $visibleIds
      */
     private function searchQuery(array $filters, ?array $visibleIds, ?string $sort): QueryBuilder
@@ -134,6 +134,9 @@ class ClientRepository extends ServiceEntityRepository
         if (($filters['term'] ?? null) !== null) {
             $qb->andWhere('c.name LIKE :term OR c.companyName LIKE :term OR c.email LIKE :term OR c.clientCode LIKE :term')
                 ->setParameter('term', '%'.addcslashes($filters['term'], '%_').'%');
+        }
+        if (($filters['name'] ?? null) !== null) {
+            $qb->andWhere('c.name LIKE :name')->setParameter('name', '%'.addcslashes($filters['name'], '%_').'%');
         }
         if (($filters['isActive'] ?? null) !== null) {
             $qb->andWhere('c.isActive = :active')->setParameter('active', $filters['isActive']);

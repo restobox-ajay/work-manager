@@ -45,7 +45,7 @@ final class ProjectService
     }
 
     /**
-     * @param array{term?: ?string, clientId?: ?int, status?: ?int} $filters
+     * @param array{term?: ?string, name?: ?string, clientId?: ?int, status?: ?int} $filters
      *
      * @return Paginated<Project>
      */

@@ -54,7 +54,7 @@ final class ClientService
     }
 
     /**
-     * @param array{term?: ?string, isActive?: ?int} $filters
+     * @param array{term?: ?string, name?: ?string, isActive?: ?int} $filters
      *
      * @return Paginated<Client>
      */

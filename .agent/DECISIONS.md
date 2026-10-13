@@ -3070,3 +3070,22 @@ projects keep the name exactly as typed — no rule on save. down() is irreversi
 local copy of the pre-migration names is in var/project-names-before-ADR-135.txt (not committed).
 
 **Verified.** ProjectNameTidyMigrationTest (10 cases); migrated the dev and test databases: 65 projects, 0 with a dash.
+
+## ADR-136: Column filter rows on Projects, Clients and the dashboard task grid (owner request, 2026-10-13)
+
+**Decision.** Filters sit in a row under the column labels (`tr.col-filters`), bound to a bare GET form by the
+`form` attribute; a dropdown applies on change (`select[data-autosubmit]` in app.js), a text box on Enter, and the
+current sort is kept.
+- **Projects:** Client (dropdown), Project name (new `name` filter, project name only) and Status; Reset in the last
+  column. The filter bar above the grid is gone (owner: "remove filter at top"), including the "Project or client"
+  search — `?q=` still works in a URL but has no box.
+- **Clients:** Name (new `name` filter, client name only) and Status; the filter bar above the grid (the
+  name/company/email/code search) is gone the same way.
+- **Dashboard (manager view):** the task grid's row filters by Client, Project (the chosen client's projects, else
+  all; picking a client clears the project — `data-reset`), Task name (`q`), Task type and Status ("All" = `all`,
+  kept in step with the status pills). Pills and "View more" carry the name and type filters too.
+- **Task Type column** added to the shared compact task grid (`_work/task_rows.html.twig`), so the dashboard and
+  the My work widgets both show it. The full task list already had the column and a type filter.
+
+**Verified.** GridColumnFiltersTest (3 tests); Work/Project/Task/Note functional tests and every other test that
+opens /dashboard, /client or /project — all green. Not browser-checked (extension not connected).

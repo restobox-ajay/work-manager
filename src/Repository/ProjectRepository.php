@@ -30,7 +30,7 @@ class ProjectRepository extends ServiceEntityRepository
     }
 
     /**
-     * @param array{term?: ?string, clientId?: ?int, status?: ?int} $filters
+     * @param array{term?: ?string, name?: ?string, clientId?: ?int, status?: ?int} $filters
      * @param int[]|null                                            $visibleIds null = every project
      *
      * @return Project[]
@@ -49,7 +49,7 @@ class ProjectRepository extends ServiceEntityRepository
     }
 
     /**
-     * @param array{term?: ?string, clientId?: ?int, status?: ?int} $filters
+     * @param array{term?: ?string, name?: ?string, clientId?: ?int, status?: ?int} $filters
      * @param int[]|null                                            $visibleIds
      */
     public function countSearch(array $filters, ?array $visibleIds): int
@@ -141,7 +141,7 @@ class ProjectRepository extends ServiceEntityRepository
     }
 
     /**
-     * @param array{term?: ?string, clientId?: ?int, status?: ?int} $filters
+     * @param array{term?: ?string, name?: ?string, clientId?: ?int, status?: ?int} $filters
      * @param int[]|null                                            $visibleIds
      */
     private function searchQuery(array $filters, ?array $visibleIds, ?string $sort): QueryBuilder
@@ -163,6 +163,9 @@ class ProjectRepository extends ServiceEntityRepository
         if (($filters['term'] ?? null) !== null) {
             $qb->andWhere('p.name LIKE :term OR c.name LIKE :term')
                 ->setParameter('term', '%'.addcslashes($filters['term'], '%_').'%');
+        }
+        if (($filters['name'] ?? null) !== null) {
+            $qb->andWhere('p.name LIKE :name')->setParameter('name', '%'.addcslashes($filters['name'], '%_').'%');
         }
 
         [$column, $direction] = SortParam::resolve($sort, self::SORTABLE_COLUMNS, 'name');
