@@ -11,8 +11,8 @@ use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 
 /**
- * ADR-132: the task status form shows Name, Order and Active side by side on one row, Name first; other Config
- * forms keep their two-column layout.
+ * ADR-132/133: the task status form stacks Name and Active one per line; Order is not on the form (it is set by
+ * dragging the list), and a new status goes to the end of the list. Other Config forms keep their two columns.
  */
 final class ConfigFormLayoutTest extends WebTestCase
 {
@@ -40,34 +40,52 @@ final class ConfigFormLayoutTest extends WebTestCase
         parent::tearDown();
     }
 
-    public function testTheTaskStatusFormIsOneRowWithNameFirst(): void
+    public function testTheTaskStatusFormStacksNameAndActiveWithoutOrder(): void
     {
         $crawler = $this->client->request('GET', '/config/task-statuses/new');
         self::assertResponseIsSuccessful();
 
-        $grid = $crawler->filter('form.mx-form .form-grid.cf-row');
-        self::assertCount(1, $grid, 'The fields sit in one row.');
-        self::assertSame(['name', 'order', 'isActive'], $grid->filter('input')->each(static fn ($input) => $input->attr('name')));
-        self::assertCount(0, $grid->filter('.span-2'), 'No field spans the whole row.');
+        $grid = $crawler->filter('form.mx-form .form-grid.cf-stack');
+        self::assertCount(1, $grid, 'The fields are stacked one per line.');
+        self::assertSame(['name', 'isActive'], $grid->filter('input')->each(static fn ($input) => $input->attr('name')));
         self::assertNotNull($crawler->filter('#cf-name')->attr('autofocus'), 'Name, now first, takes the focus.');
     }
 
-    public function testTheTaskStatusFormStillSaves(): void
+    public function testANewStatusGoesToTheEndOfTheList(): void
     {
+        $lastOrder = (int) $this->em->getConnection()->fetchOne('SELECT MAX("order") FROM task_status');
+
         $this->client->request('GET', '/config/task-statuses/new');
-        $this->client->submitForm('Add', ['name' => self::STATUS_NAME, 'order' => '95']);
+        $this->client->submitForm('Add', ['name' => self::STATUS_NAME]);
 
         self::assertResponseRedirects('/config/task-statuses');
         $status = $this->em->getRepository(TaskStatus::class)->findOneBy(['name' => self::STATUS_NAME]);
         self::assertNotNull($status);
-        self::assertSame(95, $status->getOrder());
+        self::assertSame($lastOrder + 10, $status->getOrder());
+    }
+
+    public function testSavingAnExistingStatusKeepsItsOrder(): void
+    {
+        $status = (new TaskStatus())->setName(self::STATUS_NAME)->setOrder(35)->setIsActive(true);
+        $this->em->persist($status);
+        $this->em->flush();
+        $id = $status->getId();
+        $this->em->clear();
+
+        $form = $this->client->request('GET', "/config/task-statuses/$id/edit")->selectButton('Save')->form();
+        // A hand-crafted post: the form itself has no Order field.
+        $this->client->request('POST', $form->getUri(), $form->getValues() + ['order' => '1']);
+        self::assertResponseRedirects('/config/task-statuses');
+
+        $this->em->clear();
+        self::assertSame(35, $this->em->getRepository(TaskStatus::class)->find($id)->getOrder(), 'A posted order is ignored.');
     }
 
     public function testOtherConfigFormsKeepTheTwoColumnLayout(): void
     {
         $crawler = $this->client->request('GET', '/config/task-types/new');
         self::assertResponseIsSuccessful();
-        self::assertCount(0, $crawler->filter('.form-grid.cf-row'));
+        self::assertCount(0, $crawler->filter('.form-grid.cf-stack'));
         self::assertCount(1, $crawler->filter('form.mx-form .form-grid'));
     }
 

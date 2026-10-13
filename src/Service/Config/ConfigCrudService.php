@@ -16,6 +16,9 @@ use Doctrine\ORM\EntityManagerInterface;
  */
 final class ConfigCrudService
 {
+    /** Gap between dragged positions (10, 20, 30…), leaving room to slot a row in by hand. */
+    private const POSITION_STEP = 10;
+
     public function __construct(
         private readonly EntityManagerInterface $em,
         private readonly WriteValidator $validator,
@@ -69,7 +72,12 @@ final class ConfigCrudService
 
         $isNew = $row === null;
         $row ??= new ($list->entityClass)();
-        foreach ($list->fields as $field) {
+        $sortField = $list->sortField();
+        if ($isNew && $sortField !== null && !$sortField->editable) {
+            // Its order is set only by dragging, so a new row starts at the end of the list.
+            $row->{$sortField->setter}($this->nextPosition($list, $sortField));
+        }
+        foreach ($list->editableFields() as $field) {
             $value = $values[$field->name];
             $row->{$field->setter}($field->fromForm !== null ? ($field->fromForm)($value) : $value);
         }
@@ -118,12 +126,22 @@ final class ConfigCrudService
         }
         $position = 0;
         foreach ([...$ordered, ...array_values($byId)] as $row) {
-            $row->{$field->setter}(++$position * 10);
+            $row->{$field->setter}(++$position * self::POSITION_STEP);
         }
         $this->em->flush();
         $this->audit->record($actor, sprintf('config.%s_reorder', $list->kind), sprintf('%s reordered (%d rows)', $list->plural, $position));
 
         return count($ordered);
+    }
+
+    private function nextPosition(ConfigListDefinition $list, ConfigField $sortField): int
+    {
+        $last = 0;
+        foreach ($this->rows($list) as $row) {
+            $last = max($last, (int) $row->{$sortField->getter}());
+        }
+
+        return $last + self::POSITION_STEP;
     }
 
     public function delete(ConfigListDefinition $list, object $row, User $actor): void
@@ -146,7 +164,7 @@ final class ConfigCrudService
     private function normalize(ConfigListDefinition $list, array $posted): array
     {
         $values = [];
-        foreach ($list->fields as $field) {
+        foreach ($list->editableFields() as $field) {
             $raw = $posted[$field->name] ?? null;
             $values[$field->name] = match ($field->type) {
                 ConfigField::CHECKBOX => InputValue::flag($raw),
@@ -175,7 +193,7 @@ final class ConfigCrudService
         $errors = [];
         $repository = $this->em->getRepository($list->entityClass);
 
-        foreach ($list->fields as $field) {
+        foreach ($list->editableFields() as $field) {
             $value = $values[$field->name];
             if ($field->required && ($value === null || $value === '')) {
                 $errors[] = sprintf('%s is required.', $field->label);

@@ -3040,3 +3040,13 @@ row with their bottoms lined up (Name widest; the row wraps on narrow screens). 
 first in the field list, so it takes the autofocus; the list page is unchanged (Order is hidden there, ADR-127).
 
 **Verified.** ConfigFormLayoutTest (3 tests). Not browser-checked (extension not connected).
+
+## ADR-133: Task status form — no Order field, fields stacked (owner request, 2026-10-13; supersedes ADR-132's layout)
+
+**Decision.** The task status form shows Name then Active, one per line in a single narrow column
+(`ConfigListDefinition::$oneColumn`, CSS `.form-grid.cf-stack`), replacing ADR-132's side-by-side row. Order is
+off the form: `ConfigField::$editable = false` keeps it as the list's drag sort key (ADR-127) but the form neither
+shows nor writes it, so a posted `order` is ignored. A new status is placed at the end (highest order + 10,
+`ConfigCrudService::nextPosition()`); its place is then changed by dragging the list.
+
+**Verified.** ConfigFormLayoutTest (4 tests). Not browser-checked (extension not connected).

@@ -54,11 +54,11 @@ final class ConfigListRegistry
         $lists = [
             new ConfigListDefinition('task-statuses', TaskStatus::class, 'Task Statuses', 'Task status', [
                 new F('name', 'Name', 'getName', 'setName', required: true, maxLength: 50),
-                new F('order', 'Order', 'getOrder', 'setOrder', F::INTEGER),
+                new F('order', 'Order', 'getOrder', 'setOrder', F::INTEGER, editable: false),
                 $active('isActive', 'setIsActive'),
             ], ['order' => 'ASC', 'id' => 'ASC'], false,
                 'Task forms offer the active ones, in this order. Paid is set by the payment flow, not by hand.',
-                defaults: ['isActive' => true], singleRow: true),
+                defaults: ['isActive' => true], oneColumn: true),
 
             new ConfigListDefinition('task-types', TaskType::class, 'Task Types', 'Task type', [
                 new F('name', 'Name', 'getName', 'setName', required: true, maxLength: 60),

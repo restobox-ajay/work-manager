@@ -39,6 +39,8 @@ final class ConfigField
         public readonly ?\Closure $toForm = null,
         /** Converts the form value to what the setter takes (e.g. a string to an enum); identity when null. */
         public readonly ?\Closure $fromForm = null,
+        /** False: not on the form and never written from it (e.g. an order set only by dragging, ADR-133). */
+        public readonly bool $editable = true,
     ) {
     }
 }
