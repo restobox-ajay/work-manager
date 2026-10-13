@@ -3060,3 +3060,13 @@ form and never written from a post (`editableFields()`); ADR-133's per-field `ed
 rule. A new row goes to the end of its list (highest order + 10); its place is changed by dragging (ADR-127).
 
 **Verified.** ConfigFormLayoutTest (4 tests, every list's /new page). Not browser-checked (extension not connected).
+
+## ADR-135: Existing project names tidied (owner request, 2026-10-13)
+
+**Decision.** A one-off data migration (Version20261018090000) rewrites existing project names only: hyphens and
+Unicode dashes become a single space, then each word's first letter is capitalised the way PHP's ucwords() does it
+(the rest of the word is untouched, so "GHL" stays; dots stay, "safewaytire.ca" → "Safewaytire.ca"). New and edited
+projects keep the name exactly as typed — no rule on save. down() is irreversible (the old names are not stored); a
+local copy of the pre-migration names is in var/project-names-before-ADR-135.txt (not committed).
+
+**Verified.** ProjectNameTidyMigrationTest (10 cases); migrated the dev and test databases: 65 projects, 0 with a dash.
