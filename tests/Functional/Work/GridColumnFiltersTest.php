@@ -124,6 +124,16 @@ final class GridColumnFiltersTest extends WebTestCase
         self::assertStringNotContainsString('Logo task', $text);
     }
 
+    public function testProjectClientAndDashboardGridsHaveNoFilterButton(): void
+    {
+        foreach (['/project' => 'project-filters', '/client' => 'client-filters', '/dashboard' => 'dashboard-filters'] as $url => $formId) {
+            $crawler = $this->client->request('GET', $url);
+            self::assertResponseIsSuccessful();
+            self::assertCount(1, $crawler->filter("form#$formId"), $url);
+            self::assertCount(0, $crawler->filter("form#$formId button, button[form=\"$formId\"]"), "$url: no Filter button.");
+        }
+    }
+
     public function testTaskListFiltersApplyWithoutAFilterButton(): void
     {
         $crawler = $this->client->request('GET', '/task');

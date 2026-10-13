@@ -4259,3 +4259,4 @@ ADR-134 (2026-10-13): all Config forms stacked one field per line; order/sort-or
 ADR-135 (2026-10-13): one-off migration Version20261018090000 — existing project names: dashes → spaces, ucwords. Dev+test DB migrated (0 dashed names left). Unit test 10/10.
 ADR-136 (2026-10-13): column filter rows — Projects (client/name/status), Clients (name/status), top filter bars removed; dashboard task grid filters (client/project/task name/type/status) + Task Type column. GridColumnFiltersTest 3/3; related suites green; not browser-checked.
 ADR-137 (2026-10-13): task list Filter button removed; dropdowns auto-apply, search on Enter. Tests green.
+ADR-138 (2026-10-13): removed the (CSS-visible) hidden Filter buttons from Projects/Clients/dashboard filter forms. GridColumnFiltersTest 5/5.

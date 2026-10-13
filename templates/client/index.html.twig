@@ -19,10 +19,9 @@
 {{ ui.flashes() }}
 
 <div class="table-card">
-    {# The filter row under the column labels (ADR-136) belongs to this form; Enter in the name box submits it. #}
+    {# The filter row under the column labels (ADR-136) belongs to this form; Enter in the name box submits it (the browser's implicit submission: one text box, no button). #}
     <form id="client-filters" method="get" action="{{ path('app_client_index') }}">
         {% if sort %}<input type="hidden" name="sort" value="{{ sort }}">{% endif %}
-        <button type="submit" hidden>Filter</button>
     </form>
     <div class="tscroll">
         <table class="t">

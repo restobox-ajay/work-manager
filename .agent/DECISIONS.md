@@ -3097,3 +3097,12 @@ opens /dashboard, /client or /project — all green. Not browser-checked (extens
 (invoices, notes, events, work orders, admin logs) are unchanged.
 
 **Verified.** GridColumnFiltersTest (4 tests); Task functional tests green.
+
+## ADR-138: No Filter button on the Projects, Clients and dashboard grids (owner request, 2026-10-13)
+
+**Decision.** ADR-136's column-filter forms carried a `<button type="submit" hidden>`, but app-bridge.css's
+`.page-body button:not(.btn){display:inline-flex}` overrides `[hidden]`, so a blue "Filter" button showed. The
+buttons are removed: dropdowns apply on change, and each form has exactly one text box, so Enter still submits it
+(implicit submission). Lesson: in this app, `hidden` on a plain `<button>` does not hide it.
+
+**Verified.** GridColumnFiltersTest (5 tests; asserts no button on the three forms).
