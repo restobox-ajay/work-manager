@@ -59,27 +59,26 @@
 <div class="table-card" style="min-width:0">
     <form class="table-header mx-form" method="get" action="{{ path(listRoute) }}" style="flex-wrap:wrap">
         <input type="search" name="q" value="{{ filters.q }}" placeholder="Task, project or client" aria-label="Search tasks">
-        <select name="clientId" aria-label="Client" style="width:auto;max-width:180px">
+        <select name="clientId" aria-label="Client" style="width:auto;max-width:180px" data-autosubmit data-reset="projectId">
             <option value="">All clients</option>
             <option value="{{ noneId }}" {{ filters.clientId == noneId ? 'selected' }}>(no client)</option>
             {% for client in clients %}<option value="{{ client.id }}" {{ filters.clientId == client.id ? 'selected' }}>{{ client.name }}</option>{% endfor %}
         </select>
-        <select name="projectId" aria-label="Project" style="width:auto;max-width:200px">
+        <select name="projectId" aria-label="Project" style="width:auto;max-width:200px" data-autosubmit>
             <option value="">All projects</option>
             <option value="{{ noneId }}" {{ filters.projectId == noneId ? 'selected' }}>(no project)</option>
             {% for project in projects %}<option value="{{ project.id }}" {{ filters.projectId == project.id ? 'selected' }}>{{ project.client ? project.client.name ~ ' › ' }}{{ project.name }}</option>{% endfor %}
         </select>
         {# No contractor filter (ADR-100); a contractor picked in the side list or a dashboard link survives filtering. #}
         {% if filters.assigneeId is not null %}<input type="hidden" name="assigneeId" value="{{ filters.assigneeId }}">{% endif %}
-        <select name="taskStatusId" aria-label="Status" style="width:auto">
+        <select name="taskStatusId" aria-label="Status" style="width:auto" data-autosubmit>
             <option value="">All statuses</option>
             {% for id, name in statuses %}<option value="{{ id }}" {{ filters.taskStatusId == id ? 'selected' }}>{{ name }}</option>{% endfor %}
         </select>
-        <select name="taskTypeId" aria-label="Task type" style="width:auto">
+        <select name="taskTypeId" aria-label="Task type" style="width:auto" data-autosubmit>
             <option value="">All types</option>
             {% for id, name in types %}<option value="{{ id }}" {{ filters.taskTypeId == id ? 'selected' }}>{{ name }}</option>{% endfor %}
         </select>
-        <button class="btn primary sm" type="submit">Filter</button>
         {% if params|length > 1 %}<a class="btn secondary sm" href="{{ path(listRoute) }}">Reset</a>{% endif %}
     </form>
     <div class="tscroll">

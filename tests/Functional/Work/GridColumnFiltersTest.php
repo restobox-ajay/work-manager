@@ -18,7 +18,7 @@ use Symfony\Component\DomCrawler\Crawler;
 /**
  * ADR-136: filters in a row under the column labels — Projects and Clients (name, status; Projects also client;
  * no filter bar above the grid), and the dashboard's task grid (client, project, task name, task type, status) with
- * its new Task Type column.
+ * its new Task Type column. The task list's filters apply without a Filter button (ADR-137).
  */
 final class GridColumnFiltersTest extends WebTestCase
 {
@@ -122,6 +122,17 @@ final class GridColumnFiltersTest extends WebTestCase
         $text = $this->client->request('GET', '/dashboard?clientId='.$this->clientId.'&q=Copy&taskStatusId=all')->filter('table.t tbody')->text();
         self::assertStringContainsString('Copy task', $text);
         self::assertStringNotContainsString('Logo task', $text);
+    }
+
+    public function testTaskListFiltersApplyWithoutAFilterButton(): void
+    {
+        $crawler = $this->client->request('GET', '/task');
+        self::assertResponseIsSuccessful();
+        $form = $crawler->filter('form.table-header');
+        self::assertCount(0, $form->filter('button'), 'No Filter button.');
+        foreach (['clientId', 'projectId', 'taskStatusId', 'taskTypeId'] as $name) {
+            self::assertCount(1, $form->filter(sprintf('select[name="%s"][data-autosubmit]', $name)), $name);
+        }
     }
 
     /** @return list<string> the grid rows' text in the given (1-based) column, this test's rows only */

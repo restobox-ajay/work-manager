@@ -3089,3 +3089,11 @@ current sort is kept.
 
 **Verified.** GridColumnFiltersTest (3 tests); Work/Project/Task/Note functional tests and every other test that
 opens /dashboard, /client or /project — all green. Not browser-checked (extension not connected).
+
+## ADR-137: Task list filters apply without a Filter button (owner request, 2026-10-13)
+
+**Decision.** The Filter button on the task list (/task, /task/contractor) is gone: its dropdowns apply on change
+(`data-autosubmit`; a new client clears the project) and the search box on Enter. Other pages' Filter buttons
+(invoices, notes, events, work orders, admin logs) are unchanged.
+
+**Verified.** GridColumnFiltersTest (4 tests); Task functional tests green.
