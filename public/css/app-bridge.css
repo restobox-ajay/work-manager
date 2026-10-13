@@ -961,3 +961,8 @@ a.pl-label:hover,a.pl-label:focus{color:#fff;text-decoration:none;filter:brightn
 .pl-tone-4{background:#0b7285}.pl-tone-5{background:#6f42c1}.pl-tone-6{background:#343a40}.pl-tone-7{background:#c92a2a}
 .project-links .pl-row input.pl-invalid{border-color:#dc3545;box-shadow:0 0 0 2px rgba(220,53,69,.15)}
 .project-links .pl-error{grid-column:1/-1;color:#c92a2a;font-size:12px;margin-top:-2px}
+/* Config form with few short fields (ConfigListDefinition::$singleRow): one row, name widest, bottoms aligned */
+.form-grid.cf-row{display:flex;align-items:flex-end;flex-wrap:wrap}
+.form-grid.cf-row>*{flex:1 1 140px;min-width:0}
+.form-grid.cf-row>:first-child{flex:2 1 220px}
+.form-grid.cf-row .mx-check{font-size:.84rem;padding:6px 9px;white-space:nowrap}

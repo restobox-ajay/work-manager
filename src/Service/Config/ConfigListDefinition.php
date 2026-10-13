@@ -30,6 +30,8 @@ final class ConfigListDefinition
         public readonly array $defaults = [],
         /** Adjusts the normalized values before they are checked and written: fn (array $values): array */
         public readonly ?\Closure $prepare = null,
+        /** Few short fields: the form shows them side by side on one row instead of two columns */
+        public readonly bool $singleRow = false,
     ) {
     }
 

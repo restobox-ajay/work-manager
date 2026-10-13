@@ -3031,3 +3031,12 @@ a null project for anyone allowed to add tasks (`WorkAccess::canAddTaskTo`, admi
 `client_id` were already nullable; the task page shows "No project" and every list shows "—".
 
 **Verified.** TaskWithoutProjectTest (form + Quick Add, 2 tests); Task functional tests 11/11.
+
+## ADR-132: Task status form on one row, Name first (owner request, 2026-10-13)
+
+**Decision.** On /config/task-statuses/new and edit, Name comes first, then Order and Active, side by side on one
+row with their bottoms lined up (Name widest; the row wraps on narrow screens). Opt-in per list via
+`ConfigListDefinition::$singleRow` (CSS `.form-grid.cf-row`); other Config forms keep two columns. Name is also now
+first in the field list, so it takes the autofocus; the list page is unchanged (Order is hidden there, ADR-127).
+
+**Verified.** ConfigFormLayoutTest (3 tests). Not browser-checked (extension not connected).
