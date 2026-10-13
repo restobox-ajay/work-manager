@@ -152,6 +152,17 @@ final class WorkAccess implements ResetInterface
             || $this->isReviewer($user, $task);
     }
 
+    /**
+     * Split a task into several (work-platform's task split, ADR-139): it edits the task and files new ones in its
+     * project, so it needs both rights — and never on a paid task, which is payment history.
+     */
+    public function canSplitTask(User $user, Task $task): bool
+    {
+        return $task->getTaskStatusId() !== TaskStatus::PAID_ID
+            && $this->canCreateTask($user)
+            && $this->canUpdateTask($user, $task);
+    }
+
     /** See the payout and currency: admins, and the assignee for their own task. */
     public function canAccessFee(User $user, Task $task): bool
     {

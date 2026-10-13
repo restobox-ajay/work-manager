@@ -50,18 +50,7 @@ final class TaskService
 
         $task = new Task();
         $this->populate($task, $input, $project, $this->access->canSetFees($actor, $project));
-        // No assignee chosen (the task form no longer asks, ADR-100): the task is its creator's (ADR-114).
-        if ($task->getAssignee() === null) {
-            $task->setAssignee($actor);
-        }
-
-        $now = time();
-        $task->setCreatedAt($now)->setCreatedBy($actor->getId())->setUpdatedAt($now)->setUpdatedBy($actor->getId());
-        $task->setCreationDate($task->getCreationDate() ?? new \DateTimeImmutable('today'));
-        // Every task is regular work as soon as it is filed: there is no authorization queue (ADR-084).
-        $task->setAuthorized(Task::AUTHORIZED_NO);
-
-        $this->em->persist($task);
+        $this->persistNew($task, $actor);
         $this->em->flush();
 
         $this->audit->record($actor, 'task.create', $this->describe($task));
@@ -77,21 +66,63 @@ final class TaskService
             return WriteResult::failed($errors);
         }
 
-        $previousStatusId = $task->getTaskStatusId();
-        // Fee fields are written only by someone who may set fees on the task's project — never its assignee
-        // alone, who could otherwise set their own payout.
-        $this->populate($task, $input, $project, $this->access->canSetFees($actor, $project));
-        $task->setUpdatedAt(time())->setUpdatedBy($actor->getId());
-
-        if ($task->getTaskStatusId() === TaskStatus::APPROVED_ID && $previousStatusId !== TaskStatus::APPROVED_ID) {
-            $task->setApprovedDate(time())->setApprovedBy($actor->getId());
-        }
-
+        $this->applyUpdate($task, $input, $project, $actor);
         $this->em->flush();
 
         $this->audit->record($actor, 'task.update', $this->describe($task));
 
         return WriteResult::saved($task);
+    }
+
+    /**
+     * Splits a task (work-platform's task split, ADR-139): row 1 edits the task itself; every new row with a name
+     * becomes a task in the same project, for the same contractor and reviewer. Blank-named new rows are skipped.
+     * Every row is checked before anything is written, and all of it is saved in one flush.
+     *
+     * @param array<int, TaskInput> $newRows keyed by their row number on the form (2, 3…)
+     *
+     * @return array{0: list<Task>, 1: list<string>} the new tasks, or the errors (then nothing is saved)
+     */
+    public function split(Task $original, TaskInput $originalRow, array $newRows, User $actor): array
+    {
+        $newRows = array_filter($newRows, static fn (TaskInput $row) => $row->name !== '');
+        if ($newRows === []) {
+            return [[], ['Give at least one new task a name.']];
+        }
+
+        $errors = [];
+        [$project, $rowErrors] = $this->validate($this->inProject($originalRow, $original), $actor, $original);
+        foreach ($rowErrors as $error) {
+            $errors[] = sprintf('Row 1: %s', $error);
+        }
+        foreach ($newRows as $number => $row) {
+            $row->assigneeId = $original->getAssignee()?->getId();
+            $row->reviewerUserId = $original->getReviewerUserId();
+            foreach ($this->validate($this->inProject($row, $original), $actor, null)[1] as $error) {
+                $errors[] = sprintf('Row %d: %s', $number, $error);
+            }
+        }
+        if ($errors !== []) {
+            return [[], $errors];
+        }
+
+        $canSetFees = $this->access->canSetFees($actor, $project);
+        $this->applyUpdate($original, $originalRow, $project, $actor);
+        $created = [];
+        foreach ($newRows as $row) {
+            $task = new Task();
+            $this->populate($task, $row, $project, $canSetFees);
+            $this->persistNew($task, $actor);
+            $created[] = $task;
+        }
+        $this->em->flush();
+
+        $this->audit->record($actor, 'task.update', $this->describe($original));
+        foreach ($created as $task) {
+            $this->audit->record($actor, 'task.split', sprintf('%s (split from #%d)', $this->describe($task), (int) $original->getId()));
+        }
+
+        return [$created, []];
     }
 
     /** The assignee's progress note (work-platform's update-status-detail). */
@@ -149,6 +180,45 @@ final class TaskService
         }
 
         return [$project, $errors];
+    }
+
+    /** A split row always belongs to the split task's project: whatever was posted, the project is not a split field. */
+    private function inProject(TaskInput $row, Task $original): TaskInput
+    {
+        $row->projectId = $original->getProject()?->getId();
+
+        return $row;
+    }
+
+    /** Stamps a new task and hands it to Doctrine; the caller flushes. */
+    private function persistNew(Task $task, User $actor): void
+    {
+        // No assignee chosen (the task form no longer asks, ADR-100): the task is its creator's (ADR-114).
+        if ($task->getAssignee() === null) {
+            $task->setAssignee($actor);
+        }
+
+        $now = time();
+        $task->setCreatedAt($now)->setCreatedBy($actor->getId())->setUpdatedAt($now)->setUpdatedBy($actor->getId());
+        $task->setCreationDate($task->getCreationDate() ?? new \DateTimeImmutable('today'));
+        // Every task is regular work as soon as it is filed: there is no authorization queue (ADR-084).
+        $task->setAuthorized(Task::AUTHORIZED_NO);
+
+        $this->em->persist($task);
+    }
+
+    /** Writes validated input onto an existing task; the caller flushes. */
+    private function applyUpdate(Task $task, TaskInput $input, ?Project $project, User $actor): void
+    {
+        $previousStatusId = $task->getTaskStatusId();
+        // Fee fields are written only by someone who may set fees on the task's project — never its assignee
+        // alone, who could otherwise set their own payout.
+        $this->populate($task, $input, $project, $this->access->canSetFees($actor, $project));
+        $task->setUpdatedAt(time())->setUpdatedBy($actor->getId());
+
+        if ($task->getTaskStatusId() === TaskStatus::APPROVED_ID && $previousStatusId !== TaskStatus::APPROVED_ID) {
+            $task->setApprovedDate(time())->setApprovedBy($actor->getId());
+        }
     }
 
     /** The only assignment of task fields from input. */

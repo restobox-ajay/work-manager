@@ -4260,3 +4260,4 @@ ADR-135 (2026-10-13): one-off migration Version20261018090000 — existing proje
 ADR-136 (2026-10-13): column filter rows — Projects (client/name/status), Clients (name/status), top filter bars removed; dashboard task grid filters (client/project/task name/type/status) + Task Type column. GridColumnFiltersTest 3/3; related suites green; not browser-checked.
 ADR-137 (2026-10-13): task list Filter button removed; dropdowns auto-apply, search on Enter. Tests green.
 ADR-138 (2026-10-13): removed the (CSS-visible) hidden Filter buttons from Projects/Clients/dashboard filter forms. GridColumnFiltersTest 5/5.
+ADR-139 (2026-10-13): task split (/task/{id}/split) ported from work-platform-symfony — row 1 edits the task, named rows become new tasks in the same project/contractor/reviewer, all-or-nothing, admin-only, not Paid; live Total/Diff. TaskSplitTest 6/6; related suites green; not browser-checked.

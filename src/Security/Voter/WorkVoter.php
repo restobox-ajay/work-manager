@@ -35,6 +35,7 @@ final class WorkVoter extends Voter
     public const TASK_EDIT = 'TASK_EDIT';
     public const TASK_STATUS_DETAIL = 'TASK_STATUS_DETAIL';
     public const TASK_DELETE = 'TASK_DELETE';
+    public const TASK_SPLIT = 'TASK_SPLIT';
     public const TASK_FEE = 'TASK_FEE';
     /** Manages work (admins, ADR-124): the manager-only task pages. */
     public const WORK_MANAGE = 'WORK_MANAGE';
@@ -52,6 +53,7 @@ final class WorkVoter extends Voter
         self::TASK_EDIT          => Task::class,
         self::TASK_STATUS_DETAIL => Task::class,
         self::TASK_DELETE        => Task::class,
+        self::TASK_SPLIT         => Task::class,
         self::TASK_FEE           => Task::class,
         self::WORK_MANAGE        => null,
     ];
@@ -93,6 +95,7 @@ final class WorkVoter extends Voter
             self::TASK_EDIT          => $this->access->canUpdateTask($user, $subject),
             self::TASK_STATUS_DETAIL => $this->access->canUpdateStatusDetail($user, $subject),
             self::TASK_DELETE        => $this->access->canDeleteTask($user, $subject),
+            self::TASK_SPLIT         => $this->access->canSplitTask($user, $subject),
             self::TASK_FEE           => $this->access->canAccessFee($user, $subject),
             self::WORK_MANAGE        => $this->access->managesAnyWork($user),
         };

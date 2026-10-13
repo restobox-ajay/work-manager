@@ -18,6 +18,7 @@
     <div class="ph-actions">
         <a class="btn secondary back" href="{{ path('app_task_index') }}">Tasks</a>
         {% if is_granted('TASK_EDIT', task) %}<a class="btn warning" href="{{ path('app_task_edit', {id: task.id}) }}">Edit</a>{% endif %}
+        {% if is_granted('TASK_SPLIT', task) %}<a class="btn info" href="{{ path('app_task_split', {id: task.id}) }}">Split</a>{% endif %}
     </div>
 </div>
 

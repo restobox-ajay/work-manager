@@ -1,0 +1,87 @@
+{% extends 'base.html.twig' %}
+{% import '_work/macros.html.twig' as ui %}
+
+{#
+    Split a task (ADR-139, after work-platform's task/split): row 1 is the task itself, every other row a new task in
+    the same project. "Add row" and the row remove buttons work in place with JavaScript (task-split.js) and fall
+    back to ?rows= links without it. Total / Original / Diff are a live preview; the server checks every row.
+#}
+{% block title %}Split task #{{ task.id }}{% endblock %}
+
+{% macro options(map, selected, blank) %}
+    {% if blank is not null %}<option value="">{{ blank }}</option>{% endif %}
+    {% for id, label in map %}<option value="{{ id }}" {{ selected == id ? 'selected' }}>{{ label }}</option>{% endfor %}
+{% endmacro %}
+
+{% macro row(i, row, isOriginal, showFees, types, statuses, currencies, removeHref) %}
+    {% import _self as f %}
+    <tr class="split-row" data-split-row>
+        <td class="nowrap"><b data-split-number>{{ isOriginal ? 1 : '' }}</b>{% if isOriginal %} <span class="muted small">this task</span>{% endif %}</td>
+        <td><input type="text" name="rows[{{ i }}][name]" value="{{ row.name ?? '' }}" maxlength="5000" aria-label="Task name" {{ isOriginal ? 'required' }} style="min-width:220px"></td>
+        <td><select name="rows[{{ i }}][taskTypeId]" aria-label="Task type">{{ f.options(types, row.taskTypeId ?? null, '—') }}</select></td>
+        <td><select name="rows[{{ i }}][taskStatusId]" aria-label="Status">{{ f.options(statuses, row.taskStatusId ?? null, null) }}</select></td>
+        <td><input type="date" name="rows[{{ i }}][dueDate]" value="{{ row.dueDate ?? '' }}" aria-label="Due date"></td>
+        <td><input type="text" name="rows[{{ i }}][statusDetail]" value="{{ row.statusDetail ?? '' }}" aria-label="Status detail"></td>
+        {% if showFees %}
+            <td><input type="text" name="rows[{{ i }}][totalAmount]" value="{{ row.totalAmount ?? '' }}" inputmode="decimal" placeholder="0.00" style="width:100px" aria-label="Payout" data-split-amount></td>
+            <td><select name="rows[{{ i }}][currencyId]" aria-label="Currency">{{ f.options(currencies, row.currencyId ?? 1, null) }}</select></td>
+        {% endif %}
+        <td class="actions">{% if not isOriginal %}<a class="btn danger xs" href="{{ removeHref }}" data-split-remove title="Remove this row">Remove</a>{% endif %}</td>
+    </tr>
+{% endmacro %}
+
+{% block body %}
+{% import _self as f %}
+{% set back = path('app_task_view', {id: task.id}) %}
+{% set newRows = rows|length - 1 %}
+<div class="page-head">
+    <div class="ph-main">
+        <div class="eyebrow">
+            {% if task.project %}{{ task.project.client ? task.project.client.name ~ ' › ' }}{{ task.project.name }}{% else %}No project{% endif %}
+            · Task #{{ task.id }}
+        </div>
+        <div class="ph-title"><h1>Split task</h1></div>
+        <p class="lead">Row 1 is this task — adjust it as needed. Each row below becomes a new task in the same project,
+            for the same contractor. New rows left without a name are ignored.</p>
+    </div>
+    <div class="ph-actions"><a class="btn secondary back" href="{{ back }}">Back</a></div>
+</div>
+
+{{ ui.errors(errors) }}
+
+<form id="task-split-form" class="table-card mx-form" method="post" action="{{ path('app_task_split', {id: task.id}) }}">
+    <input type="hidden" name="_token" value="{{ csrf_token('task_split_' ~ task.id) }}">
+    <div class="tscroll">
+        <table class="t">
+            <thead>
+                <tr>
+                    <th>#</th><th>Task name</th><th>Task type</th><th>Status</th><th>Due date</th><th>Status detail</th>
+                    {% if showFees %}<th>Payout</th><th>Currency</th>{% endif %}
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody data-split-rows>
+                {% for row in rows %}
+                    {{ f.row(loop.index0, row, loop.first, showFees, types, statuses, currencies, path('app_task_split', {id: task.id, rows: max(1, newRows - 1)})) }}
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <div class="table-foot">
+        {% if newRows < maxNewRows %}<a class="btn secondary sm" href="{{ path('app_task_split', {id: task.id, rows: newRows + 1}) }}" data-split-add data-max="{{ maxNewRows }}">+ Add row</a>{% endif %}
+        <span class="grow"></span>
+        {% if showFees %}
+            <span class="split-totals" data-split-original="{{ task.totalAmount ?? '0.00' }}">
+                Total <b data-split-total>—</b> · Original <b>{{ task.totalAmount ?? '0.00' }}</b> · Diff <b data-split-diff>—</b>
+            </span>
+        {% endif %}
+    </div>
+    <div class="form-actions" style="padding:10px 12px">
+        <a class="btn secondary" href="{{ back }}">Cancel</a>
+        <button class="btn primary" type="submit">Split task</button>
+    </div>
+</form>
+
+<template id="split-row-template">{{ f.row('__i__', blankRow, false, showFees, types, statuses, currencies, '#') }}</template>
+<script src="{{ versioned('/js/task-split.js') }}" defer></script>
+{% endblock %}

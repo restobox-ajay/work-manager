@@ -78,7 +78,7 @@ final class TaskListService
      *
      * @param Task[] $tasks
      *
-     * @return array<int, array{archived: list<string>, canEdit: bool, canDelete: bool, canSeeFee: bool}>
+     * @return array<int, array{archived: list<string>, canEdit: bool, canSplit: bool, canDelete: bool, canSeeFee: bool}>
      */
     public function rowDetails(User $viewer, array $tasks): array
     {
@@ -94,6 +94,7 @@ final class TaskListService
             $rows[(int) $task->getId()] = [
                 'archived'  => $archived,
                 'canEdit'   => $this->access->canUpdateTask($viewer, $task),
+                'canSplit'  => $this->access->canSplitTask($viewer, $task),
                 'canDelete' => $this->access->canDeleteTask($viewer, $task),
                 'canSeeFee' => $this->access->canAccessFee($viewer, $task),
             ];

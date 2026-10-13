@@ -3106,3 +3106,26 @@ buttons are removed: dropdowns apply on change, and each form has exactly one te
 (implicit submission). Lesson: in this app, `hidden` on a plain `<button>` does not hide it.
 
 **Verified.** GridColumnFiltersTest (5 tests; asserts no button on the three forms).
+
+## ADR-139: Split a task, after work-platform-symfony (owner request, 2026-10-13)
+
+**Decision.** /task/{id}/split (Split button on the task page and in the task list's row actions). Row 1 is the
+task itself; each row below becomes a new task. Ported from work-platform-symfony's TaskController::split /
+TaskWriteService::split, adapted to this app:
+- **Fields per row:** name, task type, status, due date, status detail, and — for those who may set fees — payout
+  and currency. Contractor, reviewer and billable time/date stay off the page (ADR-100); new tasks take the
+  original's contractor and reviewer. Description, tutorial, doc link are not on the page: the original keeps
+  its own, new tasks start without them (work-platform parity).
+- **Client and project are fixed:** a new task is always in the original's project, whatever is posted.
+- **New rows** start from the original's name, type, status and currency, with due date, status detail and payout
+  blank (work-platform parity). New rows left without a name are skipped; at least one new task needs a name.
+- **All-or-nothing:** every row is validated first (errors numbered "Row N: …"), then the update and the new
+  tasks are written in one flush. Audited as task.update (original) and task.split (each new task).
+- **Who:** `WorkAccess::canSplitTask()` — may create tasks and edit this one, and the task is not Paid
+  (voter attribute TASK_SPLIT). In practice admins.
+- **Page:** "+ Add row" / Remove work in place (task-split.js) and fall back to ?rows=N (1–20) links; a live
+  Total / Original / Diff of the payouts. After saving, the first new task opens (work-platform parity).
+- `TaskService::create()`/`update()` now share `persistNew()` / `applyUpdate()` with `split()`.
+
+**Verified.** TaskSplitTest (6 tests); Task/Work/Project/WorkOrder/Note/Invoice functional and Security unit
+suites green. Not browser-checked (extension not connected).
