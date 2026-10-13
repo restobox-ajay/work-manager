@@ -961,5 +961,5 @@ a.pl-label:hover,a.pl-label:focus{color:#fff;text-decoration:none;filter:brightn
 .pl-tone-4{background:#0b7285}.pl-tone-5{background:#6f42c1}.pl-tone-6{background:#343a40}.pl-tone-7{background:#c92a2a}
 .project-links .pl-row input.pl-invalid{border-color:#dc3545;box-shadow:0 0 0 2px rgba(220,53,69,.15)}
 .project-links .pl-error{grid-column:1/-1;color:#c92a2a;font-size:12px;margin-top:-2px}
-/* Config form with few short fields (ConfigListDefinition::$oneColumn): one field per line, lined up */
-.form-grid.cf-stack{grid-template-columns:1fr;max-width:420px}
+/* Config add/edit forms: one field per line, lined up (ADR-134) */
+.form-grid.cf-stack{grid-template-columns:1fr}

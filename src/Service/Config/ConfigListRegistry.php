@@ -54,11 +54,11 @@ final class ConfigListRegistry
         $lists = [
             new ConfigListDefinition('task-statuses', TaskStatus::class, 'Task Statuses', 'Task status', [
                 new F('name', 'Name', 'getName', 'setName', required: true, maxLength: 50),
-                new F('order', 'Order', 'getOrder', 'setOrder', F::INTEGER, editable: false),
+                new F('order', 'Order', 'getOrder', 'setOrder', F::INTEGER),
                 $active('isActive', 'setIsActive'),
             ], ['order' => 'ASC', 'id' => 'ASC'], false,
                 'Task forms offer the active ones, in this order. Paid is set by the payment flow, not by hand.',
-                defaults: ['isActive' => true], oneColumn: true),
+                defaults: ['isActive' => true]),
 
             new ConfigListDefinition('task-types', TaskType::class, 'Task Types', 'Task type', [
                 new F('name', 'Name', 'getName', 'setName', required: true, maxLength: 60),
@@ -152,7 +152,7 @@ final class ConfigListRegistry
                 defaults: ['invoicePrefix' => 'INV', 'nextNumber' => 1, 'isActive' => true]),
             new ConfigListDefinition('expense-categories', ExpenseCategory::class, 'Expense Categories', 'Expense category', [
                 new F('name', 'Name', 'getName', 'setName', required: true, maxLength: 80, unique: 'This category already exists.'),
-                new F('sortOrder', 'Order', 'getSortOrder', 'setSortOrder', F::INTEGER, help: 'Lower numbers come first.'),
+                new F('sortOrder', 'Order', 'getSortOrder', 'setSortOrder', F::INTEGER),
                 $active('isActive', 'setIsActive'),
             ], ['sortOrder' => 'ASC', 'name' => 'ASC'], false,
                 'What expenses are for (Expenses menu). Switch one off rather than removing it: existing expenses keep it.',
@@ -160,7 +160,7 @@ final class ConfigListRegistry
 
             new ConfigListDefinition('subscription-categories', SubscriptionCategory::class, 'Subscription Categories', 'Subscription category', [
                 new F('name', 'Name', 'getName', 'setName', required: true, maxLength: 80, unique: 'This category already exists.'),
-                new F('sortOrder', 'Order', 'getSortOrder', 'setSortOrder', F::INTEGER, help: 'Lower numbers come first.'),
+                new F('sortOrder', 'Order', 'getSortOrder', 'setSortOrder', F::INTEGER),
                 $active('isActive', 'setIsActive'),
             ], ['sortOrder' => 'ASC', 'name' => 'ASC'], false,
                 'Kinds of apps and services (Subscriptions menu). Switch one off rather than removing it: existing subscriptions keep it.',
@@ -168,7 +168,7 @@ final class ConfigListRegistry
 
             new ConfigListDefinition('event-categories', EventCategory::class, 'Event Categories', 'Event category', [
                 new F('name', 'Name', 'getName', 'setName', required: true, maxLength: 80, unique: 'This category already exists.'),
-                new F('sortOrder', 'Order', 'getSortOrder', 'setSortOrder', F::INTEGER, help: 'Lower numbers come first.'),
+                new F('sortOrder', 'Order', 'getSortOrder', 'setSortOrder', F::INTEGER),
                 $active('isActive', 'setIsActive'),
             ], ['sortOrder' => 'ASC', 'name' => 'ASC'], false,
                 'Kinds of events (Events menu): Birth, Death, Anniversary… Switch one off rather than removing it: existing events keep it.',

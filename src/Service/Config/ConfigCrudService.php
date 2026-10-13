@@ -73,7 +73,7 @@ final class ConfigCrudService
         $isNew = $row === null;
         $row ??= new ($list->entityClass)();
         $sortField = $list->sortField();
-        if ($isNew && $sortField !== null && !$sortField->editable) {
+        if ($isNew && $sortField !== null) {
             // Its order is set only by dragging, so a new row starts at the end of the list.
             $row->{$sortField->setter}($this->nextPosition($list, $sortField));
         }

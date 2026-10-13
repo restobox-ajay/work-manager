@@ -3050,3 +3050,13 @@ shows nor writes it, so a posted `order` is ignored. A new status is placed at t
 `ConfigCrudService::nextPosition()`); its place is then changed by dragging the list.
 
 **Verified.** ConfigFormLayoutTest (4 tests). Not browser-checked (extension not connected).
+
+## ADR-134: All Config forms — no order field, fields stacked (owner request, 2026-10-13; generalises ADR-133)
+
+**Decision.** Every Config add/edit form (all 13 lists) shows its fields one per line (`.form-grid.cf-stack`; the
+per-list `oneColumn` flag is gone). A list's order field — whatever `ConfigListDefinition::sortField()` returns:
+Task Statuses' Order; Countries' Sort Order; Expense, Subscription and Event Categories' Order — is never on the
+form and never written from a post (`editableFields()`); ADR-133's per-field `editable` flag is replaced by this one
+rule. A new row goes to the end of its list (highest order + 10); its place is changed by dragging (ADR-127).
+
+**Verified.** ConfigFormLayoutTest (4 tests, every list's /new page). Not browser-checked (extension not connected).

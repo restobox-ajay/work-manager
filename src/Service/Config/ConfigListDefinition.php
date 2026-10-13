@@ -30,15 +30,18 @@ final class ConfigListDefinition
         public readonly array $defaults = [],
         /** Adjusts the normalized values before they are checked and written: fn (array $values): array */
         public readonly ?\Closure $prepare = null,
-        /** Few short fields: the form stacks them one per line instead of two columns */
-        public readonly bool $oneColumn = false,
     ) {
     }
 
-    /** @return list<ConfigField> the fields the form shows and saves */
+    /**
+     * @return list<ConfigField> the fields the form shows and saves: all but the sort field, whose value is set
+     *                           only by dragging the list (ADR-134)
+     */
     public function editableFields(): array
     {
-        return array_values(array_filter($this->fields, static fn (ConfigField $field) => $field->editable));
+        $sortField = $this->sortField();
+
+        return array_values(array_filter($this->fields, static fn (ConfigField $field) => $field !== $sortField));
     }
 
     /** @return list<ConfigField> */

@@ -5,14 +5,15 @@ declare(strict_types=1);
 namespace App\Tests\Functional\Config;
 
 use App\Entity\Settings\TaskStatus;
+use App\Service\Config\ConfigListRegistry;
 use App\Tests\Support\AuthenticationTestTrait;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 
 /**
- * ADR-132/133: the task status form stacks Name and Active one per line; Order is not on the form (it is set by
- * dragging the list), and a new status goes to the end of the list. Other Config forms keep their two columns.
+ * ADR-133/134: every Config form stacks its fields one per line; a list's order field (Order / Sort Order) is not on
+ * the form — it is set only by dragging the list — and a new row goes to the end of the list.
  */
 final class ConfigFormLayoutTest extends WebTestCase
 {
@@ -81,12 +82,15 @@ final class ConfigFormLayoutTest extends WebTestCase
         self::assertSame(35, $this->em->getRepository(TaskStatus::class)->find($id)->getOrder(), 'A posted order is ignored.');
     }
 
-    public function testOtherConfigFormsKeepTheTwoColumnLayout(): void
+    public function testEveryConfigFormIsStackedWithoutAnOrderField(): void
     {
-        $crawler = $this->client->request('GET', '/config/task-types/new');
-        self::assertResponseIsSuccessful();
-        self::assertCount(0, $crawler->filter('.form-grid.cf-stack'));
-        self::assertCount(1, $crawler->filter('form.mx-form .form-grid'));
+        foreach (explode('|', ConfigListRegistry::KINDS) as $kind) {
+            $crawler = $this->client->request('GET', "/config/$kind/new");
+            self::assertResponseIsSuccessful($kind);
+            self::assertCount(1, $crawler->filter('form.mx-form .form-grid.cf-stack'), "$kind: fields one per line.");
+            self::assertCount(0, $crawler->filter('form.mx-form .span-2'), "$kind: no field spans columns.");
+            self::assertCount(0, $crawler->filter('[name="order"], [name="sortOrder"]'), "$kind: no order field.");
+        }
     }
 
     private function cleanup(): void

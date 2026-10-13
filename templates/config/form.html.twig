@@ -18,14 +18,14 @@
 
 <form class="card mx-form" method="post" style="max-width:760px">
     <input type="hidden" name="_token" value="{{ csrf_token('config_' ~ list.kind) }}">
-    <div class="form-grid{{ list.oneColumn ? ' cf-stack' }}">
+    <div class="form-grid cf-stack">
         {% for field in list.editableFields %}
             {% set id = 'cf-' ~ field.name %}
             {% set value = values[field.name] ?? null %}
             {% if field.type == 'checkbox' %}
-                <label class="mx-check span-2"><span>{{ field.label }}{% if field.help %} <small>({{ field.help }})</small>{% endif %}</span><input type="checkbox" name="{{ field.name }}" value="1" {{ value ? 'checked' }}></label>
+                <label class="mx-check"><span>{{ field.label }}{% if field.help %} <small>({{ field.help }})</small>{% endif %}</span><input type="checkbox" name="{{ field.name }}" value="1" {{ value ? 'checked' }}></label>
             {% else %}
-                <div class="field{{ field.type == 'textarea' or loop.length == 1 ? ' span-2' }}">
+                <div class="field">
                     <label for="{{ id }}">{{ field.label }}{% if field.required %} <span class="req">*</span>{% endif %}</label>
                     {% if field.type == 'textarea' %}
                         <textarea id="{{ id }}" name="{{ field.name }}" rows="{{ field.name == 'body' ? 12 : 4 }}" {{ field.required ? 'required' }}>{{ value }}</textarea>
