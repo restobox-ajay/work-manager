@@ -3129,3 +3129,34 @@ TaskWriteService::split, adapted to this app:
 
 **Verified.** TaskSplitTest (6 tests); Task/Work/Project/WorkOrder/Note/Invoice functional and Security unit
 suites green. Not browser-checked (extension not connected).
+
+## ADR-140: Rent paid in parts — Pay takes an amount, each month lists its instalments (owner request, 2026-10-15)
+
+**Decision.** Payments were already separate records and a month already showed "Part paid", but the Year view's
+"Mark paid" always recorded everything owed, and nothing showed which payments paid a month. Now:
+- Year view: each unpaid / part-paid rent or electricity cell has **Pay** with an amount (pre-filled with what is
+  left; change it for a part payment), a date and how it was paid. Blank pays all that is owed; more than is owed is
+  refused (an advance is recorded with "+ Payment"); 0 is refused. The flash says what is still owed.
+- Under each month's status: every instalment that went to it (date, amount, method; the note as a tooltip), "of
+  ₹X" when only part of a larger payment went there, "₹N left" while part paid, and × to delete an instalment
+  (returns to the Year view). `RentLedger::allocate()` now returns each kind's `payments` (payment + amount taken).
+- "+ Payment" has **For month**: a chosen month is paid first (the payment is tied to that bill); "Oldest unpaid bill
+  first" keeps the old behaviour. A month of another tenant is refused. The tenant page's payment list shows the month.
+- "Mark not paid" still removes the payments recorded against that month with Pay.
+
+**Verified.** RentPartPaymentTest (6 tests: two-part payment, blank = rest, over/zero/invalid refused, payment for a
+chosen month, another tenant's month refused, an unlinked payment split across months, delete from the Year view);
+browser-checked; full PHPUnit run — no new failures.
+
+## ADR-141: A tenant can have several mobile numbers (owner request, 2026-10-15)
+
+**Decision.** `rent_tenant.phones` (JSON list of `{number, label}`) replaces the single `phone` column (migration
+Version20261019090000 moves each existing phone in as the first number, no label; down() keeps only the first).
+The tenant form has one row per number — number, optional label (suggestions: Self, Home, Work, Father, Mother,
+Spouse, Emergency) and remove — with "+ Add number", up to 5 (`RentService::MAX_PHONES`; the button disables at the
+limit). Blank rows are skipped; a number may contain digits, spaces, + - ( ) and dots with 7–15 digits; the same
+number twice (same digits) is refused; a label without a number asks for the number. The tenant list and the tenant
+page show every number as a tap-to-call `tel:` link with its label. Demo data gives each tenant one "Self" number.
+
+**Verified.** RentTenantPhonesTest (3 tests); migration up/down/up; browser: add up to 5, remove, save, display;
+full PHPUnit run — no new failures.

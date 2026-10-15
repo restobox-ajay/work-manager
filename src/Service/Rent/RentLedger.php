@@ -105,13 +105,14 @@ final class RentLedger
     /**
      * Which bills are paid (ADR-087): each kind of payment settles that kind's charges oldest bill first (rent payments
      * pay rent, electricity payments pay electricity, other pays other); money left over moves on to the next bill.
-     * For each bill and kind: due, paid, status (paid / part / unpaid / none when nothing was due) and paidOn — the date
-     * of the payment that completed it. A bill is paid when all its kinds are.
+     * For each bill and kind: due, paid, status (paid / part / unpaid / none when nothing was due), paidOn — the date
+     * of the payment that completed it — and payments: every instalment that went to it, with how much of each
+     * (ADR-140: a month paid in parts lists each part). A bill is paid when all its kinds are.
      *
      * @param RentBill[]    $bills    oldest first
      * @param RentPayment[] $payments oldest first
      *
-     * @return array<int, array{kinds: array<string, array{due: int, paid: int, status: string, paidOn: ?\DateTimeImmutable}>, status: string, paidOn: ?\DateTimeImmutable, due: int, paid: int}>
+     * @return array<int, array{kinds: array<string, array{due: int, paid: int, status: string, paidOn: ?\DateTimeImmutable, payments: list<array{payment: RentPayment, amount: int}>}>, status: string, paidOn: ?\DateTimeImmutable, due: int, paid: int}>
      *         keyed by bill id
      */
     public function allocate(array $bills, array $payments): array
@@ -121,7 +122,7 @@ final class RentLedger
         $linked = [];
         foreach ($payments as $payment) {
             $kind = isset($queues[$payment->getKind()]) ? $payment->getKind() : 'other';
-            $entry = ['left' => RentMoney::h($payment->getAmount()), 'date' => $payment->getPaidOn()];
+            $entry = ['left' => RentMoney::h($payment->getAmount()), 'date' => $payment->getPaidOn(), 'payment' => $payment];
             if ($payment->getBill() !== null) {
                 $linked[(int) $payment->getBill()->getId()][$kind][] = $entry;
             } else {
@@ -140,13 +141,17 @@ final class RentLedger
             foreach ($due as $kind => $amount) {
                 $paid = 0;
                 $paidOn = null;
+                $parts = [];
                 foreach ($linked[(int) $bill->getId()][$kind] ?? [] as $entry) {
                     $take = min($amount - $paid, $entry['left']);
                     $paid += $take;
                     $paidOn = $entry['date'];
+                    if ($take > 0) {
+                        $parts[] = ['payment' => $entry['payment'], 'amount' => $take];
+                    }
                     if ($entry['left'] > $take) {
                         // More than this bill needed: the rest joins the general pool for later bills.
-                        $queues[$kind][] = ['left' => $entry['left'] - $take, 'date' => $entry['date']];
+                        $queues[$kind][] = ['left' => $entry['left'] - $take] + $entry;
                     }
                 }
                 while ($paid < $amount && $queues[$kind] !== []) {
@@ -154,6 +159,7 @@ final class RentLedger
                     $paid += $take;
                     $queues[$kind][0]['left'] -= $take;
                     $paidOn = $queues[$kind][0]['date'];
+                    $parts[] = ['payment' => $queues[$kind][0]['payment'], 'amount' => $take];
                     if ($queues[$kind][0]['left'] === 0) {
                         array_shift($queues[$kind]);
                     }
@@ -164,6 +170,7 @@ final class RentLedger
                     'paid'   => $paid,
                     'status' => $amount === 0 ? 'none' : ($paid >= $amount ? 'paid' : ($paid > 0 ? 'part' : 'unpaid')),
                     'paidOn' => $amount > 0 && $paid >= $amount ? $paidOn : null,
+                    'payments' => $parts,
                 ];
             }
             $open = array_filter($kinds, static fn (array $k) => $k['status'] !== 'none');

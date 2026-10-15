@@ -24,6 +24,18 @@
             <label for="f-kind">For <span class="req">*</span></label>
             <select id="f-kind" name="kind" required>{% for k, label in kinds %}<option value="{{ k }}" {{ values.kind == k ? 'selected' }}>{{ label }}{% if remaining[k] is defined and remaining[k] > 0 %} — {{ r.inr(remaining[k]) }} owed{% endif %}</option>{% endfor %}</select>
         </div>
+        {# ADR-140: a payment for one month pays that month first (a part payment shows the month as "Part paid"). #}
+        <div class="field">
+            <label for="f-bill">For month</label>
+            <select id="f-bill" name="billId">
+                <option value="">Oldest unpaid bill first</option>
+                {% for m in months %}
+                    {% set open = [] %}
+                    {% for k, label in kinds %}{% set ks = m.state.kinds[k] %}{% if ks.due > ks.paid %}{% set open = open|merge([label|lower ~ ' ' ~ r.inr(ks.due - ks.paid)]) %}{% endif %}{% endfor %}
+                    <option value="{{ m.bill.id }}" {{ (values.billId ?? '') ~ '' == m.bill.id ~ '' ? 'selected' }}>{{ m.bill.period|date('F Y') }} — {{ open is empty ? 'paid' : open|join(' · ') ~ ' owed' ~ (m.state.paid > 0 ? ' (part paid)' : '') }}</option>
+                {% endfor %}
+            </select>
+        </div>
         <div class="field">
             <label for="f-method">Paid by <span class="req">*</span></label>
             <select id="f-method" name="method" required>{% for k, label in methods %}<option value="{{ k }}" {{ values.method == k ? 'selected' }}>{{ label }}</option>{% endfor %}</select>

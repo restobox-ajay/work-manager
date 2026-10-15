@@ -12,6 +12,7 @@ use App\Repository\Rent\RentBillRepository;
 use App\Repository\Rent\RentPaymentRepository;
 use App\Repository\Rent\RentPropertyRepository;
 use App\Repository\Rent\RentTenantRepository;
+use App\Service\Invoice\InvoiceMoney;
 use App\Service\Rent\RentLedger;
 use App\Service\Rent\RentMoney;
 use App\Service\Rent\RentService;
@@ -139,6 +140,7 @@ final class RentController extends AbstractWorkController
             'tenants' => $tenants,
             'tenant'  => $chosen,
             'view'    => $chosen !== null ? $ledger->year($chosen, $year) : null,
+            'methods' => RentMoney::METHODS,
         ]);
     }
 
@@ -239,7 +241,7 @@ final class RentController extends AbstractWorkController
             new Response(status: $errors === [] ? 200 : 422));
     }
 
-    /** Year View: pay what is still owed on the rent (or electricity) of one month, on a chosen date (ADR-088). */
+    /** Year View: pay the rent (or electricity) of one month on a chosen date — all that is owed, or part of it (ADR-088, ADR-140). */
     #[Route('/bills/{id}/mark-paid', name: 'app_rent_bill_mark_paid', requirements: ['id' => '\d+'], methods: ['POST'])]
     public function markPaid(RentBill $bill, Request $request, RentLedger $ledger, RentPaymentRepository $payments): Response
     {
@@ -248,10 +250,17 @@ final class RentController extends AbstractWorkController
         $kind = $request->request->getString('kind');
         $allocation = $ledger->allocate($this->bills->findForTenant($tenant), $payments->findForTenant($tenant));
         $state = $allocation[(int) $bill->getId()]['kinds'][$kind] ?? null;
-        $errors = $this->rent->markPaid($bill, $kind, $state !== null ? $state['due'] - $state['paid'] : 0, $request->request->get('paidOn'), $this->viewer());
-        $errors === []
-            ? $this->addFlash('success', sprintf('%s for %s marked paid.', RentMoney::KINDS[$kind], $bill->getPeriod()?->format('F Y')))
-            : $this->addFlash('error', implode(' ', $errors));
+        $owed = $state !== null ? $state['due'] - $state['paid'] : 0;
+        $errors = $this->rent->markPaid($bill, $kind, $owed, $request->request->all(), $this->viewer());
+        if ($errors !== []) {
+            $this->addFlash('error', implode(' ', $errors));
+        } else {
+            $state = $ledger->allocate($this->bills->findForTenant($tenant), $payments->findForTenant($tenant))[(int) $bill->getId()]['kinds'][$kind];
+            $left = $state['due'] - $state['paid'];
+            $this->addFlash('success', $left > 0
+                ? sprintf('Part payment saved: %s for %s, %s still owed.', RentMoney::KINDS[$kind], $bill->getPeriod()?->format('F Y'), InvoiceMoney::display(RentMoney::d($left), RentMoney::CURRENCY))
+                : sprintf('%s for %s marked paid.', RentMoney::KINDS[$kind], $bill->getPeriod()?->format('F Y')));
+        }
 
         return $this->redirectToRoute('app_rent_year', ['tenant' => $tenant?->getId(), 'year' => $bill->getPeriod()?->format('Y')]);
     }
@@ -273,12 +282,13 @@ final class RentController extends AbstractWorkController
     // ── Payments ─────────────────────────────────────────────────────────────
 
     #[Route('/tenants/{id}/payments/new', name: 'app_rent_payment_new', requirements: ['id' => '\d+'], methods: ['GET', 'POST'])]
-    public function newPayment(RentTenant $tenant, Request $request, RentLedger $ledger): Response
+    public function newPayment(RentTenant $tenant, Request $request, RentLedger $ledger, RentPaymentRepository $payments): Response
     {
         $remaining = $ledger->forTenant($tenant)['totals']['remaining'];
         $kind = $request->query->getString('kind') ?: ($remaining['rent'] > 0 ? 'rent' : ($remaining['electricity'] > 0 ? 'electricity' : 'rent'));
         $values = ['paidOn' => (new \DateTimeImmutable('today'))->format('Y-m-d'), 'kind' => $kind, 'method' => 'cash',
-            'amount' => isset($remaining[$kind]) && $remaining[$kind] > 0 ? RentMoney::d($remaining[$kind]) : '', 'note' => ''];
+            'amount' => isset($remaining[$kind]) && $remaining[$kind] > 0 ? RentMoney::d($remaining[$kind]) : '', 'note' => '',
+            'billId' => $request->query->getString('bill')];
         $errors = [];
         if ($request->isMethod('POST')) {
             $this->assertCsrf($request, 'rent_payment');
@@ -292,8 +302,13 @@ final class RentController extends AbstractWorkController
             $errors = $result->errors;
         }
 
+        // ADR-140: the months a payment can be for — newest first, with what each still owes.
+        $bills = $this->bills->findForTenant($tenant);
+        $allocation = $ledger->allocate($bills, $payments->findForTenant($tenant));
+        $months = array_reverse(array_map(static fn (RentBill $b) => ['bill' => $b, 'state' => $allocation[(int) $b->getId()]], $bills));
+
         return $this->render('rent/payment_form.html.twig', ['tenant' => $tenant, 'values' => $values, 'errors' => $errors,
-            'remaining' => $remaining, 'kinds' => RentMoney::KINDS, 'methods' => RentMoney::METHODS],
+            'remaining' => $remaining, 'kinds' => RentMoney::KINDS, 'methods' => RentMoney::METHODS, 'months' => $months],
             new Response(status: $errors === [] ? 200 : 422));
     }
 
@@ -302,10 +317,14 @@ final class RentController extends AbstractWorkController
     {
         $this->assertCsrf($request, 'rent_payment_delete_'.$payment->getId());
         $tenantId = $payment->getTenant()?->getId();
+        $year = $payment->getBill()?->getPeriod()?->format('Y') ?? $payment->getPaidOn()?->format('Y');
         $this->rent->deletePayment($payment, $this->viewer());
         $this->addFlash('success', 'Payment deleted.');
 
-        return $this->redirectToRoute('app_rent_tenant', ['id' => $tenantId]);
+        // Deleted from the Year view's list of a month's payments (ADR-140): go back there.
+        return $request->request->getString('return') === 'year'
+            ? $this->redirectToRoute('app_rent_year', ['tenant' => $tenantId, 'year' => $year])
+            : $this->redirectToRoute('app_rent_tenant', ['id' => $tenantId]);
     }
 
     // ── Forms ────────────────────────────────────────────────────────────────
@@ -336,7 +355,7 @@ final class RentController extends AbstractWorkController
     private function tenantForm(?RentTenant $tenant, Request $request): Response
     {
         $values = $tenant !== null ? [
-            'propertyId' => $tenant->getProperty()?->getId(), 'name' => $tenant->getName(), 'phone' => $tenant->getPhone(),
+            'propertyId' => $tenant->getProperty()?->getId(), 'name' => $tenant->getName(), 'phones' => $tenant->getPhones(),
             'email' => $tenant->getEmail(), 'monthlyRent' => $tenant->getMonthlyRent(), 'deposit' => $tenant->getDeposit(),
             'openingMeter' => $tenant->getOpeningMeter(), 'startDate' => $tenant->getStartDate()?->format('Y-m-d'),
             'endDate' => $tenant->getEndDate()?->format('Y-m-d'), 'isActive' => $tenant->isActive(), 'notes' => $tenant->getNotes(),

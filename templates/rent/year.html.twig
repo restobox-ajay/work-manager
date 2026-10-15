@@ -4,16 +4,40 @@
 
 {% block title %}Rent year view · {{ year }}{% endblock %}
 
-{% macro mark(bill, kind, state) %}
+{# ADR-140: what was paid towards one kind of a month — each instalment, with a delete button — and what is left. #}
+{% macro parts(state, methods) %}
+    {%- if state.payments is not empty -%}
+        {%- import 'rent/_macros.html.twig' as r -%}
+        <ul class="rent-parts">
+            {%- for part in state.payments -%}
+                {%- set p = part.payment -%}
+                <li>
+                    <span title="{{ p.note ?? '' }}">{{ p.paidOn ? p.paidOn|date('M j') : '—' }} · <b>{{ r.inr(part.amount) }}</b>{% if part.amount != (p.amount * 100)|round %}<span class="muted" title="Part of a {{ p.amount|invoice_money('INR') }} payment; the rest went to other months"> of {{ p.amount|invoice_money('INR') }}</span>{% endif %} · {{ methods[p.method] ?? p.method }}</span>
+                    <form class="mx-form rent-part-del" method="post" action="{{ path('app_rent_payment_delete', {id: p.id}) }}" onsubmit="return confirm('Delete the {{ p.amount|invoice_money('INR') }} payment of {{ p.paidOn ? p.paidOn|date('M j, Y') : '' }}?');">
+                        <input type="hidden" name="_token" value="{{ csrf_token('rent_payment_delete_' ~ p.id) }}">
+                        <input type="hidden" name="return" value="year">
+                        <button type="submit" title="Delete this payment" aria-label="Delete this payment">×</button>
+                    </form>
+                </li>
+            {%- endfor -%}
+        </ul>
+        {%- if state.status == 'part' -%}<div class="small text-danger">{{ r.inr(state.due - state.paid) }} left</div>{%- endif -%}
+    {%- endif -%}
+{% endmacro %}
+
+{% macro mark(bill, kind, state, methods) %}
     {%- if state.status in ['unpaid', 'part'] -%}
+        {%- set owed = ((state.due - state.paid) / 100)|number_format(2, '.', '') -%}
         <form class="mx-form rent-mark" method="post" action="{{ path('app_rent_bill_mark_paid', {id: bill.id}) }}">
             <input type="hidden" name="_token" value="{{ csrf_token('rent_mark_' ~ bill.id) }}">
             <input type="hidden" name="kind" value="{{ kind }}">
+            <input type="text" inputmode="decimal" name="amount" value="{{ owed }}" aria-label="Amount paid" title="Change it for a part payment" class="rent-mark-amount">
             <input type="date" name="paidOn" value="{{ 'now'|date('Y-m-d') }}" aria-label="Paid on" required>
-            <button class="btn success xs" type="submit" title="Record {{ ((state.due - state.paid) / 100)|number_format(2, '.', '')|invoice_money('INR') }} as paid on this date">Mark paid</button>
+            <select name="method" aria-label="Paid by">{% for k, label in methods %}<option value="{{ k }}">{{ label }}</option>{% endfor %}</select>
+            <button class="btn success xs" type="submit" title="Record this amount as paid on this date: all of {{ owed|invoice_money('INR') }}, or less for a part payment">Pay</button>
         </form>
     {%- elseif state.status == 'paid' and state.marked -%}
-        <form class="mx-form rent-mark" method="post" action="{{ path('app_rent_bill_mark_unpaid', {id: bill.id}) }}" onsubmit="return confirm('Mark this as not paid? The payment made with Mark paid is removed.');">
+        <form class="mx-form rent-mark" method="post" action="{{ path('app_rent_bill_mark_unpaid', {id: bill.id}) }}" onsubmit="return confirm('Mark this as not paid? Every payment recorded against this month with Pay is removed.');">
             <input type="hidden" name="_token" value="{{ csrf_token('rent_mark_' ~ bill.id) }}">
             <input type="hidden" name="kind" value="{{ kind }}">
             <button class="btn danger xs" type="submit">Mark not paid</button>
@@ -27,7 +51,7 @@
     <div class="ph-main">
         <div class="eyebrow">Rent</div>
         <div class="ph-title"><h1>Year view{{ tenant ? ' · ' ~ tenant.name : '' }} · {{ year }}</h1></div>
-        <p class="lead">Choose a tenant and a year: every month from January to December, what was billed, whether it is paid, and when. Use Mark paid / Mark not paid to update a month; other payments settle the oldest bill first, rent with rent payments and electricity with electricity payments.</p>
+        <p class="lead">Choose a tenant and a year: every month from January to December, what was billed, whether it is paid, and when. Use Pay to record a month's payment — change the amount for a part payment, and pay the rest later; each instalment is listed under the month. Mark not paid undoes it; other payments settle the oldest bill first, rent with rent payments and electricity with electricity payments.</p>
     </div>
     {% if tenant %}
     <div class="ph-actions">
@@ -80,11 +104,11 @@
                         <td class="bold nowrap">{{ m.month|date('F') }}</td>
                         {% if b %}
                             <td class="num">{{ b.rentAmount|invoice_money('INR') }}</td>
-                            <td>{{ r.status(p.kinds.rent.status) }}{% if p.kinds.rent.status == 'part' %}<div class="muted small">{{ r.inr(p.kinds.rent.paid) }} paid</div>{% endif %}{{ y.mark(b, 'rent', p.kinds.rent) }}</td>
+                            <td>{{ r.status(p.kinds.rent.status) }}{{ y.parts(p.kinds.rent, methods) }}{{ y.mark(b, 'rent', p.kinds.rent, methods) }}</td>
                             <td class="nowrap">{{ p.kinds.rent.paidOn ? p.kinds.rent.paidOn|date('M j, Y') : '—' }}</td>
                             <td class="num">{{ r.units(b.units * 100) }}</td>
                             <td class="num">{{ b.electricityAmount|invoice_money('INR') }}</td>
-                            <td>{{ r.status(p.kinds.electricity.status) }}{% if p.kinds.electricity.status == 'part' %}<div class="muted small">{{ r.inr(p.kinds.electricity.paid) }} paid</div>{% endif %}{{ y.mark(b, 'electricity', p.kinds.electricity) }}</td>
+                            <td>{{ r.status(p.kinds.electricity.status) }}{{ y.parts(p.kinds.electricity, methods) }}{{ y.mark(b, 'electricity', p.kinds.electricity, methods) }}</td>
                             <td class="nowrap">{{ p.kinds.electricity.paidOn ? p.kinds.electricity.paidOn|date('M j, Y') : '—' }}</td>
                             <td class="num">{{ b.otherAmount != '0.00' ? b.otherAmount|invoice_money('INR') : '—' }}{% if b.otherAmount != '0.00' %} {{ r.status(p.kinds.other.status, true) }}{% endif %}</td>
                             <td class="num bold">{{ b.total|invoice_money('INR') }}</td>

@@ -23,8 +23,14 @@ class RentTenant
     #[ORM\Column(length: 120)]
     private string $name = '';
 
-    #[ORM\Column(length: 30, nullable: true)]
-    private ?string $phone = null;
+    /**
+     * Mobile / phone numbers (ADR-141), in the order entered: each a number and an optional label ("Self", "Father",
+     * "Office"…). Replaces the single phone column.
+     *
+     * @var list<array{number: string, label: ?string}>|null
+     */
+    #[ORM\Column(type: 'json', nullable: true)]
+    private ?array $phones = null;
 
     #[ORM\Column(length: 180, nullable: true)]
     private ?string $email = null;
@@ -77,14 +83,17 @@ class RentTenant
         return $this;
     }
 
-    public function getPhone(): ?string
+    /** @return list<array{number: string, label: ?string}> */
+    public function getPhones(): array
     {
-        return $this->phone;
+        // MySQL's JSON column reorders an object's keys; hand them back in one fixed shape.
+        return array_map(static fn (array $phone) => ['number' => (string) ($phone['number'] ?? ''), 'label' => $phone['label'] ?? null], $this->phones ?? []);
     }
 
-    public function setPhone(?string $phone): static
+    /** @param list<array{number: string, label: ?string}> $phones */
+    public function setPhones(array $phones): static
     {
-        $this->phone = $phone;
+        $this->phones = $phones === [] ? null : array_values($phones);
 
         return $this;
     }

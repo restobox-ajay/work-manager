@@ -4261,3 +4261,5 @@ ADR-136 (2026-10-13): column filter rows — Projects (client/name/status), Clie
 ADR-137 (2026-10-13): task list Filter button removed; dropdowns auto-apply, search on Enter. Tests green.
 ADR-138 (2026-10-13): removed the (CSS-visible) hidden Filter buttons from Projects/Clients/dashboard filter forms. GridColumnFiltersTest 5/5.
 ADR-139 (2026-10-13): task split (/task/{id}/split) ported from work-platform-symfony — row 1 edits the task, named rows become new tasks in the same project/contractor/reviewer, all-or-nothing, admin-only, not Paid; live Total/Diff. TaskSplitTest 6/6; related suites green; not browser-checked.
+ADR-140 (2026-10-15): rent part payments: Pay with an amount in the Year view, instalments listed per month, "+ Payment" for a chosen month. 6 new tests green; browser-checked.
+ADR-141 (2026-10-15): tenant mobile numbers: several per tenant with labels (phones JSON replaces phone). Migration Version20261019090000. 3 tests green; browser-checked.

@@ -26,6 +26,10 @@ use Doctrine\DBAL\ArrayParameterType;
 final class RentService
 {
     private const MAX_AMOUNT = 1_000_000_000_00;
+    /** A tenant's numbers (ADR-141). Shared with the form, which offers this many rows at most. */
+    public const MAX_PHONES = 5;
+    private const PHONE_LABEL_MAX = 40;
+    private const PHONE_PATTERN = '/^\+?[0-9(][0-9 ()\-.]*$/';
 
     public function __construct(
         private readonly EntityManagerInterface $em,
@@ -78,10 +82,7 @@ final class RentService
         if ($email !== null && (filter_var($email, FILTER_VALIDATE_EMAIL) === false || mb_strlen($email) > 180)) {
             $errors[] = 'Enter a valid email address.';
         }
-        $phone = InputValue::text($posted['phone'] ?? null);
-        if ($phone !== null && mb_strlen($phone) > 30) {
-            $errors[] = 'Phone cannot be longer than 30 characters.';
-        }
+        $phones = $this->phonesFrom($errors, $posted['phones'] ?? null);
         $rent = $this->amount($errors, $posted['monthlyRent'] ?? null, 'Monthly rent', true);
         $deposit = $this->amount($errors, $posted['deposit'] ?? null, 'Security deposit', false);
         $meter = $this->amount($errors, $posted['openingMeter'] ?? null, 'Opening meter reading', false);
@@ -98,7 +99,7 @@ final class RentService
         $tenant ??= (new RentTenant())->setCreatedAt(time());
         $tenant->setProperty($property)
             ->setName($name)
-            ->setPhone($phone)
+            ->setPhones($phones)
             ->setEmail($email)
             ->setMonthlyRent(RentMoney::d($rent))
             ->setDeposit(RentMoney::d($deposit))
@@ -280,11 +281,17 @@ final class RentService
         if ($note !== null && mb_strlen($note) > 255) {
             $errors[] = 'The note cannot be longer than 255 characters.';
         }
+        // ADR-140: a payment may be for one month (it pays that bill first); without one it settles the oldest bills.
+        $billId = InputValue::int($posted['billId'] ?? null);
+        $bill = $billId !== null ? $this->em->find(RentBill::class, $billId) : null;
+        if ($billId !== null && ($bill === null || $bill->getTenant()?->getId() !== $tenant->getId())) {
+            $errors[] = 'Choose one of this tenant\'s months, or "Oldest bill first".';
+        }
         if ($errors !== []) {
             return WriteResult::failed($errors);
         }
 
-        $payment = (new RentPayment())->setTenant($tenant)->setPaidOn($paidOn)->setAmount(RentMoney::d($amount))
+        $payment = (new RentPayment())->setTenant($tenant)->setBill($bill)->setPaidOn($paidOn)->setAmount(RentMoney::d($amount))
             ->setKind($kind)->setMethod($method)->setNote($note)->setCreatedAt(time())->setCreatedBy($actor->getId());
 
         return $this->persist($payment, true, 'payment', sprintf('%s %s %s on %s', $tenant->getName(), RentMoney::KINDS[$kind],
@@ -302,30 +309,55 @@ final class RentService
     // ── Mark paid / not paid (Year View, ADR-088) ──────────────────────────
 
     /**
-     * Records a payment of what is still owed on one kind of one bill, dated $paidOn and tied to that bill.
+     * Records a payment towards one kind of one bill, dated $posted['paidOn'] and tied to that bill (ADR-088). The
+     * amount may be part of what is owed — a part payment; the month then shows "Part paid" and the rest stays owed
+     * (ADR-140). A blank amount pays everything still owed. More than is owed is refused: an advance is recorded
+     * with "+ Payment" and settles the next bills.
+     *
+     * @param array<string, mixed> $posted paidOn, amount, method, note
      *
      * @return list<string> errors; empty when done
      */
-    public function markPaid(RentBill $bill, string $kind, int $owed, mixed $paidOn, User $actor): array
+    public function markPaid(RentBill $bill, string $kind, int $owed, array $posted, User $actor): array
     {
         $errors = [];
-        $date = $this->date($errors, $paidOn, 'Paid on', true);
+        $date = $this->date($errors, $posted['paidOn'] ?? null, 'Paid on', true);
         if (!isset(RentMoney::KINDS[$kind])) {
             $errors[] = 'Choose rent or electricity.';
         }
         if ($errors === [] && $owed <= 0) {
             $errors[] = 'Nothing is owed on that.';
         }
+        $amount = $this->amount($errors, $posted['amount'] ?? null, 'Amount', false);
+        if (InputValue::text($posted['amount'] ?? null) === null) {
+            $amount = $owed; // blank: everything still owed
+        } elseif ($amount === 0 && $errors === []) {
+            $errors[] = 'Amount must be more than 0.';
+        }
+        $what = sprintf('%s for %s', RentMoney::KINDS[$kind] ?? $kind, $bill->getPeriod()?->format('F Y'));
+        if ($errors === [] && $amount > $owed) {
+            $errors[] = sprintf('%s is more than the %s still owed on %s. Record an advance with "+ Payment" instead.',
+                InvoiceMoney::display(RentMoney::d($amount), RentMoney::CURRENCY), InvoiceMoney::display(RentMoney::d($owed), RentMoney::CURRENCY), $what);
+        }
+        $method = InputValue::text($posted['method'] ?? null) ?? 'cash';
+        if (!isset(RentMoney::METHODS[$method])) {
+            $errors[] = 'Choose how it was paid.';
+        }
+        $note = InputValue::text($posted['note'] ?? null);
+        if ($note !== null && mb_strlen($note) > 255) {
+            $errors[] = 'The note cannot be longer than 255 characters.';
+        }
         if ($errors !== []) {
             return $errors;
         }
 
-        $payment = (new RentPayment())->setTenant($bill->getTenant())->setBill($bill)->setPaidOn($date)->setAmount(RentMoney::d($owed))
-            ->setKind($kind)->setMethod('cash')->setNote(sprintf('Marked paid: %s %s', RentMoney::KINDS[$kind], $bill->getPeriod()?->format('M Y')))
+        $part = $amount < $owed;
+        $payment = (new RentPayment())->setTenant($bill->getTenant())->setBill($bill)->setPaidOn($date)->setAmount(RentMoney::d($amount))
+            ->setKind($kind)->setMethod($method)->setNote($note ?? sprintf('%s: %s %s', $part ? 'Part payment' : 'Marked paid', RentMoney::KINDS[$kind], $bill->getPeriod()?->format('M Y')))
             ->setCreatedAt(time())->setCreatedBy($actor->getId());
         $this->em->persist($payment);
         $this->em->flush();
-        $this->audit->record($actor, 'rent.mark_paid', sprintf('%s %s %s %s on %s', $bill->getTenant()?->getName(), $bill->getPeriod()?->format('Y-m'),
+        $this->audit->record($actor, $part ? 'rent.part_payment' : 'rent.mark_paid', sprintf('%s %s %s %s on %s', $bill->getTenant()?->getName(), $bill->getPeriod()?->format('Y-m'),
             $kind, InvoiceMoney::display($payment->getAmount(), RentMoney::CURRENCY), $date->format('Y-m-d')));
 
         return [];
@@ -362,6 +394,46 @@ final class RentService
     }
 
     /** @param list<string> $errors */
+    /**
+     * A tenant's numbers (ADR-141) from the form's rows (number + optional label): blank rows are skipped; a number
+     * may hold digits, spaces, +, -, ( ) and dots with 7–15 digits; the same number twice is refused.
+     *
+     * @param list<string> $errors
+     *
+     * @return list<array{number: string, label: ?string}>
+     */
+    private function phonesFrom(array &$errors, mixed $rows): array
+    {
+        $phones = [];
+        $seen = [];
+        foreach (is_array($rows) ? array_values($rows) : [] as $n => $row) {
+            $number = is_array($row) ? InputValue::text($row['number'] ?? null) : null;
+            $label = is_array($row) ? InputValue::text($row['label'] ?? null) : null;
+            if ($number === null && $label === null) {
+                continue;
+            }
+            $which = sprintf('Mobile number %d%s', $n + 1, $label !== null ? ' ("'.$label.'")' : '');
+            $digits = preg_replace('/\D/', '', $number ?? '') ?? '';
+            if ($number === null) {
+                $errors[] = "$which: enter the number.";
+            } elseif (!preg_match(self::PHONE_PATTERN, $number) || strlen($digits) < 7 || strlen($digits) > 15) {
+                $errors[] = "$which is not a valid phone number. Use digits, with + - ( ) or spaces if you like: 7 to 15 digits.";
+            } elseif (isset($seen[$digits])) {
+                $errors[] = "$which is entered twice.";
+            }
+            if ($label !== null && mb_strlen($label) > self::PHONE_LABEL_MAX) {
+                $errors[] = sprintf('%s: the label cannot be longer than %d characters.', $which, self::PHONE_LABEL_MAX);
+            }
+            $seen[$digits] = true;
+            $phones[] = ['number' => (string) $number, 'label' => $label];
+        }
+        if (count($phones) > self::MAX_PHONES) {
+            $errors[] = sprintf('A tenant can have at most %d numbers.', self::MAX_PHONES);
+        }
+
+        return $phones;
+    }
+
     private function requireText(array &$errors, string $value, string $label, int $max): void
     {
         if ($value === '') {

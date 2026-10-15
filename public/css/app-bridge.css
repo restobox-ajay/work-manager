@@ -966,3 +966,14 @@ a.pl-label:hover,a.pl-label:focus{color:#fff;text-decoration:none;filter:brightn
 /* Column filter row under a grid's labels (ADR-136) */
 table.t tr.col-filters th{background:var(--filter-bg);padding:5px 8px;text-transform:none;letter-spacing:0;font-weight:400}
 table.t tr.col-filters input,table.t tr.col-filters select{font-size:.78rem;padding:4px 7px;min-width:90px}
+/* Rent part payments (ADR-140): a month's instalments under its status, and the Pay form's amount and method. */
+form.rent-mark[action$="/mark-paid"] { display: grid; grid-template-columns: 118px auto; gap: 4px; justify-content: start; }
+.rent-mark .rent-mark-amount { height: 24px; font-size: .72rem; padding: 0 6px; width: 118px; }
+.rent-mark select { height: 24px; font-size: .72rem; padding: 0 4px; width: auto; min-width: 0; }
+.rent-parts { list-style: none; margin: 4px 0 2px; padding: 0; font-size: .74rem; line-height: 1.6; }
+.rent-parts li { display: flex; align-items: center; gap: 4px; white-space: nowrap; }
+.rent-parts .rent-part-del { display: inline; margin: 0; }
+.rent-parts .rent-part-del button { border: 0; background: none; color: #c92a2a; cursor: pointer; font-size: .9rem; line-height: 1; padding: 0 2px; }
+/* Tenant mobile numbers (ADR-141): one row per number — number, label, remove. */
+.tenant-phones .ph-rows{display:flex;flex-direction:column;gap:6px;margin-bottom:8px}
+.tenant-phones .ph-row{display:grid;grid-template-columns:minmax(140px,1fr) minmax(120px,1fr) auto;gap:6px;align-items:center}

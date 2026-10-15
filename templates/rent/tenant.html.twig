@@ -10,7 +10,7 @@
     <div class="ph-main">
         <div class="eyebrow">Rent · {{ tenant.property.name }}</div>
         <div class="ph-title"><h1>{{ tenant.name }}</h1>{% if not tenant.active %}<span class="badge plain">Moved out</span>{% endif %}</div>
-        <p class="lead">{{ tenant.monthlyRent|invoice_money('INR') }} a month{% if tenant.startDate %} · since {{ tenant.startDate|date('M j, Y') }}{% endif %}{% if tenant.endDate %} · until {{ tenant.endDate|date('M j, Y') }}{% endif %}{% if tenant.deposit != '0.00' %} · deposit {{ tenant.deposit|invoice_money('INR') }}{% endif %}{% if tenant.phone %} · {{ tenant.phone }}{% endif %}</p>
+        <p class="lead">{{ tenant.monthlyRent|invoice_money('INR') }} a month{% if tenant.startDate %} · since {{ tenant.startDate|date('M j, Y') }}{% endif %}{% if tenant.endDate %} · until {{ tenant.endDate|date('M j, Y') }}{% endif %}{% if tenant.deposit != '0.00' %} · deposit {{ tenant.deposit|invoice_money('INR') }}{% endif %}{% for ph in tenant.phones %} · <a href="tel:{{ ph.number|replace({' ': '', '(': '', ')': '', '-': '', '.': ''}) }}" class="nowrap">{{ ph.number }}</a>{% if ph.label %} <span class="muted">({{ ph.label }})</span>{% endif %}{% endfor %}</p>
     </div>
     <div class="ph-actions">
         <a class="btn secondary back" href="{{ path('app_rent_tenants') }}">Back</a>
@@ -74,13 +74,14 @@
     <div class="table-header"><h2>Payments</h2></div>
     <div class="tscroll">
         <table class="t">
-            <thead><tr><th>Date</th><th>For</th><th>Method</th><th class="num">Amount</th><th>Note</th><th></th></tr></thead>
+            <thead><tr><th>Date</th><th>For</th><th>Month</th><th>Method</th><th class="num">Amount</th><th>Note</th><th></th></tr></thead>
             <tbody>
                 {% set payments = [] %}{% for row in ledger.rows %}{% set payments = payments|merge(row.payments) %}{% endfor %}
                 {% for p in payments|reverse %}
                     <tr>
                         <td class="nowrap">{{ p.paidOn|date('M j, Y') }}</td>
                         <td>{{ kinds[p.kind] ?? p.kind }}</td>
+                        <td class="nowrap">{{ p.bill and p.bill.period ? p.bill.period|date('M Y') : '' }}{% if not p.bill %}<span class="muted small">oldest first</span>{% endif %}</td>
                         <td>{{ methods[p.method] ?? p.method }}</td>
                         <td class="num bold">{{ p.amount|invoice_money('INR') }}</td>
                         <td class="small">{{ p.note ?? '' }}</td>
@@ -92,7 +93,7 @@
                         </td>
                     </tr>
                 {% else %}
-                    <tr><td colspan="6" class="empty">No payments yet.</td></tr>
+                    <tr><td colspan="7" class="empty">No payments yet.</td></tr>
                 {% endfor %}
             </tbody>
         </table>

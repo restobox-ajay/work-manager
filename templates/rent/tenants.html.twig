@@ -27,7 +27,7 @@
                 {% for t in tenants %}
                     {% set b = balances[t.id] %}
                     <tr>
-                        <td><a class="bold" href="{{ path('app_rent_tenant', {id: t.id}) }}">{{ t.name }}</a>{% if not t.active %} <span class="badge plain">Moved out</span>{% endif %}{% if t.phone %}<div class="muted small">{{ t.phone }}</div>{% endif %}</td>
+                        <td><a class="bold" href="{{ path('app_rent_tenant', {id: t.id}) }}">{{ t.name }}</a>{% if not t.active %} <span class="badge plain">Moved out</span>{% endif %}{% if t.phones is not empty %}<div class="muted small">{% for ph in t.phones %}<a href="tel:{{ ph.number|replace({' ': '', '(': '', ')': '', '-': '', '.': ''}) }}" class="nowrap">{{ ph.number }}</a>{% if ph.label %} ({{ ph.label }}){% endif %}{{ not loop.last ? ', ' }}{% endfor %}</div>{% endif %}</td>
                         <td>{{ t.property.name }}</td>
                         <td class="num">{{ t.monthlyRent|invoice_money('INR') }}</td>
                         <td class="nowrap">{{ t.startDate ? t.startDate|date('M j, Y') : '—' }}</td>

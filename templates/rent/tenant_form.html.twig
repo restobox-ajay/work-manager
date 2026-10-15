@@ -25,8 +25,24 @@
                 {% for p in properties %}<option value="{{ p.id }}" data-rent="{{ p.defaultRent }}" {{ values.propertyId == p.id ? 'selected' }}>{{ p.name }}{{ p.active ? '' : ' (inactive)' }}</option>{% endfor %}
             </select>
         </div>
-        <div class="field"><label for="f-phone">Phone</label><input type="text" id="f-phone" name="phone" value="{{ values.phone ?? '' }}" maxlength="30"></div>
         <div class="field"><label for="f-email">Email</label><input type="email" id="f-email" name="email" value="{{ values.email ?? '' }}" maxlength="180"></div>
+        {# ADR-141: any number of mobile numbers (up to MAX_PHONES), each with an optional label. #}
+        {% set phoneRows = values.phones ?? [] %}
+        {% set maxPhones = constant('App\\Service\\Rent\\RentService::MAX_PHONES') %}
+        <div class="field tenant-phones" data-ph-max="{{ maxPhones }}">
+            <label>Mobile numbers</label>
+            <div class="ph-rows" data-ph-rows>
+                {% for phone in phoneRows|merge(phoneRows is empty ? [{number: '', label: ''}] : []) %}
+                    <div class="ph-row" data-ph-row>
+                        <input type="tel" name="phones[{{ loop.index0 }}][number]" value="{{ phone.number ?? '' }}" maxlength="25" placeholder="98100 12345" aria-label="Mobile number">
+                        <input type="text" name="phones[{{ loop.index0 }}][label]" value="{{ phone.label ?? '' }}" maxlength="40" list="ph-labels" placeholder="Label (optional)" aria-label="Label">
+                        <button class="btn light sm" type="button" data-ph-remove title="Remove this number" aria-label="Remove this number">✕</button>
+                    </div>
+                {% endfor %}
+            </div>
+            <div><button class="btn info sm" type="button" data-ph-add>+ Add number</button> <small class="muted">up to {{ maxPhones }}</small></div>
+            <datalist id="ph-labels"><option value="Self"><option value="Home"><option value="Work"><option value="Father"><option value="Mother"><option value="Spouse"><option value="Emergency"></datalist>
+        </div>
         <div class="field"><label for="f-rent">Monthly rent (₹) <span class="req">*</span></label><input type="text" inputmode="decimal" id="f-rent" name="monthlyRent" value="{{ values.monthlyRent ?? '' }}" required></div>
         <div class="field"><label for="f-deposit">Security deposit (₹)</label><input type="text" inputmode="decimal" id="f-deposit" name="deposit" value="{{ values.deposit ?? '' }}"></div>
         <div class="field"><label for="f-start">Move-in date <span class="req">*</span></label><input type="date" id="f-start" name="startDate" value="{{ values.startDate ?? '' }}" required></div>
@@ -41,6 +57,34 @@
     </div>
 </form>
 <script>
+    // Mobile numbers (ADR-141): add a row (up to the limit); remove one (the last is only emptied); renumber on submit.
+    (function () {
+        var wrap = document.querySelector('.tenant-phones'), box = wrap && wrap.querySelector('[data-ph-rows]');
+        if (!box) { return; }
+        var max = parseInt(wrap.dataset.phMax, 10), add = wrap.querySelector('[data-ph-add]');
+        function rows() { return box.querySelectorAll('[data-ph-row]'); }
+        function refresh() {
+            rows().forEach(function (row, i) {
+                row.querySelectorAll('input').forEach(function (input) { input.name = input.name.replace(/phones\[\d+\]/, 'phones[' + i + ']'); });
+            });
+            add.disabled = rows().length >= max;
+        }
+        add.addEventListener('click', function () {
+            if (rows().length >= max) { return; }
+            var row = rows()[0].cloneNode(true);
+            row.querySelectorAll('input').forEach(function (input) { input.value = ''; });
+            box.appendChild(row); refresh(); row.querySelector('input').focus();
+        });
+        box.addEventListener('click', function (e) {
+            var btn = e.target.closest('[data-ph-remove]');
+            if (!btn) { return; }
+            var row = btn.closest('[data-ph-row]');
+            if (rows().length > 1) { row.remove(); } else { row.querySelectorAll('input').forEach(function (i) { i.value = ''; }); }
+            refresh();
+        });
+        box.closest('form').addEventListener('submit', refresh);
+        refresh();
+    })();
     // Choosing a property fills an empty rent with that property's usual rent.
     (function () {
         var property = document.getElementById('f-property'), rent = document.getElementById('f-rent');

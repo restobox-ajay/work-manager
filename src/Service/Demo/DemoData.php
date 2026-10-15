@@ -336,7 +336,7 @@ final class DemoData
             }
             ++$counts[0];
             $tenant = $this->rent->saveTenant(null, ['name' => $tenantName, 'propertyId' => (string) $property->record->getId(), 'email' => $email,
-                'phone' => '98100 0000'.$counts[0], 'monthlyRent' => $rentAmount, 'deposit' => (string) (2 * (int) $rentAmount), 'openingMeter' => $meter,
+                'phones' => [['number' => '98100 0000'.$counts[0], 'label' => 'Self']], 'monthlyRent' => $rentAmount, 'deposit' => (string) (2 * (int) $rentAmount), 'openingMeter' => $meter,
                 'startDate' => $start, 'isActive' => '1'], $actor);
             if (!$this->saved($tenant, 'Tenant', $problems)) {
                 continue;
